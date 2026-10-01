@@ -5,20 +5,17 @@ import 'package:flutter/services.dart';
 class AppFloatingNavItem {
   final IconData unselectedIcon;
   final IconData selectedIcon;
-  final String label;
 
   const AppFloatingNavItem({
     required this.unselectedIcon,
     required this.selectedIcon,
-    required this.label,
   });
 }
 
-/// 苹果悬浮胶囊底栏（Apple Floating Frosted Glass Bar）：
-/// 1. 外层 Container 负责扩散阴影，内层通过 ClipRRect + BackdropFilter 实现纯正的高斯模糊毛玻璃；
-///    之所以分两层，是因为 ClipRRect 会直接裁切掉同层级的 BoxShadow 投影，导致弥散悬浮阴影丢失。
-/// 2. 内部带有跟随当前 Tab 平滑滑动的微透指示器滑块（AnimatedAlign）；
-/// 3. 与 Scaffold(extendBody: true) 配合使用，使滚动列表内容在底栏下方穿透并呈现动态磨砂质感。
+/// 苹果悬浮极简纯图标毛玻璃胶囊底栏（Apple Floating Frosted Dock）：
+/// 1. 外层扩散阴影，内层通过 ClipRRect + BackdropFilter(sigma: 20) 实现通透的苹果磨砂毛玻璃质感；
+/// 2. 纯图标极简布局，移除多余文字，高度精简为 52px，最大宽度 280px；
+/// 3. 通透半透明底色（约 68% 透明度），结合 Scaffold(extendBody: true) 实现内容穿透与动态高斯模糊。
 class AppFloatingBottomBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -54,14 +51,14 @@ class AppFloatingBottomBar extends StatelessWidget {
           heightFactor: 1,
           child: ConstrainedBox(
             constraints: const BoxConstraints(
-              maxWidth: 460,
-              minHeight: 64,
-              maxHeight: 64,
+              maxWidth: 280,
+              minHeight: 52,
+              maxHeight: 52,
             ),
             // 外层：提供悬浮弥散阴影
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(32),
+                borderRadius: BorderRadius.circular(26),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withAlpha(isDark ? 80 : 25),
@@ -72,29 +69,29 @@ class AppFloatingBottomBar extends StatelessWidget {
               ),
               // 内层：高斯模糊毛玻璃裁剪
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(32),
+                borderRadius: BorderRadius.circular(26),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                     decoration: BoxDecoration(
-                      // 通透的磨砂半透底色：暗色 80% 黑，浅色 80% 白
+                      // 高透磨砂质感底色：约 68%~70% 不透明度，确保底层卡片与内容色彩能清晰折射透出
                       color: isDark
-                          ? const Color(0xCC1B1B1F)
-                          : Colors.white.withAlpha(205),
-                      borderRadius: BorderRadius.circular(32),
+                          ? const Color(0xB31C1C1E)
+                          : Colors.white.withAlpha(175),
+                      borderRadius: BorderRadius.circular(26),
                       border: Border.all(
                         color: isDark
-                            ? Colors.white.withAlpha(36)
-                            : Colors.black.withAlpha(18),
+                            ? Colors.white.withAlpha(30)
+                            : Colors.black.withAlpha(15),
                         width: 1.2,
                       ),
                     ),
                     child: Stack(
                       children: [
-                        // 平滑移动的跟随高亮指示器滑块
+                        // 平滑跟随的药丸指示器滑块
                         AnimatedAlign(
-                          duration: const Duration(milliseconds: 250),
+                          duration: const Duration(milliseconds: 240),
                           curve: Curves.easeOutCubic,
                           alignment: items.length > 1
                               ? AlignmentDirectional(
@@ -107,9 +104,9 @@ class AppFloatingBottomBar extends StatelessWidget {
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 4),
                               child: Container(
-                                height: 50,
+                                height: 40,
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(24),
+                                  borderRadius: BorderRadius.circular(20),
                                   color: isDark
                                       ? primaryColor.withAlpha(55)
                                       : primaryColor.withAlpha(28),
@@ -119,7 +116,7 @@ class AppFloatingBottomBar extends StatelessWidget {
                           ),
                         ),
 
-                        // 各导航项图标与文本
+                        // 各导航项纯图标展示
                         Row(
                           children: List.generate(items.length, (i) {
                             final isSelected = currentIndex == i;
@@ -136,30 +133,12 @@ class AppFloatingBottomBar extends StatelessWidget {
                                   HapticFeedback.lightImpact();
                                   onTap(i);
                                 },
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      isSelected ? item.selectedIcon : item.unselectedIcon,
-                                      color: itemColor,
-                                      size: 22,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    AnimatedDefaultTextStyle(
-                                      duration: const Duration(milliseconds: 180),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        height: 1.2,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                        color: itemColor,
-                                      ),
-                                      child: Text(
-                                        item.label,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
+                                child: Center(
+                                  child: Icon(
+                                    isSelected ? item.selectedIcon : item.unselectedIcon,
+                                    color: itemColor,
+                                    size: 24,
+                                  ),
                                 ),
                               ),
                             );

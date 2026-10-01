@@ -57,17 +57,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           AppFloatingNavItem(
             unselectedIcon: Icons.home_outlined,
             selectedIcon: Icons.home_rounded,
-            label: '首页',
           ),
           AppFloatingNavItem(
             unselectedIcon: Icons.calendar_month_outlined,
             selectedIcon: Icons.calendar_month_rounded,
-            label: '时间表',
           ),
           AppFloatingNavItem(
             unselectedIcon: Icons.settings_outlined,
             selectedIcon: Icons.settings_rounded,
-            label: '设置',
           ),
         ],
       ),

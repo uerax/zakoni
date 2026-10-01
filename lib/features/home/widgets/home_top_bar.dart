@@ -40,19 +40,20 @@ class HomeTopBar extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(100),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
                 height: 52,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
+                  // 高透磨砂质感底色：约 68%~70% 不透明度，确保底层卡片与内容色彩在滚动经过时清晰折射出高斯模糊
                   color: isDark
-                      ? const Color(0xF21B1B1F)
-                      : Colors.white.withAlpha(242),
+                      ? const Color(0xB31C1C1E)
+                      : Colors.white.withAlpha(175),
                   borderRadius: BorderRadius.circular(100),
                   border: Border.all(
                     color: isDark
-                        ? Colors.white.withAlpha(46)
-                        : Colors.black.withAlpha(20),
+                        ? Colors.white.withAlpha(30)
+                        : Colors.black.withAlpha(15),
                     width: 1.2,
                   ),
                 ),
@@ -96,8 +97,9 @@ class HomeTopBar extends StatelessWidget {
     required bool isDark,
   }) {
     return Container(
-      width: 160,
-      height: 40,
+      // 宽度从原本松散的 160px 收紧为 116px，消除两端多余无效空间，使滑块与文字饱满精致
+      width: 116,
+      height: 38,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: isDark

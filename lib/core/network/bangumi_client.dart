@@ -162,8 +162,15 @@ class BangumiClient {
             .whereType<Map<String, dynamic>>()
             .map((entry) {
               final subject = entry['subject'] is Map<String, dynamic>
-                  ? (entry['subject'] as Map<String, dynamic>)
-                  : entry;
+                  ? Map<String, dynamic>.from(entry['subject'] as Map<String, dynamic>)
+                  : Map<String, dynamic>.from(entry);
+              // 关键：next.bgm.tv 返回的热度值保存在外层 entry['count'] 中，需合并注入到 subject 中以正确生成 item.heat
+              if (entry['count'] != null) {
+                subject['heat'] = entry['count'];
+              }
+              if (entry['watchers'] != null) {
+                subject['watchers'] = entry['watchers'];
+              }
               return BangumiItem.fromJson(subject);
             })
             .toList();

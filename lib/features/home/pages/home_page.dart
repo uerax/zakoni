@@ -58,35 +58,41 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
+    final safeTop = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // 顶部胶囊导航栏：【番剧】、【分类】、搜索、用户头像
-            HomeTopBar(
-              selectedIndex: _headerTabIndex,
-              onTabChanged: (index) {
-                setState(() {
-                  _headerTabIndex = index;
-                });
-              },
-            ),
+      body: Stack(
+        children: [
+          // 1. 底层：内容滚动区域（贯通至屏幕顶端，实现内容上滑时穿透顶部胶囊并呈现高斯模糊）
+          Positioned.fill(
+            child: _headerTabIndex == 0
+                ? _buildAnimeContent(context, theme, safeTop)
+                : SafeArea(child: _buildCategoryPlaceholder(context, theme)),
+          ),
 
-            // 主体区域
-            Expanded(
-              child: _headerTabIndex == 0
-                  ? _buildAnimeContent(context, theme)
-                  : _buildCategoryPlaceholder(context, theme),
+          // 2. 顶层：悬浮的毛玻璃顶部胶囊导航栏
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: HomeTopBar(
+                selectedIndex: _headerTabIndex,
+                onTabChanged: (index) {
+                  setState(() {
+                    _headerTabIndex = index;
+                  });
+                },
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildAnimeContent(BuildContext context, ThemeData theme) {
+  Widget _buildAnimeContent(BuildContext context, ThemeData theme, double safeTop) {
     return FutureBuilder<({List<BangumiItem> tv, List<BangumiItem> movies, List<BangumiItem> ova})>(
       future: _dataFuture,
       builder: (context, snapshot) {
@@ -156,6 +162,11 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             // 核心防卡顿防线：精确限制可视区外预加载距离（250px），未进入视口的卡片不发起网络下载
             scrollCacheExtent: const ScrollCacheExtent.pixels(250),
             slivers: [
+              // 顶部预留安全高度（状态栏 + 胶囊栏高度），首屏自然位于胶囊下方，上滑时内容穿透并呈现高斯模糊
+              SliverToBoxAdapter(
+                child: SizedBox(height: safeTop + 64),
+              ),
+
               // 热门排行单行横向拖动板块 (Anibaka 经典交互，支持 TV / 剧场版 / OVA 切换)
               SliverToBoxAdapter(
                 child: RankHorizontalSection(
@@ -164,12 +175,6 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                   onCategoryChanged: (index) {
                     setState(() {
                       _rankCategoryIndex = index;
-                    });
-                  },
-                  onMoreTap: () {
-                    // 与 Animaku 一致：点击“更多”直接切换到分类过滤视图
-                    setState(() {
-                      _headerTabIndex = 1;
                     });
                   },
                 ),

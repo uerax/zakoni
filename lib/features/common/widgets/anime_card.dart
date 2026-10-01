@@ -36,6 +36,25 @@ class AnimeCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     resizeWidth: 320,
                   ),
+                  // 封面底部暗色渐变遮罩
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: 38,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withAlpha(180),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                   // 右上角评分角标
                   if (item.ratingScore > 0)
                     Positioned(
@@ -64,21 +83,21 @@ class AnimeCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // 左下角状态/在看/热度角标
+                  // 左下角状态/已看/在看/热度角标（Animaku 原生规范，优先展示已看人数）
                   if (_buildBottomBadgeText() != null)
                     Positioned(
-                      bottom: 6,
+                      bottom: 5,
                       left: 6,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE91E63).withAlpha(200),
+                          color: Colors.black.withAlpha(140),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           _buildBottomBadgeText()!,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Color(0xFFFFD54F),
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -122,11 +141,14 @@ class AnimeCard extends StatelessWidget {
   }
 
   String? _buildBottomBadgeText() {
-    if (item.heat != null && item.heat! > 0) {
-      return formatHeatLabel(item.heat);
+    if (item.collect != null && item.collect! > 0) {
+      return '${formatCompactCount(item.collect)} 已看';
     }
     if (item.doing != null && item.doing! > 0) {
-      return formatDoingLabel(item.doing);
+      return '${formatCompactCount(item.doing)} 在看';
+    }
+    if (item.heat != null && item.heat! > 0) {
+      return '${formatCompactCount(item.heat)} 热度';
     }
     return null;
   }

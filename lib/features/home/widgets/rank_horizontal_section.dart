@@ -25,14 +25,12 @@ class RankHorizontalSection extends StatefulWidget {
   final List<BangumiItem> items;
   final int selectedCategoryIndex;
   final ValueChanged<int> onCategoryChanged;
-  final VoidCallback? onMoreTap;
 
   const RankHorizontalSection({
     super.key,
     required this.items,
     required this.selectedCategoryIndex,
     required this.onCategoryChanged,
-    this.onMoreTap,
   });
 
   @override
@@ -57,6 +55,39 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// 依据 Animaku 规范解析卡片左下角统计指标：
+  /// 1. 热门排行/TV类：必定展示热度值（如 "4.6k 热度"）；
+  /// 2. 剧场版/OVA/其他类：优先展示已看人数（如 "5.9w 已看"）；
+  /// 3. 兜底：若无上述字段则顺次取在看人数或热度。
+  ({String count, String label})? _resolveCardStat(BangumiItem item) {
+    if (widget.selectedCategoryIndex == 0) {
+      if (item.heat != null && item.heat! > 0) {
+        return (count: formatCompactCount(item.heat), label: '热度');
+      }
+      if (item.doing != null && item.doing! > 0) {
+        return (count: formatCompactCount(item.doing), label: '热度');
+      }
+      if (item.collect != null && item.collect! > 0) {
+        return (count: formatCompactCount(item.collect), label: '热度');
+      }
+      return null;
+    }
+
+    if (item.collect != null && item.collect! > 0) {
+      return (count: formatCompactCount(item.collect), label: '已看');
+    }
+
+    if (item.heat != null && item.heat! > 0) {
+      return (count: formatCompactCount(item.heat), label: '热度');
+    }
+
+    if (item.doing != null && item.doing! > 0) {
+      return (count: formatCompactCount(item.doing), label: '在看');
+    }
+
+    return null;
   }
 
   @override
@@ -108,12 +139,13 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
 
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       child: Row(
         children: [
-          // "🏆 热门排行"大标题（去除了左侧竖条边框）
+          // 左侧："🏆 热门排行"大标题
           Text(
             '🏆 热门排行',
             style: TextStyle(
@@ -123,67 +155,102 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
               color: theme.textTheme.titleLarge?.color,
             ),
           ),
-          const SizedBox(width: 14),
 
-          // 中间：【TV】、【剧场版】、【OVA】切换选择器（小字号精致呈现）
+          const Spacer(),
+
+          // 右侧：Anibaka 经典微胶囊选项卡切换器（TV / 剧场版 / OVA）
+          _buildMiniCapsuleSelector(context, theme, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniCapsuleSelector(
+    BuildContext context,
+    ThemeData theme,
+    bool isDark,
+  ) {
+    return Container(
+      width: 168,
+      height: 38,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withAlpha(36)
+            : Colors.black.withAlpha(18),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Stack(
+        children: [
+          // 平滑移动的微渐变高亮指示器药丸滑块（与顶部胶囊完全相同参数）
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: AlignmentDirectional(
+              -1 + 2 * widget.selectedCategoryIndex / (RankHorizontalSection.categories.length - 1),
+              0,
+            ),
+            child: FractionallySizedBox(
+              widthFactor: 1 / RankHorizontalSection.categories.length,
+              heightFactor: 1.0,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      theme.colorScheme.primary,
+                      theme.colorScheme.primary.withAlpha(217),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(100),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withAlpha(80),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // 选项文字样式：100% 复制自顶部胶囊，确保字号、字重、字距、颜色完全一致
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: List.generate(RankHorizontalSection.categories.length, (index) {
               final isSelected = widget.selectedCategoryIndex == index;
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  widget.onCategoryChanged(index);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    style: TextStyle(
-                      // 精巧小字号，与大标题形成鲜明层级，且保持固定字号杜绝布局抖动
-                      fontSize: 12.5,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected
-                          ? theme.colorScheme.primary
-                          : theme.textTheme.bodyMedium?.color?.withAlpha(120),
+              final text = RankHorizontalSection.categories[index];
+
+              return Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    widget.onCategoryChanged(index);
+                  },
+                  child: Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                        letterSpacing: isSelected ? 1.2 : 0.8,
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark
+                                ? Colors.white.withAlpha(217)
+                                : Colors.black.withAlpha(191)),
+                      ),
+                      child: Text(
+                        text,
+                        maxLines: 1,
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                    child: Text(RankHorizontalSection.categories[index]),
                   ),
                 ),
               );
             }),
-          ),
-
-          const Spacer(),
-
-          // 右侧：与 Animaku 一致的“更多 >”快速跳转分类过滤按钮
-          InkWell(
-            onTap: widget.onMoreTap,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '更多',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 11,
-                    color: theme.colorScheme.primary,
-                  ),
-                ],
-              ),
-            ),
           ),
         ],
       ),
@@ -193,6 +260,7 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
   Widget _buildRankCard(BuildContext context, BangumiItem item, int index) {
     final rank = index + 1;
     final rankColor = _getRankColor(rank);
+    final stat = _resolveCardStat(item);
 
     return Padding(
       padding: const EdgeInsets.only(right: 12),
@@ -203,7 +271,7 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 封面图片区（带金银铜排名勋章与评分）
+              // 封面图片区（带金银铜排名勋章、底部渐变、左下角热度/已看与右下角评分）
               SizedBox(
                 height: RankHorizontalSection.cardHeight,
                 child: Stack(
@@ -224,7 +292,7 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
                     ),
                     // 左上角排名勋章
                     _buildRankBadge(rank, rankColor),
-                    // 右上角评分角标
+                    // 右上角评分角标（保持原本样式）
                     if (item.ratingScore > 0)
                       Positioned(
                         top: 4,
@@ -250,6 +318,55 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
                               ),
                             ],
                           ),
+                        ),
+                      ),
+                    // 封面底部暗色渐变遮罩（确保左下角热度/已看人数清晰锐利）
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 40,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withAlpha(200),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // 左下角：热度值（TV热门分类优先）或已看人数（剧场版/OVA/其他分类，对齐 Animaku 规范）
+                    if (stat != null)
+                      Positioned(
+                        left: 6,
+                        bottom: 4,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              stat.count,
+                              style: const TextStyle(
+                                color: Color(0xFFFFD54F),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              stat.label,
+                              style: TextStyle(
+                                color: Colors.white.withAlpha(210),
+                                fontSize: 9.5,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zakoni/core/network/bangumi_client.dart';
 import 'package:zakoni/main.dart';
@@ -43,7 +44,14 @@ void main() {
     expect(find.text('TV'), findsOneWidget);
     expect(find.text('剧场版'), findsOneWidget);
     expect(find.text('OVA'), findsOneWidget);
-    expect(find.text('更多'), findsOneWidget);
+
+    // 测试点击胶囊切换到“剧场版”和“OVA”
+    await tester.tap(find.text('剧场版'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OVA'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('TV'));
+    await tester.pumpAndSettle();
 
     // 切换到分类标签
     await tester.tap(find.text('分类'));
@@ -55,22 +63,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('🏆 热门排行'), findsOneWidget);
 
-    // 测试点击热门排行的“更多”，快速切换到分类 Tab
-    await tester.tap(find.text('更多'));
-    await tester.pumpAndSettle();
-    expect(find.text('分类检索功能设计中'), findsOneWidget);
-
-    // 切回番剧标签
-    await tester.tap(find.text('番剧'));
-    await tester.pumpAndSettle();
-
-    // 切换到底部时间表
-    await tester.tap(find.text('时间表'));
+    // 切换到底部时间表（纯图标导航栏）
+    await tester.tap(find.byIcon(Icons.calendar_month_outlined));
     await tester.pumpAndSettle();
     expect(find.text('每日放送'), findsOneWidget);
 
     // 切换到底部设置
-    await tester.tap(find.text('设置'));
+    await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
     expect(find.text('Bangumi 网络线路'), findsOneWidget);
     expect(find.text('镜像加速线路（推荐）'), findsOneWidget);
