@@ -1,0 +1,360 @@
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import '../../../core/models/bangumi/bangumi_item.dart';
+import '../../common/widgets/anime_card.dart';
+import '../../common/widgets/cached_anime_image.dart';
+
+/// 热门排行单行横向拖动组件（Anibaka 经典交互）：
+/// 1. 左侧标题“🏆 热门排行”，中间支持【TV】/【剧场版】/【OVA】分类切换，右侧提供【更多 >】快速跳转分类过滤；
+/// 2. 横向 ListView 设置 scrollCacheExtent: 150，严格控制可视区预加载范围，配合 CachedAnimeImage 实现
+///    “只有快滑动接近视口才触发图片下载”，彻底避免首屏几十张图片瞬时高并发堵塞网络和掉帧；
+/// 3. 支持桌面端双重滚动适配：鼠标左键按住拖拽滑动 + 普通鼠标滚轮上下滚动自动转横向平滑滚动。
+class RankHorizontalSection extends StatefulWidget {
+  static const double cardWidth = 136;
+  static const double cardAspectRatio = 2 / 3;
+  static const double cardHeight = cardWidth / cardAspectRatio; // 204
+
+  static const Color _goldColor = Color(0xFFFFD700);
+  static const Color _silverColor = Color(0xFFC0C0C0);
+  static const Color _bronzeColor = Color(0xFFCD7F32);
+
+  static const List<String> categories = ['TV', '剧场版', 'OVA'];
+
+  final List<BangumiItem> items;
+  final int selectedCategoryIndex;
+  final ValueChanged<int> onCategoryChanged;
+  final VoidCallback? onMoreTap;
+
+  const RankHorizontalSection({
+    super.key,
+    required this.items,
+    required this.selectedCategoryIndex,
+    required this.onCategoryChanged,
+    this.onMoreTap,
+  });
+
+  @override
+  State<RankHorizontalSection> createState() => _RankHorizontalSectionState();
+}
+
+class _RankHorizontalSectionState extends State<RankHorizontalSection> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void didUpdateWidget(covariant RankHorizontalSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 切换分类标签时，将横向滚动列表平滑重置回首项
+    if (oldWidget.selectedCategoryIndex != widget.selectedCategoryIndex) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHeader(context),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: RankHorizontalSection.cardHeight + 46,
+          child: widget.items.isEmpty
+              ? _buildEmptyOrLoading(context)
+              : Listener(
+                  // 针对桌面端（Windows/macOS）的鼠标滚轮适配：
+                  // 将普通垂直滚轮滚动的 delta 平滑映射到横向滚动，无需用户按住 Shift
+                  onPointerSignal: (pointerSignal) {
+                    if (pointerSignal is PointerScrollEvent) {
+                      final double delta = pointerSignal.scrollDelta.dy != 0
+                          ? pointerSignal.scrollDelta.dy
+                          : pointerSignal.scrollDelta.dx;
+                      if (delta != 0 && _scrollController.hasClients) {
+                        final double targetOffset = (_scrollController.offset + delta).clamp(
+                          0.0,
+                          _scrollController.position.maxScrollExtent,
+                        );
+                        _scrollController.jumpTo(targetOffset);
+                      }
+                    }
+                  },
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    key: ValueKey('rank_list_${widget.selectedCategoryIndex}'),
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    // 核心防卡顿防线：仅预加载可视区外 150px (约 1 张卡片)，未滚动进入的图片不发起解码与下载
+                    scrollCacheExtent: const ScrollCacheExtent.pixels(150),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: widget.items.length,
+                    itemBuilder: (context, index) {
+                      return _buildRankCard(context, widget.items[index], index);
+                    },
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        children: [
+          // "🏆 热门排行"大标题（去除了左侧竖条边框）
+          Text(
+            '🏆 热门排行',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+              color: theme.textTheme.titleLarge?.color,
+            ),
+          ),
+          const SizedBox(width: 14),
+
+          // 中间：【TV】、【剧场版】、【OVA】切换选择器（小字号精致呈现）
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(RankHorizontalSection.categories.length, (index) {
+              final isSelected = widget.selectedCategoryIndex == index;
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  widget.onCategoryChanged(index);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    style: TextStyle(
+                      // 精巧小字号，与大标题形成鲜明层级，且保持固定字号杜绝布局抖动
+                      fontSize: 12.5,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.textTheme.bodyMedium?.color?.withAlpha(120),
+                    ),
+                    child: Text(RankHorizontalSection.categories[index]),
+                  ),
+                ),
+              );
+            }),
+          ),
+
+          const Spacer(),
+
+          // 右侧：与 Animaku 一致的“更多 >”快速跳转分类过滤按钮
+          InkWell(
+            onTap: widget.onMoreTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '更多',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 11,
+                    color: theme.colorScheme.primary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRankCard(BuildContext context, BangumiItem item, int index) {
+    final rank = index + 1;
+    final rankColor = _getRankColor(rank);
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: () => showAnimeDetailSheet(context, item),
+        child: SizedBox(
+          width: RankHorizontalSection.cardWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 封面图片区（带金银铜排名勋章与评分）
+              SizedBox(
+                height: RankHorizontalSection.cardHeight,
+                child: Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: AspectRatio(
+                        aspectRatio: RankHorizontalSection.cardAspectRatio,
+                        child: CachedAnimeImage(
+                          imageUrl: item.thumbnailUrl.isNotEmpty
+                              ? item.thumbnailUrl
+                              : item.coverUrl,
+                          width: RankHorizontalSection.cardWidth,
+                          height: RankHorizontalSection.cardHeight,
+                          resizeWidth: 300,
+                        ),
+                      ),
+                    ),
+                    // 左上角排名勋章
+                    _buildRankBadge(rank, rankColor),
+                    // 右上角评分角标
+                    if (item.ratingScore > 0)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withAlpha(180),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${item.ratingScore}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // 标题固定 32px 高度（恒定容纳 2 行高度），杜绝不同条目标题行数差异造成的卡片垂直高度抖动
+              SizedBox(
+                height: 32,
+                child: Text(
+                  item.preferredName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRankBadge(int rank, Color rankColor) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: rankColor,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(8),
+            bottomRight: Radius.circular(8),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(40),
+              blurRadius: 3,
+              offset: const Offset(1, 1),
+            ),
+          ],
+        ),
+        child: Text(
+          '#$rank',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontStyle: FontStyle.italic,
+            fontSize: 11.5,
+            height: 1.1,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getRankColor(int rank) {
+    if (rank == 1) return RankHorizontalSection._goldColor;
+    if (rank == 2) return RankHorizontalSection._silverColor;
+    if (rank == 3) return RankHorizontalSection._bronzeColor;
+    return Colors.blueGrey.withAlpha(200);
+  }
+
+  Widget _buildEmptyOrLoading(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: 4,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: SizedBox(
+            width: RankHorizontalSection.cardWidth,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: RankHorizontalSection.cardHeight,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(100),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  height: 14,
+                  width: 90,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(100),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
