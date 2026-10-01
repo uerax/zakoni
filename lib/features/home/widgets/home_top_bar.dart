@@ -155,18 +155,26 @@ class HomeTopBar extends StatelessWidget {
                     child: AnimatedDefaultTextStyle(
                       duration: const Duration(milliseconds: 200),
                       style: TextStyle(
+                        fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'HarmonyOS Sans',
                         fontSize: 14,
+                        height: 1.0,
                         fontWeight: selectedIndex == 0
-                            ? FontWeight.w900
-                            : FontWeight.w700,
-                        letterSpacing: selectedIndex == 0 ? 1.2 : 0.8,
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        letterSpacing: selectedIndex == 0 ? 0.8 : 0.4,
                         color: selectedIndex == 0
                             ? Colors.white
                             : (isDark
                                 ? Colors.white.withAlpha(217)
                                 : Colors.black.withAlpha(191)),
                       ),
-                      child: const Text('番剧'),
+                      child: const Text(
+                        '番剧',
+                        textHeightBehavior: TextHeightBehavior(
+                          applyHeightToFirstAscent: false,
+                          applyHeightToLastDescent: false,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -182,18 +190,26 @@ class HomeTopBar extends StatelessWidget {
                     child: AnimatedDefaultTextStyle(
                       duration: const Duration(milliseconds: 200),
                       style: TextStyle(
+                        fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'HarmonyOS Sans',
                         fontSize: 14,
+                        height: 1.0,
                         fontWeight: selectedIndex == 1
-                            ? FontWeight.w900
-                            : FontWeight.w700,
-                        letterSpacing: selectedIndex == 1 ? 1.2 : 0.8,
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        letterSpacing: selectedIndex == 1 ? 0.8 : 0.4,
                         color: selectedIndex == 1
                             ? Colors.white
                             : (isDark
                                 ? Colors.white.withAlpha(217)
                                 : Colors.black.withAlpha(191)),
                       ),
-                      child: const Text('分类'),
+                      child: const Text(
+                        '分类',
+                        textHeightBehavior: TextHeightBehavior(
+                          applyHeightToFirstAscent: false,
+                          applyHeightToLastDescent: false,
+                        ),
+                      ),
                     ),
                   ),
                 ),

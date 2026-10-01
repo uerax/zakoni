@@ -215,11 +215,12 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
               ),
             ),
           ),
-          // 选项文字样式：100% 复制自顶部胶囊，确保字号、字重、字距、颜色完全一致
+          // 选项文字样式：严格按文字度量对齐，显式锁定同一字体 + height: 1.0 + TextHeightBehavior 消除度量高低差与伪粗体毛刺
           Row(
             children: List.generate(RankHorizontalSection.categories.length, (index) {
               final isSelected = widget.selectedCategoryIndex == index;
               final text = RankHorizontalSection.categories[index];
+              final fontFamily = theme.textTheme.bodyMedium?.fontFamily ?? 'HarmonyOS Sans';
 
               return Expanded(
                 child: GestureDetector(
@@ -232,9 +233,12 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
                     child: AnimatedDefaultTextStyle(
                       duration: const Duration(milliseconds: 200),
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                        letterSpacing: isSelected ? 1.2 : 0.8,
+                        fontFamily: fontFamily,
+                        fontSize: 13.5,
+                        height: 1.0,
+                        // 选中采用真实 Bold.ttf 对应的 w700，避免 w900 触发引擎人工描边（Synthetic Bold）导致的毛刺与笔画发虚
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        letterSpacing: isSelected ? 0.6 : 0.4,
                         color: isSelected
                             ? Colors.white
                             : (isDark
@@ -245,6 +249,10 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
                         text,
                         maxLines: 1,
                         textAlign: TextAlign.center,
+                        textHeightBehavior: const TextHeightBehavior(
+                          applyHeightToFirstAscent: false,
+                          applyHeightToLastDescent: false,
+                        ),
                       ),
                     ),
                   ),
