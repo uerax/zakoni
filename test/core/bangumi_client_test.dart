@@ -192,5 +192,33 @@ void main() {
       expect(res.items.first.id, 1001);
       expect(res.items.first.nameCn, '热血动画');
     });
+
+    test('searchWithTotal smartly branches rank filter for historical vs current season', () async {
+      final requestedFilters = <Map<String, dynamic>>[];
+      dio = Dio(BaseOptions(baseUrl: 'https://api.bgm.tv'));
+      dio.httpClientAdapter = MockAdapter((options) {
+        final payload = options.data as Map<String, dynamic>;
+        requestedFilters.add(Map<String, dynamic>.from(payload['filter'] as Map<String, dynamic>));
+        return {
+          'statusCode': 200,
+          'data': {'total': 10, 'limit': 24, 'offset': 0, 'data': []}
+        };
+      });
+      client = BangumiClient(dio: dio);
+
+      // 1. 历史已完结年份 (如 2020) 按 score 排序：应注入 rank > 0 过滤，保障榜单质量
+      await client.searchWithTotal('', year: 2020, sort: 'score');
+      expect(requestedFilters.first.containsKey('rank'), true);
+      expect(requestedFilters.first['rank'], ['>0', '<=99999']);
+
+      // 2. 当前正在播出的当季新番 (年份 >= 当前年份) 按 score 排序：不注入 rank 过滤，确保全量展示新番
+      await client.searchWithTotal(
+        '',
+        year: DateTime.now().year,
+        airDate: ['>=${DateTime.now().year}-10-01', '<${DateTime.now().year + 1}-01-01'],
+        sort: 'score',
+      );
+      expect(requestedFilters.last.containsKey('rank'), false);
+    });
   });
 }

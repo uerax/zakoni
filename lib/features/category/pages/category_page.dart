@@ -227,6 +227,7 @@ class _CategoryPageState extends State<CategoryPage>
 
       if (_selectedMonth != null && _selectedMonth! > 0) {
         final targetYear = _selectedYear ?? currentYear;
+        yearParam = targetYear;
         airDate = seasonAirDate(targetYear, _selectedMonth!);
       } else if (_selectedYear != null) {
         yearParam = _selectedYear;
@@ -279,6 +280,7 @@ class _CategoryPageState extends State<CategoryPage>
 
       if (_selectedMonth != null && _selectedMonth! > 0) {
         final targetYear = _selectedYear ?? currentYear;
+        yearParam = targetYear;
         airDate = seasonAirDate(targetYear, _selectedMonth!);
       } else if (_selectedYear != null) {
         yearParam = _selectedYear;
