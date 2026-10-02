@@ -140,6 +140,17 @@ class _CategoryPageState extends State<CategoryPage>
       (_selectedTag == null || _selectedTag == '全部') &&
       _selectedSort == 'heat';
 
+  /// 是否处于初始默认选项（未被用户二次修改）
+  bool get isDefaultState {
+    if (widget.initialCategory != null && widget.initialCategory!.isNotEmpty) {
+      return _selectedTag == widget.initialCategory &&
+          _selectedYear == null &&
+          _selectedMonth == null &&
+          _selectedSort == 'heat';
+    }
+    return isCurrentSeason;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -325,12 +336,19 @@ class _CategoryPageState extends State<CategoryPage>
     _fetchFirstPage();
   }
 
-  /// 清空所有筛选条件，查看全部历史番剧
-  void _clearAllFilters() {
+  /// 复原到初始默认选项（若有 initialCategory 则恢复该分类，否则复原为当季新番默认选项）
+  void _resetToDefault() {
+    if (isDefaultState) return;
     setState(() {
-      _selectedTag = null;
-      _selectedYear = null;
-      _selectedMonth = null;
+      if (widget.initialCategory != null && widget.initialCategory!.isNotEmpty) {
+        _selectedTag = widget.initialCategory;
+        _selectedYear = null;
+        _selectedMonth = null;
+      } else {
+        _selectedTag = null;
+        _selectedYear = currentYear;
+        _selectedMonth = currentSeasonMonth;
+      }
       _selectedSort = 'heat';
       _isTagExpanded = false;
     });
@@ -420,8 +438,8 @@ class _CategoryPageState extends State<CategoryPage>
                           // 左侧：年份下拉菜单
                           _buildYearDropdownMenu(theme, isDark),
                           const Spacer(),
-                          // 中间：若非默认条件，展示快速“清空”小按钮
-                          if (!isCurrentSeason) ...[
+                          // 中间：若非默认条件，展示快速“重置”小按钮，点击复原回初始状态
+                          if (!isDefaultState) ...[
                             _buildResetActionChip(theme, isDark),
                             const SizedBox(width: 8),
                           ],
@@ -1123,12 +1141,12 @@ class _CategoryPageState extends State<CategoryPage>
     );
   }
 
-  /// 一键清空重置胶囊
+  /// 一键复原回初始默认选项的重置胶囊
   Widget _buildResetActionChip(ThemeData theme, bool isDark) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: _clearAllFilters,
+        onTap: _resetToDefault,
         borderRadius: BorderRadius.circular(100),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
@@ -1144,15 +1162,16 @@ class _CategoryPageState extends State<CategoryPage>
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Icons.refresh_rounded,
+                Icons.restart_alt_rounded,
                 size: 13,
                 color: isDark ? Colors.white70 : Colors.black87,
               ),
               const SizedBox(width: 3),
               Text(
-                '清空',
+                '重置',
                 style: TextStyle(
                   fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
                   color: isDark ? Colors.white70 : Colors.black87,
                 ),
               ),
@@ -1259,9 +1278,9 @@ class _CategoryPageState extends State<CategoryPage>
               ),
               const SizedBox(height: 20),
               OutlinedButton.icon(
-                onPressed: _clearAllFilters,
-                icon: const Icon(Icons.tune_rounded, size: 16),
-                label: const Text('清空筛选'),
+                onPressed: _resetToDefault,
+                icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                label: const Text('恢复默认'),
               ),
             ],
           ),
