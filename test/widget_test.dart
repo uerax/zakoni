@@ -67,13 +67,13 @@ void main() {
     // 切换到底部设置
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('个性化定制 (图标与背景壁纸)'), findsOneWidget);
+    expect(find.text('网络线路'), findsOneWidget);
+    expect(find.text('镜像加速'), findsOneWidget);
+    expect(find.text('官方直连'), findsOneWidget);
 
-    // 向下滚动设置项，验证网络线路选项
+    // 向下滚动设置项，验证个性化外观选项
     await tester.drag(find.byType(ListView), const Offset(0, -450));
     await tester.pumpAndSettle();
-    expect(find.text('Bangumi 网络线路'), findsOneWidget);
-    expect(find.text('镜像加速线路（推荐）'), findsOneWidget);
-    expect(find.text('官方直连线路'), findsOneWidget);
+    expect(find.text('个性化外观'), findsOneWidget);
   });
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/network/bangumi_client.dart';
+import 'core/providers/bangumi_providers.dart';
 import 'core/utils/font_manager.dart';
 import 'core/utils/scroll_behavior.dart';
 import 'features/main_navigation_shell.dart';
@@ -19,9 +21,13 @@ class ZakoniApp extends StatelessWidget {
     // 采用 Anibaka 经典高雅动漫海蓝作为全局主强调色
     const primaryColor = Color(0xFF0077B6);
 
-    return ListenableBuilder(
-      listenable: FontManager.instance,
-      builder: (context, _) {
+    return ProviderScope(
+      overrides: [
+        if (client != null) bangumiClientProvider.overrideWithValue(client!),
+      ],
+      child: ListenableBuilder(
+        listenable: FontManager.instance,
+        builder: (context, _) {
         final currentFont = FontManager.instance.activeFontFamily;
         final fontFallback = FontManager.fallbackFontFamilies;
 
@@ -94,6 +100,7 @@ class ZakoniApp extends StatelessWidget {
           home: MainNavigationShell(client: client),
         );
       },
-    );
-  }
+    ),
+  );
+}
 }

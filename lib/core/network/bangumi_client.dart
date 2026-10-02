@@ -6,93 +6,40 @@ import '../models/bangumi/bangumi_collection.dart';
 import '../models/bangumi/bangumi_comment.dart';
 import '../models/bangumi/bangumi_episode.dart';
 import '../models/bangumi/bangumi_item.dart';
+import '../models/bangumi/bangumi_search_result.dart';
 import '../models/bangumi/bangumi_user.dart';
 import '../utils/image_utils.dart';
+import '../utils/timed_cache.dart';
+import 'bangumi_api_exception.dart';
+import 'bangumi_search_query_builder.dart';
+import 'bangumi_source_preset.dart';
+import 'bangumi_user_agent.dart';
 
-enum BangumiSourcePreset {
-  mirror(
-    'https://bgmapi.anibt.net',
-    'bgmimg.anibt.net',
-    '镜像加速线路 (推荐，Anycast CDN 国内直连)',
-  ),
-  official(
-    'https://api.bgm.tv',
-    'lain.bgm.tv',
-    '官方直连线路 (海外用户推荐)',
-  );
-
-  final String apiBase;
-  final String imageHost;
-  final String label;
-
-  const BangumiSourcePreset(this.apiBase, this.imageHost, this.label);
-}
-
-class BangumiApiException implements Exception {
-  final int? statusCode;
-  final String message;
-  final dynamic error;
-
-  const BangumiApiException(this.message, {this.statusCode, this.error});
-
-  @override
-  String toString() => 'BangumiApiException: [$statusCode] $message';
-}
-
-/// Bangumi 搜索与分类检索分页结果封装
-class BangumiSearchResult {
-  final List<BangumiItem> items;
-  final int total;
-  final int limit;
-  final int offset;
-
-  const BangumiSearchResult({
-    required this.items,
-    required this.total,
-    required this.limit,
-    required this.offset,
-  });
-
-  bool get hasMore => offset + items.length < total;
-
-  static const empty = BangumiSearchResult(
-    items: [],
-    total: 0,
-    limit: 20,
-    offset: 0,
-  );
-}
+export '../models/bangumi/bangumi_search_result.dart';
+export 'bangumi_api_exception.dart';
+export 'bangumi_source_preset.dart';
+export 'bangumi_user_agent.dart';
 
 class BangumiClient {
   /// 遵循 Bangumi API 开发者准则规范配置合规的 User-Agent
-  /// 包含开发者个人 ID、应用名称、动态版本号变量及项目主页
-  static String get defaultUserAgent => AppConstants.bangumiUserAgent;
+  static String get defaultUserAgent => BangumiUserAgent.defaultUserAgent;
 
   /// 支持按动态版本号与可选平台标识构造合规 User-Agent
   static String buildUserAgent({
     String version = AppConstants.appVersion,
     String? platform,
-  }) {
-    final platformInfo = platform != null ? ' ($platform)' : '';
-    return '${AppConstants.developerId}/${AppConstants.appName}/$version$platformInfo (${AppConstants.projectUrl})';
-  }
+  }) =>
+      BangumiUserAgent.build(version: version, platform: platform);
 
   final Dio _dio;
   String _baseUrl;
   BangumiSourcePreset _sourcePreset = BangumiSourcePreset.mirror;
 
   // 内存防抖缓存，避免同一会话在页面/Tab之间切换时无意义地重复请求接口
-  List<BangumiCalendarDay>? _calendarCache;
-  DateTime? _calendarCacheTime;
-
-  List<BangumiItem>? _trendingCache;
-  DateTime? _trendingCacheTime;
-
-  List<BangumiItem>? _moviesCache;
-  DateTime? _moviesCacheTime;
-
-  List<BangumiItem>? _ovaCache;
-  DateTime? _ovaCacheTime;
+  final _calendarCache = TimedCache<List<BangumiCalendarDay>>();
+  final _trendingCache = TimedCache<List<BangumiItem>>();
+  final _moviesCache = TimedCache<List<BangumiItem>>();
+  final _ovaCache = TimedCache<List<BangumiItem>>();
 
   BangumiClient({
     String? baseUrl,
@@ -135,28 +82,22 @@ class BangumiClient {
   }
 
   void clearCache() {
-    _calendarCache = null;
-    _calendarCacheTime = null;
-    _trendingCache = null;
-    _trendingCacheTime = null;
-    _moviesCache = null;
-    _moviesCacheTime = null;
-    _ovaCache = null;
-    _ovaCacheTime = null;
+    _calendarCache.clear();
+    _trendingCache.clear();
+    _moviesCache.clear();
+    _ovaCache.clear();
   }
 
   /// 获取每日放送时间表 (周一至周日)，带 30 分钟内存持久化缓存
   Future<List<BangumiCalendarDay>> getCalendar({bool forceRefresh = false}) async {
-    if (!forceRefresh && _calendarCache != null && _calendarCacheTime != null) {
-      if (DateTime.now().difference(_calendarCacheTime!).inMinutes < 30) {
-        return _calendarCache!;
-      }
+    if (!forceRefresh && _calendarCache.value != null) {
+      return _calendarCache.value!;
     }
 
     try {
       final res = await _dio.get('/calendar');
       final rawList = res.data;
-      if (rawList is! List) return _calendarCache ?? const [];
+      if (rawList is! List) return _calendarCache.value ?? const [];
 
       final days = rawList.map((day) {
         if (day is Map<String, dynamic>) {
@@ -166,22 +107,19 @@ class BangumiClient {
       }).whereType<BangumiCalendarDay>().toList();
 
       if (days.isNotEmpty) {
-        _calendarCache = days;
-        _calendarCacheTime = DateTime.now();
+        _calendarCache.set(days);
       }
       return days;
     } on DioException catch (e) {
-      if (_calendarCache != null) return _calendarCache!;
+      if (_calendarCache.staleValue != null) return _calendarCache.staleValue!;
       throw _handleDioError('获取每日放送失败', e);
     }
   }
 
   /// 获取首页热门番剧列表 (带内存缓存与多源降级容灾)
   Future<List<BangumiItem>> getTrending({int limit = 18, bool forceRefresh = false}) async {
-    if (!forceRefresh && _trendingCache != null && _trendingCacheTime != null) {
-      if (DateTime.now().difference(_trendingCacheTime!).inMinutes < 30) {
-        return _trendingCache!;
-      }
+    if (!forceRefresh && _trendingCache.value != null) {
+      return _trendingCache.value!;
     }
 
     // 1. 优先尝试 next.bgm.tv /p1/trending/subjects (若无跨域限制或在原生平台)
@@ -210,8 +148,7 @@ class BangumiClient {
             })
             .toList();
         if (items.isNotEmpty) {
-          _trendingCache = items;
-          _trendingCacheTime = DateTime.now();
+          _trendingCache.set(items);
           return items;
         }
       }
@@ -233,21 +170,18 @@ class BangumiClient {
         limit: limit,
       );
       if (items.isNotEmpty) {
-        _trendingCache = items;
-        _trendingCacheTime = DateTime.now();
+        _trendingCache.set(items);
         return items;
       }
     } catch (_) {}
 
-    return _trendingCache ?? const [];
+    return _trendingCache.staleValue ?? const [];
   }
 
   /// 获取热门剧场版列表 (带内存缓存)
   Future<List<BangumiItem>> getHotMovies({int limit = 18, bool forceRefresh = false}) async {
-    if (!forceRefresh && _moviesCache != null && _moviesCacheTime != null) {
-      if (DateTime.now().difference(_moviesCacheTime!).inMinutes < 30) {
-        return _moviesCache!;
-      }
+    if (!forceRefresh && _moviesCache.value != null) {
+      return _moviesCache.value!;
     }
 
     try {
@@ -258,22 +192,19 @@ class BangumiClient {
         limit: limit,
       );
       if (items.isNotEmpty) {
-        _moviesCache = items;
-        _moviesCacheTime = DateTime.now();
+        _moviesCache.set(items);
         return items;
       }
     } catch (e) {
       developer.log('获取热门剧场版失败: $e');
     }
-    return _moviesCache ?? const [];
+    return _moviesCache.staleValue ?? const [];
   }
 
   /// 获取热门 OVA 列表 (带 30 分钟内存持久化缓存)
   Future<List<BangumiItem>> getHotOva({int limit = 18, bool forceRefresh = false}) async {
-    if (!forceRefresh && _ovaCache != null && _ovaCacheTime != null) {
-      if (DateTime.now().difference(_ovaCacheTime!).inMinutes < 30) {
-        return _ovaCache!;
-      }
+    if (!forceRefresh && _ovaCache.value != null) {
+      return _ovaCache.value!;
     }
 
     try {
@@ -284,14 +215,13 @@ class BangumiClient {
         limit: limit,
       );
       if (items.isNotEmpty) {
-        _ovaCache = items;
-        _ovaCacheTime = DateTime.now();
+        _ovaCache.set(items);
         return items;
       }
     } catch (e) {
       developer.log('获取热门 OVA 失败: $e');
     }
-    return _ovaCache ?? const [];
+    return _ovaCache.staleValue ?? const [];
   }
 
   /// 获取番剧条目详情
@@ -375,61 +305,22 @@ class BangumiClient {
     int type = 2, // 2 = 动画
   }) async {
     final trimmed = keyword.trim();
-    // 只有当没有关键词、也没有任何筛选过滤条件时才直接返回空
-    if (trimmed.isEmpty &&
-        (tags == null || tags.isEmpty) &&
-        year == null &&
-        (airDate == null || airDate.isEmpty) &&
-        sort == null) {
+    final payload = BangumiSearchQueryBuilder.buildPayload(
+      keyword: keyword,
+      sort: sort,
+      tags: tags,
+      year: year,
+      airDate: airDate,
+      type: type,
+    );
+
+    if (payload == null) {
       return BangumiSearchResult.empty;
     }
 
-    // 处理排序逻辑：Bangumi 官方 v0 不支持 date 排序，参照 animaku 上游使用 heat，客户端本地按放送日期倒序
     final isSortByDate = sort == 'date' || sort == 'airdate';
-    final upstreamSort = isSortByDate ? 'heat' : sort;
 
     try {
-      final filter = <String, dynamic>{
-        'type': [type],
-        'nsfw': false,
-      };
-      if (tags != null && tags.isNotEmpty) {
-        filter['tag'] = tags;
-      }
-      if (year != null) {
-        filter['air_date'] = ['>=$year-01-01', '<=$year-12-31'];
-      }
-      if (airDate != null && airDate.isNotEmpty) {
-        filter['air_date'] = airDate;
-      }
-
-      // 智能时间感知分流：提取当前检索的目标年份
-      int? effectiveYear = year;
-      if (effectiveYear == null && airDate != null && airDate.isNotEmpty) {
-        final match = RegExp(r'\d{4}').firstMatch(airDate.first);
-        if (match != null) {
-          effectiveYear = int.tryParse(match.group(0)!);
-        }
-      }
-
-      // 特殊处理说明：
-      // 1. 历史已完结年份或全量大库搜索时，必须过滤 rank > 0，防止 Bangumi 数据库将未上榜的 rank=0 条目在升序排位中置顶；
-      // 2. 当前正在播出的当季新番（年份 >= 当前年份），绝大多数条目尚未结榜（rank 仍为 0），不加此过滤以确保完整展示当前季度的所有新番条目。
-      final isCurrentOrFuture = effectiveYear != null && effectiveYear >= DateTime.now().year;
-      if (!isCurrentOrFuture && (upstreamSort == 'rank' || upstreamSort == 'score')) {
-        filter['rank'] = ['>0', '<=99999'];
-      }
-
-      final payload = <String, dynamic>{
-        'filter': filter,
-      };
-      if (trimmed.isNotEmpty) {
-        payload['keyword'] = trimmed;
-      }
-      if (upstreamSort != null && upstreamSort.isNotEmpty) {
-        payload['sort'] = upstreamSort;
-      }
-
       final res = await _dio.post(
         '/v0/search/subjects',
         data: payload,
@@ -603,21 +494,6 @@ class BangumiClient {
     }
   }
 
-  BangumiApiException _handleDioError(String prefix, DioException e) {
-    final status = e.response?.statusCode;
-    final resData = e.response?.data;
-    String message = e.message ?? '未知网络异常';
-
-    if (resData is Map && resData.containsKey('description')) {
-      message = resData['description'].toString();
-    } else if (resData is Map && resData.containsKey('message')) {
-      message = resData['message'].toString();
-    }
-
-    return BangumiApiException(
-      '$prefix: $message',
-      statusCode: status,
-      error: e,
-    );
-  }
+  BangumiApiException _handleDioError(String prefix, DioException e) =>
+      BangumiApiException.fromDio(prefix, e);
 }

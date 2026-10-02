@@ -37,6 +37,7 @@ dependencies:
   dio: ^5.11.1
   cached_network_image: ^3.4.1
   file_picker: ^11.0.2
+  flutter_riverpod: ^3.4.3
 
 dev_dependencies:
   flutter_test:
