@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../core/network/bangumi_client.dart';
+import '../../../core/utils/appearance_manager.dart';
 import '../../../core/utils/font_manager.dart';
+import '../../common/widgets/wallpaper_crop_dialog.dart';
 
 class SettingsPage extends StatefulWidget {
   final BangumiClient client;
@@ -19,6 +22,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late BangumiSourcePreset _currentPreset;
+  String _wallpaperScope = 'all'; // 'all', 'home', 'category', 'settings'
 
   @override
   void initState() {
@@ -97,27 +101,166 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Future<void> _pickCustomIcon() async {
+    final success = await AppearanceManager.instance.pickAndSetCustomIcon();
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('应用图标已成功替换并即时生效'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _resetDefaultIcon() {
+    AppearanceManager.instance.resetDefaultIcon();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已恢复为默认泡面猫耳 Logo'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _pickCustomWallpaper() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.image,
+        dialogTitle: '选择壁纸图片 (.png / .jpg / .webp)',
+      );
+
+      if (result == null || result.files.single.path == null) return;
+
+      final file = File(result.files.single.path!);
+      if (!await file.exists()) return;
+      if (!mounted) return;
+
+      // 选图成功后，立即唤起原生交互式取景框，供用户随心拖动画面对焦与缩放
+      final appMgr = AppearanceManager.instance;
+      final cropResult = await WallpaperCropDialog.show(
+        context,
+        imageFile: file,
+        initialAlignX: appMgr.wallpaperAlignX,
+        initialAlignY: appMgr.wallpaperAlignY,
+        initialScale: appMgr.wallpaperScale,
+      );
+
+      if (cropResult == null || !mounted) return;
+
+      // 直接应用已选中的文件路径并锁定取景参数，绝不发生二次文件选择
+      appMgr.setWallpaperPath(file.path, pageKey: _wallpaperScope);
+      appMgr.setWallpaperTransform(
+        alignX: cropResult.alignX,
+        alignY: cropResult.alignY,
+        scale: cropResult.scale,
+      );
+
+      final scopeName = switch (_wallpaperScope) {
+        'all' => '全局所有页面',
+        'home' => '首页',
+        'category' => '分类页',
+        'settings' => '设置页',
+        _ => '',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已成功设置【$scopeName】背景壁纸并锁定取景视窗'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      debugPrint('上传壁纸失败: $e');
+    }
+  }
+
+  Future<void> _reopenCropDialog() async {
+    final appMgr = AppearanceManager.instance;
+    final file = appMgr.getWallpaperFileForPage(
+      _wallpaperScope == 'all' ? null : _wallpaperScope,
+    );
+    if (file == null || !mounted) return;
+
+    final cropResult = await WallpaperCropDialog.show(
+      context,
+      imageFile: file,
+      initialAlignX: appMgr.wallpaperAlignX,
+      initialAlignY: appMgr.wallpaperAlignY,
+      initialScale: appMgr.wallpaperScale,
+    );
+
+    if (cropResult != null) {
+      appMgr.setWallpaperTransform(
+        alignX: cropResult.alignX,
+        alignY: cropResult.alignY,
+        scale: cropResult.scale,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已更新壁纸取景视窗'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _clearCustomWallpaper() {
+    AppearanceManager.instance.clearWallpaper(pageKey: _wallpaperScope);
+    final scopeName = switch (_wallpaperScope) {
+      'all' => '全局壁纸',
+      'home' => '首页专属壁纸',
+      'category' => '分类页专属壁纸',
+      'settings' => '设置页专属壁纸',
+      _ => '',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('已清除【$scopeName】'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final fontMgr = FontManager.instance;
+    final appMgr = AppearanceManager.instance;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.settings_rounded, color: Color(0xFF0077B6)),
-            SizedBox(width: 8),
-            Text('设置', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
-      body: ListView(
-        // 底部预留 96px 间距，适配悬浮毛玻璃底栏穿透
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-        children: [
-          // 1. 字体与外观管理
-          _buildSectionHeader('字体与外观 (支持上传与热替换)'),
+    return ListenableBuilder(
+      listenable: appMgr,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            title: const Row(
+              children: [
+                Icon(Icons.settings_rounded, color: Color(0xFF0077B6)),
+                SizedBox(width: 8),
+                Text('设置', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          body: ListView(
+            // 底部预留 96px 间距，适配悬浮毛玻璃底栏穿透
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+            children: [
+              // 1. 个性化图标与壁纸
+              _buildSectionHeader('个性化定制 (图标与背景壁纸)'),
+              _buildAppearanceCard(theme, appMgr),
+              const SizedBox(height: 24),
+
+              // 2. 字体与外观管理
+              _buildSectionHeader('字体管理 (支持上传与热替换)'),
           Card(
             elevation: 0,
             color: theme.colorScheme.surfaceContainerLow,
@@ -296,6 +439,288 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
         ],
+      ),
+    );
+  },
+);
+}
+
+  Widget _buildAppearanceCard(ThemeData theme, AppearanceManager appMgr) {
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. 图标自定义行
+            Row(
+              children: [
+                appMgr.buildAppLogoWidget(
+                  size: 42,
+                  borderRadius: 10,
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withAlpha(120),
+                    width: 1.0,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '应用图标',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        appMgr.hasCustomIcon ? '当前使用自定义图片' : '默认：内置Logo',
+                        style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _pickCustomIcon,
+                    icon: const Icon(Icons.image_outlined, size: 16),
+                    label: const Text('上传自定义图标', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                if (appMgr.hasCustomIcon) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: _resetDefaultIcon,
+                    icon: const Icon(Icons.restore_rounded, size: 16),
+                    label: const Text('恢复默认', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+
+            const Divider(height: 24),
+
+            // 2. 背景壁纸自定义行
+            Row(
+              children: [
+                Icon(
+                  Icons.wallpaper_rounded,
+                  size: 24,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '背景壁纸',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _getWallpaperStatusText(appMgr),
+                        style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // 页面作用域分段切换胶囊
+            _buildWallpaperScopeSelector(theme),
+            const SizedBox(height: 12),
+
+            // 操作按钮行
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _pickCustomWallpaper,
+                    icon: const Icon(Icons.file_upload_outlined, size: 16),
+                    label: Text(
+                      _wallpaperScope == 'all' ? '上传壁纸 (全部应用)' : '设置当前页面专属壁纸',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                if (_hasCurrentScopeWallpaper(appMgr)) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: _clearCustomWallpaper,
+                    icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.redAccent),
+                    label: Text(
+                      _wallpaperScope == 'all' ? '清除全局' : '恢复跟随全局',
+                      style: const TextStyle(fontSize: 12, color: Colors.redAccent),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+
+            // 若当前页面或全局有壁纸生效，展示【交互式取景调整按钮】与视觉调节滑块
+            if (appMgr.hasWallpaperForPage(_wallpaperScope == 'all' ? null : _wallpaperScope)) ...[
+              const SizedBox(height: 14),
+
+              // 交互式取景框唤起入口
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: _reopenCropDialog,
+                  icon: const Icon(Icons.crop_free_rounded, size: 18),
+                  label: const Text('调整画面取景'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // 不透明度调节
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '壁纸不透明度',
+                    style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  Text(
+                    '${(appMgr.wallpaperOpacity * 100).toInt()}%',
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Slider(
+                value: appMgr.wallpaperOpacity,
+                min: 0.05,
+                max: 0.60,
+                divisions: 55,
+                onChanged: (val) => appMgr.setWallpaperOpacity(val),
+              ),
+
+              // 高斯模糊度调节
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '高斯模糊程度',
+                    style: TextStyle(fontSize: 11.5, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  Text(
+                    '${appMgr.wallpaperBlur.toStringAsFixed(1)} px',
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Slider(
+                value: appMgr.wallpaperBlur,
+                min: 0.0,
+                max: 20.0,
+                divisions: 40,
+                onChanged: (val) => appMgr.setWallpaperBlur(val),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getWallpaperStatusText(AppearanceManager appMgr) {
+    if (_wallpaperScope == 'all') {
+      return appMgr.globalWallpaperPath != null ? '已设置全局默认壁纸' : '未设置全局壁纸';
+    }
+    if (appMgr.isPageOverridden(_wallpaperScope)) {
+      return '当前页面已单独定制专属壁纸';
+    }
+    if (appMgr.globalWallpaperPath != null) {
+      return '当前跟随全局默认壁纸';
+    }
+    return '未设置壁纸 (纯净环境光)';
+  }
+
+  bool _hasCurrentScopeWallpaper(AppearanceManager appMgr) {
+    if (_wallpaperScope == 'all') {
+      return appMgr.globalWallpaperPath != null;
+    }
+    return appMgr.isPageOverridden(_wallpaperScope);
+  }
+
+  Widget _buildWallpaperScopeSelector(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    const scopes = [
+      ('all', '全部应用'),
+      ('home', '首页'),
+      ('category', '分类'),
+      ('settings', '设置'),
+    ];
+
+    return Container(
+      height: 34,
+      padding: const EdgeInsets.all(2.5),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(12),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Row(
+        children: scopes.map((item) {
+          final isSelected = _wallpaperScope == item.$1;
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                setState(() {
+                  _wallpaperScope = item.$1;
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(100),
+                  color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                ),
+                child: Center(
+                  child: Text(
+                    item.$2,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark ? Colors.white70 : Colors.black87),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

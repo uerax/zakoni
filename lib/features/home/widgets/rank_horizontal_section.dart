@@ -4,14 +4,16 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../common/widgets/anime_card.dart';
+import '../../common/widgets/bouncing_scale_card.dart';
 import '../../common/widgets/cached_anime_image.dart';
 
-/// 热门排行单行横向拖动组件（Anibaka 经典交互）：
-/// 1. 左侧标题“🏆 热门排行”，中间支持【TV】/【剧场版】/【OVA】分类切换，右侧提供【更多 >】快速跳转分类过滤；
-/// 2. 横向 ListView 设置 scrollCacheExtent: 150，严格控制可视区预加载范围，配合 CachedAnimeImage 实现
-///    “只有快滑动接近视口才触发图片下载”，彻底避免首屏几十张图片瞬时高并发堵塞网络和掉帧；
-/// 3. 支持桌面端双重滚动适配：鼠标左键按住拖拽滑动 + 普通鼠标滚轮上下滚动自动转横向平滑滚动。
-class RankHorizontalSection extends StatefulWidget {
+/// 现代流媒体原生多轨货架组件（Netflix / Apple TV / Animaku 经典设计）：
+/// 1. 纯净大气的原生标题栏，无任何 Web 杂乱超链接；
+/// 2. 达到列表末端时展示原生“浏览全部”专属探索卡片，顺应用户滑尽意犹未尽的自然动线；
+/// 3. 严格控制预加载范围（scrollCacheExtent: 100px）与图片降采样（resizeWidth: 300），
+///    即便多行同屏，也绝不引发图片并发风暴与掉帧；
+/// 4. 桌面端鼠标滚轮上下滑动平滑转横向平滑滚动 + 卡片按压弹性手感。
+class AnimeHorizontalShelf extends StatefulWidget {
   static const double cardWidth = 136;
   static const double cardAspectRatio = 2 / 3;
   static const double cardHeight = cardWidth / cardAspectRatio; // 204
@@ -20,36 +22,38 @@ class RankHorizontalSection extends StatefulWidget {
   static const Color _silverColor = Color(0xFFC0C0C0);
   static const Color _bronzeColor = Color(0xFFCD7F32);
 
-  static const List<String> categories = ['TV', '剧场版', 'OVA'];
+  // Animaku 原生规范统计标签语义色彩：
+  // 热度: 玫瑰火红 (rose-400), 在看: 琥珀金黄 (amber-400), 已看: 翡翠翠绿 (emerald-400)
+  static const Color heatColor = Color(0xFFFB7185);
+  static const Color doingColor = Color(0xFFFBBF24);
+  static const Color collectColor = Color(0xFF34D399);
 
+  final String title;
   final List<BangumiItem> items;
-  final int selectedCategoryIndex;
-  final ValueChanged<int> onCategoryChanged;
+  final VoidCallback? onViewAllTap;
+  final String viewAllSubtitle;
+  final bool showRankBadges;
+  final String defaultStatType; // 'heat' | 'collect' | 'doing'
 
-  const RankHorizontalSection({
+  const AnimeHorizontalShelf({
     super.key,
+    required this.title,
     required this.items,
-    required this.selectedCategoryIndex,
-    required this.onCategoryChanged,
+    this.onViewAllTap,
+    this.viewAllSubtitle = '浏览全部',
+    this.showRankBadges = true,
+    this.defaultStatType = 'heat',
   });
 
   @override
-  State<RankHorizontalSection> createState() => _RankHorizontalSectionState();
+  State<AnimeHorizontalShelf> createState() => _AnimeHorizontalShelfState();
 }
 
-class _RankHorizontalSectionState extends State<RankHorizontalSection> {
-  final ScrollController _scrollController = ScrollController();
+/// 向后兼容类型别名（兼容旧引用）
+typedef RankHorizontalSection = AnimeHorizontalShelf;
 
-  @override
-  void didUpdateWidget(covariant RankHorizontalSection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 切换分类标签时，将横向滚动列表平滑重置回首项
-    if (oldWidget.selectedCategoryIndex != widget.selectedCategoryIndex) {
-      if (_scrollController.hasClients) {
-        _scrollController.jumpTo(0);
-      }
-    }
-  }
+class _AnimeHorizontalShelfState extends State<AnimeHorizontalShelf> {
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void dispose() {
@@ -57,34 +61,29 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
     super.dispose();
   }
 
-  /// 依据 Animaku 规范解析卡片左下角统计指标：
-  /// 1. 热门排行/TV类：必定展示热度值（如 "4.6k 热度"）；
-  /// 2. 剧场版/OVA/其他类：优先展示已看人数（如 "5.9w 已看"）；
-  /// 3. 兜底：若无上述字段则顺次取在看人数或热度。
-  ({String count, String label})? _resolveCardStat(BangumiItem item) {
-    if (widget.selectedCategoryIndex == 0) {
+  /// 依据 Animaku 规范解析卡片左下角统计指标与语义色彩
+  ({String count, String label, Color color})? _resolveCardStat(BangumiItem item) {
+    if (widget.defaultStatType == 'heat') {
       if (item.heat != null && item.heat! > 0) {
-        return (count: formatCompactCount(item.heat), label: '热度');
+        return (count: formatCompactCount(item.heat), label: '热度', color: AnimeHorizontalShelf.heatColor);
       }
       if (item.doing != null && item.doing! > 0) {
-        return (count: formatCompactCount(item.doing), label: '热度');
+        return (count: formatCompactCount(item.doing), label: '在看', color: AnimeHorizontalShelf.doingColor);
       }
       if (item.collect != null && item.collect! > 0) {
-        return (count: formatCompactCount(item.collect), label: '热度');
+        return (count: formatCompactCount(item.collect), label: '已看', color: AnimeHorizontalShelf.collectColor);
       }
       return null;
     }
 
     if (item.collect != null && item.collect! > 0) {
-      return (count: formatCompactCount(item.collect), label: '已看');
+      return (count: formatCompactCount(item.collect), label: '已看', color: AnimeHorizontalShelf.collectColor);
     }
-
     if (item.heat != null && item.heat! > 0) {
-      return (count: formatCompactCount(item.heat), label: '热度');
+      return (count: formatCompactCount(item.heat), label: '热度', color: AnimeHorizontalShelf.heatColor);
     }
-
     if (item.doing != null && item.doing! > 0) {
-      return (count: formatCompactCount(item.doing), label: '在看');
+      return (count: formatCompactCount(item.doing), label: '在看', color: AnimeHorizontalShelf.doingColor);
     }
 
     return null;
@@ -92,18 +91,21 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
 
   @override
   Widget build(BuildContext context) {
+    // 列表项总数：实际动漫数量 + 末端“浏览全部”专属探索卡片
+    final hasViewAllCard = widget.onViewAllTap != null && widget.items.isNotEmpty;
+    final totalItemCount = widget.items.length + (hasViewAllCard ? 1 : 0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildHeader(context),
         const SizedBox(height: 6),
         SizedBox(
-          height: RankHorizontalSection.cardHeight + 46,
+          height: AnimeHorizontalShelf.cardHeight + 46,
           child: widget.items.isEmpty
-              ? _buildEmptyOrLoading(context)
+              ? _buildEmptyPlaceholder(context)
               : Listener(
-                  // 针对桌面端（Windows/macOS）的鼠标滚轮适配：
-                  // 将普通垂直滚轮滚动的 delta 平滑映射到横向滚动，无需用户按住 Shift
+                  // 针对桌面端（Windows/macOS）的鼠标滚轮平滑映射：普通滚轮上下滚动自动转横向平滑滚动
                   onPointerSignal: (pointerSignal) {
                     if (pointerSignal is PointerScrollEvent) {
                       final double delta = pointerSignal.scrollDelta.dy != 0
@@ -120,15 +122,19 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
                   },
                   child: ListView.builder(
                     controller: _scrollController,
-                    key: ValueKey('rank_list_${widget.selectedCategoryIndex}'),
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
-                    // 核心防卡顿防线：仅预加载可视区外 150px (约 1 张卡片)，未滚动进入的图片不发起解码与下载
-                    scrollCacheExtent: const ScrollCacheExtent.pixels(150),
+                    // 核心性能防线：仅预加载可视区外 100px (约半张卡片)，未进入视口的卡片绝不发起网络下载与解码
+                    scrollCacheExtent: const ScrollCacheExtent.pixels(100),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: widget.items.length,
+                    itemCount: totalItemCount,
                     itemBuilder: (context, index) {
-                      return _buildRankCard(context, widget.items[index], index);
+                      if (index < widget.items.length) {
+                        return _buildAnimeItemCard(context, widget.items[index], index);
+                      } else {
+                        // 列表末端专属的“浏览全部”卡片（Netflix / Apple TV 官方体验）
+                        return _buildViewAllCard(context);
+                      }
                     },
                   ),
                 ),
@@ -137,170 +143,64 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
     );
   }
 
+  /// 纯净大气的原生大标题（彻底摒弃粗糙的 Web 字样“更多 >”）
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-      child: Row(
-        children: [
-          // 左侧："🏆 热门排行"大标题
-          Text(
-            '🏆 热门排行',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.5,
-              color: theme.textTheme.titleLarge?.color,
-            ),
-          ),
-
-          const Spacer(),
-
-          // 右侧：Anibaka 经典微胶囊选项卡切换器（TV / 剧场版 / OVA）
-          _buildMiniCapsuleSelector(context, theme, isDark),
-        ],
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Text(
+        widget.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.5,
+          color: theme.textTheme.titleLarge?.color,
+        ),
       ),
     );
   }
 
-  Widget _buildMiniCapsuleSelector(
-    BuildContext context,
-    ThemeData theme,
-    bool isDark,
-  ) {
-    return Container(
-      width: 168,
-      height: 38,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withAlpha(36)
-            : Colors.black.withAlpha(18),
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Stack(
-        children: [
-          // 平滑移动的微渐变高亮指示器药丸滑块（与顶部胶囊完全相同参数）
-          AnimatedAlign(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            alignment: AlignmentDirectional(
-              -1 + 2 * widget.selectedCategoryIndex / (RankHorizontalSection.categories.length - 1),
-              0,
-            ),
-            child: FractionallySizedBox(
-              widthFactor: 1 / RankHorizontalSection.categories.length,
-              heightFactor: 1.0,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      theme.colorScheme.primary,
-                      theme.colorScheme.primary.withAlpha(217),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(100),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withAlpha(80),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // 选项文字样式：严格按文字度量对齐，显式锁定同一字体 + height: 1.0 + TextHeightBehavior 消除度量高低差与伪粗体毛刺
-          Row(
-            children: List.generate(RankHorizontalSection.categories.length, (index) {
-              final isSelected = widget.selectedCategoryIndex == index;
-              final text = RankHorizontalSection.categories[index];
-              final fontFamily = theme.textTheme.bodyMedium?.fontFamily ?? 'HarmonyOS Sans';
-
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    widget.onCategoryChanged(index);
-                  },
-                  child: Center(
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        fontFamily: fontFamily,
-                        fontSize: 13.5,
-                        height: 1.0,
-                        // 选中采用真实 Bold.ttf 对应的 w700，避免 w900 触发引擎人工描边（Synthetic Bold）导致的毛刺与笔画发虚
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                        letterSpacing: isSelected ? 0.6 : 0.4,
-                        color: isSelected
-                            ? Colors.white
-                            : (isDark
-                                ? Colors.white.withAlpha(217)
-                                : Colors.black.withAlpha(191)),
-                      ),
-                      child: Text(
-                        text,
-                        maxLines: 1,
-                        textAlign: TextAlign.center,
-                        textHeightBehavior: const TextHeightBehavior(
-                          applyHeightToFirstAscent: false,
-                          applyHeightToLastDescent: false,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRankCard(BuildContext context, BangumiItem item, int index) {
+  /// 常规动漫卡片（搭载金银铜勋章、语义色彩角标、按压弹性手感）
+  Widget _buildAnimeItemCard(BuildContext context, BangumiItem item, int index) {
     final rank = index + 1;
     final rankColor = _getRankColor(rank);
     final stat = _resolveCardStat(item);
 
     return Padding(
       padding: const EdgeInsets.only(right: 12),
-      child: GestureDetector(
+      child: BouncingScaleCard(
         onTap: () => showAnimeDetailSheet(context, item),
         child: SizedBox(
-          width: RankHorizontalSection.cardWidth,
+          width: AnimeHorizontalShelf.cardWidth,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 封面图片区（带金银铜排名勋章、底部渐变、左下角热度/已看与右下角评分）
+              // 封面图片区
               SizedBox(
-                height: RankHorizontalSection.cardHeight,
+                height: AnimeHorizontalShelf.cardHeight,
                 child: Stack(
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: AspectRatio(
-                        aspectRatio: RankHorizontalSection.cardAspectRatio,
+                        aspectRatio: AnimeHorizontalShelf.cardAspectRatio,
                         child: CachedAnimeImage(
                           imageUrl: item.thumbnailUrl.isNotEmpty
                               ? item.thumbnailUrl
                               : item.coverUrl,
-                          width: RankHorizontalSection.cardWidth,
-                          height: RankHorizontalSection.cardHeight,
+                          width: AnimeHorizontalShelf.cardWidth,
+                          height: AnimeHorizontalShelf.cardHeight,
                           resizeWidth: 300,
                         ),
                       ),
                     ),
                     // 左上角排名勋章
-                    _buildRankBadge(rank, rankColor),
-                    // 右上角评分角标（保持原本样式）
+                    if (widget.showRankBadges)
+                      _buildRankBadge(rank, rankColor),
+                    // 右上角评分角标
                     if (item.ratingScore > 0)
                       Positioned(
                         top: 4,
@@ -328,7 +228,7 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
                           ),
                         ),
                       ),
-                    // 封面底部暗色渐变遮罩（确保左下角热度/已看人数清晰锐利）
+                    // 封面底部暗色渐变遮罩
                     Positioned(
                       left: 0,
                       right: 0,
@@ -348,7 +248,7 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
                         ),
                       ),
                     ),
-                    // 左下角：热度值（TV热门分类优先）或已看人数（剧场版/OVA/其他分类，对齐 Animaku 规范）
+                    // 左下角：按 Animaku 规范呈现高亮数字与柔和标签
                     if (stat != null)
                       Positioned(
                         left: 6,
@@ -360,13 +260,13 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
                           children: [
                             Text(
                               stat.count,
-                              style: const TextStyle(
-                                color: Color(0xFFFFD54F),
+                              style: TextStyle(
+                                color: stat.color,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(width: 2),
+                            const SizedBox(width: 2.5),
                             Text(
                               stat.label,
                               style: TextStyle(
@@ -396,6 +296,87 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
                   ),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 列表末端专属的“浏览全部”探索卡片（Netflix / Apple TV 官方规范）：
+  /// 尺寸与普通卡片完全一致，用户滑到货架尽头时自然映入眼帘，点击带弹性反馈直接跳转
+  Widget _buildViewAllCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: BouncingScaleCard(
+        onTap: widget.onViewAllTap,
+        child: SizedBox(
+          width: AnimeHorizontalShelf.cardWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: AnimeHorizontalShelf.cardHeight,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: isDark
+                      ? const Color(0xFF242426)
+                      : const Color(0xFFF2F2F7),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withAlpha(25)
+                        : Colors.black.withAlpha(15),
+                    width: 1.2,
+                  ),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: theme.colorScheme.primary.withAlpha(isDark ? 55 : 28),
+                          border: Border.all(
+                            color: theme.colorScheme.primary.withAlpha(100),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 22,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.viewAllSubtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${widget.items.length}+ 部作品',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              // 与普通卡片的 32px 标题高度严格保持一致，确保整体水平基线规整
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -438,13 +419,13 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
   }
 
   Color _getRankColor(int rank) {
-    if (rank == 1) return RankHorizontalSection._goldColor;
-    if (rank == 2) return RankHorizontalSection._silverColor;
-    if (rank == 3) return RankHorizontalSection._bronzeColor;
+    if (rank == 1) return AnimeHorizontalShelf._goldColor;
+    if (rank == 2) return AnimeHorizontalShelf._silverColor;
+    if (rank == 3) return AnimeHorizontalShelf._bronzeColor;
     return Colors.blueGrey.withAlpha(200);
   }
 
-  Widget _buildEmptyOrLoading(BuildContext context) {
+  Widget _buildEmptyPlaceholder(BuildContext context) {
     final theme = Theme.of(context);
     return ListView.builder(
       scrollDirection: Axis.horizontal,
@@ -455,12 +436,12 @@ class _RankHorizontalSectionState extends State<RankHorizontalSection> {
         return Padding(
           padding: const EdgeInsets.only(right: 12),
           child: SizedBox(
-            width: RankHorizontalSection.cardWidth,
+            width: AnimeHorizontalShelf.cardWidth,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  height: RankHorizontalSection.cardHeight,
+                  height: AnimeHorizontalShelf.cardHeight,
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest.withAlpha(100),
                     borderRadius: BorderRadius.circular(8),

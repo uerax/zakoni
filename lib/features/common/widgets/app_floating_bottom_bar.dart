@@ -89,10 +89,10 @@ class AppFloatingBottomBar extends StatelessWidget {
                     ),
                     child: Stack(
                       children: [
-                        // 平滑跟随的药丸指示器滑块
+                        // 平滑且带物理惯性回弹的药丸指示器滑块（Curves.easeOutBack 模拟物理过冲定格）
                         AnimatedAlign(
-                          duration: const Duration(milliseconds: 240),
-                          curve: Curves.easeOutCubic,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutBack,
                           alignment: items.length > 1
                               ? AlignmentDirectional(
                                   -1 + 2 * currentIndex / (items.length - 1),
@@ -116,7 +116,7 @@ class AppFloatingBottomBar extends StatelessWidget {
                           ),
                         ),
 
-                        // 各导航项纯图标展示
+                        // 各导航项纯图标展示（结合 iOS 经典果冻弹簧微交互）
                         Row(
                           children: List.generate(items.length, (i) {
                             final isSelected = currentIndex == i;
@@ -126,20 +126,16 @@ class AppFloatingBottomBar extends StatelessWidget {
                                 : (isDark ? Colors.white60 : const Color(0xFF6B7280));
 
                             return Expanded(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
+                              child: _BouncingNavItem(
+                                isSelected: isSelected,
+                                selectedIcon: item.selectedIcon,
+                                unselectedIcon: item.unselectedIcon,
+                                color: itemColor,
                                 onTap: () {
                                   if (currentIndex == i) return;
                                   HapticFeedback.lightImpact();
                                   onTap(i);
                                 },
-                                child: Center(
-                                  child: Icon(
-                                    isSelected ? item.selectedIcon : item.unselectedIcon,
-                                    color: itemColor,
-                                    size: 24,
-                                  ),
-                                ),
                               ),
                             );
                           }),
@@ -150,6 +146,95 @@ class AppFloatingBottomBar extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 仿 iOS 经典物理触控弹簧动效组件：
+/// 当 Tab 被选中激活时，执行“下压(0.88) -> 过冲放大(1.18) -> 弹性回落(1.0)”的三段式果冻动效，
+/// 带来如同真实物理按钮一般的 Q 弹触感。
+class _BouncingNavItem extends StatefulWidget {
+  final bool isSelected;
+  final IconData selectedIcon;
+  final IconData unselectedIcon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _BouncingNavItem({
+    required this.isSelected,
+    required this.selectedIcon,
+    required this.unselectedIcon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_BouncingNavItem> createState() => _BouncingNavItemState();
+}
+
+class _BouncingNavItemState extends State<_BouncingNavItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+
+    // 三段式弹簧曲线：瞬时轻压下陷 -> 弹性过冲冲起 -> 阻尼收敛回落
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 0.88)
+            .chain(CurveTween(curve: Curves.easeOutQuad)),
+        weight: 22,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.88, end: 1.18)
+            .chain(CurveTween(curve: Curves.easeOutBack)),
+        weight: 48,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.18, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeInOutQuad)),
+        weight: 30,
+      ),
+    ]).animate(_controller);
+  }
+
+  @override
+  void didUpdateWidget(covariant _BouncingNavItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 从未选中切换为选中时，即刻触发弹性弹跳
+    if (!oldWidget.isSelected && widget.isSelected) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      child: Center(
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: Icon(
+            widget.isSelected ? widget.selectedIcon : widget.unselectedIcon,
+            color: widget.color,
+            size: 24,
           ),
         ),
       ),

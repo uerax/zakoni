@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
+import 'bouncing_scale_card.dart';
 import 'cached_anime_image.dart';
 
 class AnimeCard extends StatelessWidget {
@@ -15,13 +16,30 @@ class AnimeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bottomStat = _resolveBottomStat();
 
-    return Card(
-      elevation: 1.5,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: InkWell(
-        onTap: onTap ?? () => showAnimeDetailSheet(context, item),
+    return BouncingScaleCard(
+      onTap: onTap ?? () => showAnimeDetailSheet(context, item),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(isDark ? 50 : 15),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withAlpha(20)
+                : Colors.black.withAlpha(12),
+            width: 1.0,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -83,8 +101,8 @@ class AnimeCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // 左下角状态/已看/在看/热度角标（Animaku 原生规范，优先展示已看人数）
-                  if (_buildBottomBadgeText() != null)
+                  // 左下角状态/已看/在看/热度角标（Animaku 原生三色语义规范）
+                  if (bottomStat != null)
                     Positioned(
                       bottom: 5,
                       left: 6,
@@ -94,13 +112,28 @@ class AnimeCard extends StatelessWidget {
                           color: Colors.black.withAlpha(140),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Text(
-                          _buildBottomBadgeText()!,
-                          style: const TextStyle(
-                            color: Color(0xFFFFD54F),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              bottomStat.count,
+                              style: TextStyle(
+                                color: bottomStat.color,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              bottomStat.label,
+                              style: TextStyle(
+                                color: Colors.white.withAlpha(210),
+                                fontSize: 9,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -140,15 +173,27 @@ class AnimeCard extends StatelessWidget {
     );
   }
 
-  String? _buildBottomBadgeText() {
+  ({String count, String label, Color color})? _resolveBottomStat() {
     if (item.collect != null && item.collect! > 0) {
-      return '${formatCompactCount(item.collect)} 已看';
+      return (
+        count: formatCompactCount(item.collect),
+        label: '已看',
+        color: const Color(0xFF34D399), // 翡翠翠绿 (Animaku 规范: emerald-400)
+      );
     }
     if (item.doing != null && item.doing! > 0) {
-      return '${formatCompactCount(item.doing)} 在看';
+      return (
+        count: formatCompactCount(item.doing),
+        label: '在看',
+        color: const Color(0xFFFBBF24), // 琥珀金黄 (Animaku 规范: amber-400)
+      );
     }
     if (item.heat != null && item.heat! > 0) {
-      return '${formatCompactCount(item.heat)} 热度';
+      return (
+        count: formatCompactCount(item.heat),
+        label: '热度',
+        color: const Color(0xFFFB7185), // 玫瑰火红 (Animaku 规范: rose-400)
+      );
     }
     return null;
   }

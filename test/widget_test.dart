@@ -37,39 +37,40 @@ void main() {
     await tester.pumpWidget(ZakoniApp(client: client));
     await tester.pumpAndSettle();
 
-    // 检查顶部胶囊栏：番剧、分类
+    // 检查顶部胶囊栏：番剧、连载
     expect(find.text('番剧'), findsOneWidget);
-    expect(find.text('分类'), findsOneWidget);
-    expect(find.text('🏆 热门排行'), findsOneWidget);
-    expect(find.text('TV'), findsOneWidget);
-    expect(find.text('剧场版'), findsOneWidget);
-    expect(find.text('OVA'), findsOneWidget);
+    expect(find.text('连载'), findsOneWidget);
 
-    // 测试点击胶囊切换到“剧场版”和“OVA”
-    await tester.tap(find.text('剧场版'));
+    // 检查首屏独立货架大标题
+    expect(find.text('🏆 热门 TV 番剧'), findsOneWidget);
+    expect(find.text('🎬 热门剧场版'), findsOneWidget);
+
+    // 向下滚动页面，验证第 3 个货架（OVA）视口懒加载正常挂载
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('OVA'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('TV'));
+    expect(find.text('📀 热门 OVA / 特别篇'), findsOneWidget);
+
+    // 切换到顶部“连载”标签（连载新番周历）
+    await tester.tap(find.text('连载'));
     await tester.pumpAndSettle();
 
-    // 切换到分类标签
-    await tester.tap(find.text('分类'));
-    await tester.pumpAndSettle();
-    expect(find.text('分类检索功能设计中'), findsOneWidget);
-
-    // 切回番剧标签
+    // 切回顶部“番剧”标签
     await tester.tap(find.text('番剧'));
     await tester.pumpAndSettle();
-    expect(find.text('🏆 热门排行'), findsOneWidget);
+    expect(find.text('🏆 热门 TV 番剧', skipOffstage: false), findsOneWidget);
 
-    // 切换到底部时间表（纯图标导航栏）
-    await tester.tap(find.byIcon(Icons.calendar_month_outlined));
+    // 切换到底部“分类”（四宫格图标）
+    await tester.tap(find.byIcon(Icons.grid_view_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('每日放送'), findsOneWidget);
+    expect(find.text('⊞ 分类索引'), findsOneWidget);
 
     // 切换到底部设置
     await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('个性化定制 (图标与背景壁纸)'), findsOneWidget);
+
+    // 向下滚动设置项，验证网络线路选项
+    await tester.drag(find.byType(ListView), const Offset(0, -450));
     await tester.pumpAndSettle();
     expect(find.text('Bangumi 网络线路'), findsOneWidget);
     expect(find.text('镜像加速线路（推荐）'), findsOneWidget);

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../core/network/bangumi_client.dart';
+import '../core/utils/appearance_manager.dart';
+import 'category/pages/category_page.dart';
 import 'common/widgets/app_floating_bottom_bar.dart';
 import 'home/pages/home_page.dart';
 import 'settings/pages/settings_page.dart';
-import 'timeline/pages/timeline_page.dart';
 
 class MainNavigationShell extends StatefulWidget {
   final BangumiClient? client;
@@ -25,8 +26,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     super.initState();
     _client = widget.client ?? BangumiClient();
     _pages = [
-      HomePage(client: _client),
-      TimelinePage(client: _client),
+      HomePage(
+        client: _client,
+        onNavigateToCategory: (category) {
+          // 从首页货架“浏览全部”平滑导航至底栏“分类”页面
+          setState(() {
+            _currentIndex = 1;
+          });
+        },
+      ),
+      CategoryPage(client: _client),
       SettingsPage(
         client: _client,
         onSettingsChanged: () {
@@ -38,36 +47,64 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // 允许页面内容向下穿透延展到底部，透过苹果风格悬浮毛玻璃胶囊呈现动态磨砂质感
-      extendBody: true,
-      // 使用 IndexedStack 保活所有主要页面，切换导航栏时 0 延迟，且完整保留各自的滚动位置
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
-      bottomNavigationBar: AppFloatingBottomBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        items: const [
-          AppFloatingNavItem(
-            unselectedIcon: Icons.home_outlined,
-            selectedIcon: Icons.home_rounded,
+    final theme = Theme.of(context);
+    final pageKey = switch (_currentIndex) {
+      0 => 'home',
+      1 => 'category',
+      2 => 'settings',
+      _ => 'home',
+    };
+
+    return ListenableBuilder(
+      listenable: AppearanceManager.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          // 允许页面内容向下穿透延展到底部，透过苹果风格悬浮毛玻璃胶囊呈现动态磨砂质感
+          extendBody: true,
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 0. 基础底衬颜色（深浅主题自动适配）
+              Positioned.fill(
+                child: ColoredBox(color: theme.scaffoldBackgroundColor),
+              ),
+              // 1. 全局或页面专属自定义背景壁纸（支持各页面单独覆盖与视窗裁剪）
+              AppearanceManager.instance.buildWallpaperLayer(pageKey: pageKey),
+              // 2. 使用 IndexedStack 保活所有主要页面，切换导航栏时 0 延迟，且完整保留各自的滚动位置
+              IndexedStack(
+                index: _currentIndex,
+                children: _pages,
+              ),
+            ],
           ),
-          AppFloatingNavItem(
-            unselectedIcon: Icons.calendar_month_outlined,
-            selectedIcon: Icons.calendar_month_rounded,
+          bottomNavigationBar: AppFloatingBottomBar(
+            currentIndex: _currentIndex,
+            onTap: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            items: const [
+              // Tab 0: 首页 (番剧大厅 + 连载周历)
+              AppFloatingNavItem(
+                unselectedIcon: Icons.home_outlined,
+                selectedIcon: Icons.home_rounded,
+              ),
+              // Tab 1: 分类索引 (四宫格矩阵，苹果/现代流媒体官方规范)
+              AppFloatingNavItem(
+                unselectedIcon: Icons.grid_view_outlined,
+                selectedIcon: Icons.grid_view_rounded,
+              ),
+              // Tab 2: 系统设置
+              AppFloatingNavItem(
+                unselectedIcon: Icons.settings_outlined,
+                selectedIcon: Icons.settings_rounded,
+              ),
+            ],
           ),
-          AppFloatingNavItem(
-            unselectedIcon: Icons.settings_outlined,
-            selectedIcon: Icons.settings_rounded,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

@@ -5,10 +5,12 @@ import '../../common/widgets/anime_card.dart';
 
 class TimelinePage extends StatefulWidget {
   final BangumiClient client;
+  final bool showAppBar;
 
   const TimelinePage({
     super.key,
     required this.client,
+    this.showAppBar = true,
   });
 
   @override
@@ -44,20 +46,40 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final safeTop = MediaQuery.paddingOf(context).top;
+
+    // 当作为首页“连载”子面板嵌入时（showAppBar == false）：
+    // 采用沉浸式无边框架构，顶部预留安全区避让悬浮胶囊，底部避让 Dock 栏
+    if (!widget.showAppBar) {
+      return Column(
+        children: [
+          SizedBox(height: safeTop + 48),
+          Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: _buildWeekdayChips(theme, isDark),
+          ),
+          Expanded(
+            child: _buildCalendarBody(theme),
+          ),
+        ],
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.calendar_month_rounded, color: Color(0xFFE91E63)),
+            Icon(Icons.calendar_month_rounded, color: Color(0xFF0077B6)),
             SizedBox(width: 8),
-            Text('每日放送', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text('连载周历', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            tooltip: '刷新时间表',
+            tooltip: '刷新连载表',
             onPressed: () => _loadCalendar(forceRefresh: true),
           ),
         ],
@@ -66,125 +88,146 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
           child: Container(
             height: 48,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              children: List.generate(7, (index) {
-                final isSelected = _selectedDayIndex == index;
-                final isToday = (DateTime.now().weekday - 1) == index;
-
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: ChoiceChip(
-                      label: Center(
-                        child: Text(
-                          _weekLabels[index],
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected
-                                ? theme.colorScheme.onPrimary
-                                : (isToday ? const Color(0xFFE91E63) : null),
-                          ),
-                        ),
-                      ),
-                      selected: isSelected,
-                      selectedColor: const Color(0xFFE91E63),
-                      showCheckmark: false,
-                      padding: EdgeInsets.zero,
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() {
-                            _selectedDayIndex = index;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                );
-              }),
-            ),
+            child: _buildWeekdayChips(theme, isDark),
           ),
         ),
       ),
-      body: FutureBuilder<List<BangumiCalendarDay>>(
-        future: _calendarFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
+      body: _buildCalendarBody(theme),
+    );
+  }
+
+  Widget _buildWeekdayChips(ThemeData theme, bool isDark) {
+    final activeColor = theme.colorScheme.primary;
+
+    return Row(
+      children: List.generate(7, (index) {
+        final isSelected = _selectedDayIndex == index;
+        final isToday = (DateTime.now().weekday - 1) == index;
+
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: ChoiceChip(
+              label: Center(
+                child: Text(
+                  _weekLabels[index],
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected
+                        ? Colors.white
+                        : (isToday ? activeColor : (isDark ? Colors.white70 : Colors.black87)),
+                  ),
+                ),
+              ),
+              selected: isSelected,
+              selectedColor: activeColor,
+              backgroundColor: isDark ? Colors.white.withAlpha(18) : Colors.black.withAlpha(12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(100),
+                side: BorderSide(
+                  color: isSelected
+                      ? Colors.transparent
+                      : (isToday
+                          ? activeColor.withAlpha(120)
+                          : (isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(12))),
+                ),
+              ),
+              showCheckmark: false,
+              padding: EdgeInsets.zero,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() {
+                    _selectedDayIndex = index;
+                  });
+                }
+              },
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildCalendarBody(ThemeData theme) {
+    return FutureBuilder<List<BangumiCalendarDay>>(
+      future: _calendarFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('正在同步连载更新...'),
+              ],
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('正在加载时间表...'),
+                  const Icon(Icons.cloud_off_rounded, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text(
+                    '数据获取失败',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.redAccent),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () => _loadCalendar(forceRefresh: true),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('重试'),
+                  ),
                 ],
               ),
-            );
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.cloud_off_rounded, size: 64, color: Colors.grey),
-                    const SizedBox(height: 16),
-                    Text(
-                      '数据获取失败',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${snapshot.error}',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.redAccent),
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton.icon(
-                      onPressed: () => _loadCalendar(forceRefresh: true),
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('重试'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          final calendarList = snapshot.data ?? [];
-          if (calendarList.isEmpty) {
-            return const Center(child: Text('暂无每日放送数据'));
-          }
-
-          // 核心优化：使用 IndexedStack 替代 TabBarView
-          // 1. 点击周一到周日时直接即点即切，不再强行在 300ms 内连环滑动排版上百个卡片
-          // 2. 7 个子页面一旦排版完成全部常驻内存，二次切换时 0ms 瞬间显示，永无白屏
-          return IndexedStack(
-            index: _selectedDayIndex,
-            children: List.generate(7, (index) {
-              final weekdayId = index + 1; // 1=Mon .. 7=Sun
-              final dayData = calendarList.firstWhere(
-                (d) => d.weekday.id == weekdayId,
-                orElse: () => calendarList.length > index
-                    ? calendarList[index]
-                    : BangumiCalendarDay(
-                        weekday: BangumiWeekday(
-                          id: weekdayId,
-                          en: '',
-                          cn: _weekLabels[index],
-                          ja: '',
-                        ),
-                        items: const [],
-                      ),
-              );
-
-              return _KeepAliveDayView(dayData: dayData);
-            }),
+            ),
           );
-        },
-      ),
+        }
+
+        final calendarList = snapshot.data ?? [];
+        if (calendarList.isEmpty) {
+          return const Center(child: Text('暂无每日连载数据'));
+        }
+
+        // 核心优化：使用 IndexedStack 替代 TabBarView
+        // 1. 点击周一到周日时直接即点即切，不再强行在 300ms 内连环滑动排版上百个卡片
+        // 2. 7 个子页面一旦排版完成全部常驻内存，二次切换时 0ms 瞬间显示，永无白屏
+        return IndexedStack(
+          index: _selectedDayIndex,
+          children: List.generate(7, (index) {
+            final weekdayId = index + 1; // 1=Mon .. 7=Sun
+            final dayData = calendarList.firstWhere(
+              (d) => d.weekday.id == weekdayId,
+              orElse: () => calendarList.length > index
+                  ? calendarList[index]
+                  : BangumiCalendarDay(
+                      weekday: BangumiWeekday(
+                        id: weekdayId,
+                        en: '',
+                        cn: _weekLabels[index],
+                        ja: '',
+                      ),
+                      items: const [],
+                    ),
+            );
+
+            return _KeepAliveDayView(dayData: dayData);
+          }),
+        );
+      },
     );
   }
 }

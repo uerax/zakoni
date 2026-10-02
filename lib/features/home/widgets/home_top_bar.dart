@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class HomeTopBar extends StatelessWidget {
-  final int selectedIndex; // 0: 番剧, 1: 分类
+  final int selectedIndex; // 0: 番剧, 1: 连载
   final ValueChanged<int>? onTabChanged;
   final VoidCallback? onSearchTap;
   final VoidCallback? onAvatarTap;
@@ -22,7 +22,8 @@ class HomeTopBar extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      // 瘦身后的外边距：从 8px 收紧至 4px，降低对顶部的视觉占据
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       child: Center(
         // 外层 Container 提供悬浮阴影，内层通过 ClipRRect 裁剪毛玻璃；
         // 之所以拆分两层，是因为 ClipRRect 会裁切掉同一层级的 BoxShadow 投影，导致弥散悬浮阴影丢失。
@@ -31,9 +32,9 @@ class HomeTopBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(100),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(isDark ? 64 : 20),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: Colors.black.withAlpha(isDark ? 45 : 12),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -42,8 +43,9 @@ class HomeTopBar extends StatelessWidget {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
-                height: 52,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                // 极致简约控制栏：高度从 52px 瘦身至 40px，内部各操作组件等高统一为 30px
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
                 decoration: BoxDecoration(
                   // 高透磨砂质感底色：约 68%~70% 不透明度，确保底层卡片与内容色彩在滚动经过时清晰折射出高斯模糊
                   color: isDark
@@ -54,15 +56,15 @@ class HomeTopBar extends StatelessWidget {
                     color: isDark
                         ? Colors.white.withAlpha(30)
                         : Colors.black.withAlpha(15),
-                    width: 1.2,
+                    width: 1.0,
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 左侧：【番剧】与【分类】胶囊轨道切换按钮
+                    // 左侧：【番剧】与【连载】胶囊轨道切换按钮
                     _buildNavSegmentedTabs(theme: theme, isDark: isDark),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 6),
 
                     // 右侧 1：搜索圆形按钮
                     _buildCircleIconButton(
@@ -74,7 +76,7 @@ class HomeTopBar extends StatelessWidget {
                       },
                       isDark: isDark,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
 
                     // 右侧 2：用户登录头像插槽
                     _buildUserAvatar(
@@ -97,10 +99,9 @@ class HomeTopBar extends StatelessWidget {
     required bool isDark,
   }) {
     return Container(
-      // 宽度从原本松散的 160px 收紧为 116px，消除两端多余无效空间，使滑块与文字饱满精致
-      width: 116,
-      height: 38,
-      padding: const EdgeInsets.all(3),
+      width: 108,
+      height: 30,
+      padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: isDark
             ? Colors.white.withAlpha(36)
@@ -132,9 +133,9 @@ class HomeTopBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(100),
                   boxShadow: [
                     BoxShadow(
-                      color: theme.colorScheme.primary.withAlpha(80),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+                      color: theme.colorScheme.primary.withAlpha(50),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
                     ),
                   ],
                 ),
@@ -156,25 +157,19 @@ class HomeTopBar extends StatelessWidget {
                       duration: const Duration(milliseconds: 200),
                       style: TextStyle(
                         fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'HarmonyOS Sans',
-                        fontSize: 14,
-                        height: 1.0,
+                        fontSize: 12.5,
+                        // 采用 w600 保持饱满立体，避免 w700 在小字号下浓重糊墨；保留字体自然行高以呈现舒展字形
                         fontWeight: selectedIndex == 0
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        letterSpacing: selectedIndex == 0 ? 0.8 : 0.4,
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        letterSpacing: 0.2,
                         color: selectedIndex == 0
                             ? Colors.white
                             : (isDark
-                                ? Colors.white.withAlpha(217)
-                                : Colors.black.withAlpha(191)),
+                                ? Colors.white.withAlpha(220)
+                                : Colors.black87),
                       ),
-                      child: const Text(
-                        '番剧',
-                        textHeightBehavior: TextHeightBehavior(
-                          applyHeightToFirstAscent: false,
-                          applyHeightToLastDescent: false,
-                        ),
-                      ),
+                      child: const Text('番剧'),
                     ),
                   ),
                 ),
@@ -191,25 +186,18 @@ class HomeTopBar extends StatelessWidget {
                       duration: const Duration(milliseconds: 200),
                       style: TextStyle(
                         fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'HarmonyOS Sans',
-                        fontSize: 14,
-                        height: 1.0,
+                        fontSize: 12.5,
                         fontWeight: selectedIndex == 1
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        letterSpacing: selectedIndex == 1 ? 0.8 : 0.4,
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        letterSpacing: 0.2,
                         color: selectedIndex == 1
                             ? Colors.white
                             : (isDark
-                                ? Colors.white.withAlpha(217)
-                                : Colors.black.withAlpha(191)),
+                                ? Colors.white.withAlpha(220)
+                                : Colors.black87),
                       ),
-                      child: const Text(
-                        '分类',
-                        textHeightBehavior: TextHeightBehavior(
-                          applyHeightToFirstAscent: false,
-                          applyHeightToLastDescent: false,
-                        ),
-                      ),
+                      child: const Text('连载'),
                     ),
                   ),
                 ),
@@ -226,7 +214,7 @@ class HomeTopBar extends StatelessWidget {
     required VoidCallback onTap,
     required bool isDark,
     String? tooltip,
-    double iconSize = 20,
+    double iconSize = 16.5,
   }) {
     final button = Material(
       color: Colors.transparent,
@@ -234,8 +222,9 @@ class HomeTopBar extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(100),
         child: Container(
-          width: 38,
-          height: 38,
+          // 等高 30px，与左侧分段滑块和右侧头像严格对齐
+          width: 30,
+          height: 30,
           decoration: BoxDecoration(
             color: isDark
                 ? Colors.white.withAlpha(31)
@@ -283,17 +272,18 @@ class HomeTopBar extends StatelessWidget {
         },
         borderRadius: BorderRadius.circular(100),
         child: Container(
-          padding: const EdgeInsets.all(2),
+          // 等高 30px，与整个极简控制条融为一体
+          width: 30,
+          height: 30,
+          padding: const EdgeInsets.all(1.5),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
               color: theme.colorScheme.primary.withAlpha(128),
-              width: 1.5,
+              width: 1.2,
             ),
           ),
           child: Container(
-            width: 32,
-            height: 32,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isDark
@@ -303,7 +293,7 @@ class HomeTopBar extends StatelessWidget {
             child: const ClipOval(
               child: Icon(
                 Icons.person_rounded,
-                size: 20,
+                size: 16,
                 color: Color(0xFF9CA3AF),
               ),
             ),
