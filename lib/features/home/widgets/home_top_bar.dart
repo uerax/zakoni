@@ -1,17 +1,23 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+/// 现代响应式顶部导航栏：
+/// 1. 桌面/宽屏端（≥840px）：常驻吸顶（Sticky Header，绝不收起隐藏），采用“左品牌 + 居中 440px 搜索台 (带快捷键提示) + 右侧头像”；
+/// 2. 移动端（<840px）：B站式通栏 Quick-Return 架构，采用“左头像 + 右侧通栏搜索条”，下滑阅读时自动上收让出视口，上滑微动时快速召回；
+/// 3. 自屏幕顶端（top: 0）全宽延伸，自然包裹状态栏，彻底杜绝四周漏风与图文重叠打架；
+/// 4. 支持桌面端快捷键绑定（Ctrl+K / ⌘K）直达搜索。
 class HomeTopBar extends StatelessWidget {
-  final int selectedIndex; // 0: 番剧, 1: 连载
-  final ValueChanged<int>? onTabChanged;
+  final bool isVisible;
+  final ValueListenable<double>? scrollOffsetNotifier;
   final VoidCallback? onSearchTap;
   final VoidCallback? onAvatarTap;
 
   const HomeTopBar({
     super.key,
-    this.selectedIndex = 0,
-    this.onTabChanged,
+    this.isVisible = true,
+    this.scrollOffsetNotifier,
     this.onSearchTap,
     this.onAvatarTap,
   });
@@ -20,232 +26,245 @@ class HomeTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isDesktop = screenWidth >= 840;
 
-    return Padding(
-      // 瘦身后的外边距：从 8px 收紧至 4px，降低对顶部的视觉占据
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: Center(
-        // 外层 Container 提供悬浮阴影，内层通过 ClipRRect 裁剪毛玻璃；
-        // 之所以拆分两层，是因为 ClipRRect 会裁切掉同一层级的 BoxShadow 投影，导致弥散悬浮阴影丢失。
+    // 桌面端无条件常驻吸顶 (Offset.zero)，移动端按滑动意图平滑收起 (-1.0) 或唤出 (0.0)
+    final effectiveOffset = isDesktop
+        ? Offset.zero
+        : (isVisible ? Offset.zero : const Offset(0, -1));
+
+    Widget buildBar(double offset) {
+      final progress = (offset / 30.0).clamp(0.0, 1.0);
+
+      Widget barContent = AnimatedSlide(
+        // Quick-Return 动画：1:1 参考 B 站移动端实机约 200ms 敏捷平滑升降动画与 easeOutCubic 阻尼收敛
+        offset: effectiveOffset,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
         child: Container(
+          width: double.infinity,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(100),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(isDark ? 45 : 12),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+            color: isDark
+                ? const Color(0xFF1C1C1E).withAlpha((185 * progress).toInt())
+                : Colors.white.withAlpha((190 * progress).toInt()),
+            border: Border(
+              bottom: BorderSide(
+                color: (isDark ? Colors.white : Colors.black)
+                    .withAlpha((20 * progress).toInt()),
+                width: 0.5,
               ),
-            ],
+            ),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(100),
+          child: ClipRect(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Container(
-                // 极致简约控制栏：高度从 52px 瘦身至 40px，内部各操作组件等高统一为 30px
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-                decoration: BoxDecoration(
-                  // 高透磨砂质感底色：约 68%~70% 不透明度，确保底层卡片与内容色彩在滚动经过时清晰折射出高斯模糊
-                  color: isDark
-                      ? const Color(0xB31C1C1E)
-                      : Colors.white.withAlpha(175),
-                  borderRadius: BorderRadius.circular(100),
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withAlpha(30)
-                        : Colors.black.withAlpha(15),
-                    width: 1.0,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 左侧：【番剧】与【连载】胶囊轨道切换按钮
-                    _buildNavSegmentedTabs(theme: theme, isDark: isDark),
-                    const SizedBox(width: 6),
-
-                    // 右侧 1：搜索圆形按钮
-                    _buildCircleIconButton(
-                      icon: Icons.search_rounded,
-                      tooltip: '搜索番剧',
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        onSearchTap?.call();
-                      },
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 6),
-
-                    // 右侧 2：用户登录头像插槽
-                    _buildUserAvatar(
-                      context: context,
-                      theme: theme,
-                      isDark: isDark,
-                    ),
-                  ],
+              filter: ImageFilter.blur(
+                sigmaX: 20 * progress,
+                sigmaY: 20 * progress,
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: SizedBox(
+                  height: 42,
+                  child: isDesktop
+                      ? _buildDesktopContent(context, theme, isDark)
+                      : _buildMobileContent(context, theme, isDark),
                 ),
               ),
             ),
+          ),
+        ),
+      );
+
+      // 桌面端支持 Ctrl+K / ⌘K 全局搜索快捷键
+      if (isDesktop) {
+        barContent = CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.keyK, control: true): () {
+              onSearchTap?.call();
+            },
+            const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () {
+              onSearchTap?.call();
+            },
+          },
+          child: Focus(
+            autofocus: false,
+            child: barContent,
+          ),
+        );
+      }
+
+      return barContent;
+    }
+
+    if (scrollOffsetNotifier != null) {
+      return ValueListenableBuilder<double>(
+        valueListenable: scrollOffsetNotifier!,
+        builder: (context, offset, _) => buildBar(offset),
+      );
+    }
+
+    return buildBar(0.0);
+  }
+
+  /// 桌面端 Hero 顶部排版：左品牌 + 居中 440px 搜索台 + 右侧用户头像
+  Widget _buildDesktopContent(BuildContext context, ThemeData theme, bool isDark) {
+    final isMac = !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
+    final shortcutText = isMac ? '⌘ K' : 'Ctrl K';
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              // 左侧：品牌纯粹优雅排印
+              Text(
+                'zakoni',
+                style: TextStyle(
+                  fontFamily: theme.textTheme.titleLarge?.fontFamily ?? 'MiSans',
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const Spacer(),
+
+              // 中间：居中 440px 胶囊搜索控制台
+              SizedBox(
+                width: 440,
+                child: _buildSearchBar(
+                  theme: theme,
+                  isDark: isDark,
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(14),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(
+                        color: isDark ? Colors.white.withAlpha(25) : Colors.black.withAlpha(15),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      shortcutText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white60 : Colors.black54,
+                      ),
+                    ),
+                  ),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    onSearchTap?.call();
+                  },
+                ),
+              ),
+              const Spacer(),
+
+              // 右侧：用户登录头像插槽（包裹 44×44pt 规范触控热区）
+              _buildUserAvatar(
+                context: context,
+                theme: theme,
+                isDark: isDark,
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildNavSegmentedTabs({
-    required ThemeData theme,
-    required bool isDark,
-  }) {
-    return Container(
-      width: 108,
-      height: 30,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withAlpha(36)
-            : Colors.black.withAlpha(18),
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Stack(
+  /// 移动端顶部排版：1:1 参考 B 站实机（左头像 + 右侧通栏胶囊搜索条）
+  Widget _buildMobileContent(BuildContext context, ThemeData theme, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
         children: [
-          // 平滑滑动的微渐变指示器滑块
-          AnimatedAlign(
-            alignment: selectedIndex == 0
-                ? Alignment.centerLeft
-                : Alignment.centerRight,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            child: FractionallySizedBox(
-              widthFactor: 0.5,
-              heightFactor: 1.0,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      theme.colorScheme.primary,
-                      theme.colorScheme.primary.withAlpha(217),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(100),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withAlpha(50),
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          // 左侧：用户登录头像插槽（包裹 44×44pt 规范触控热区，36×36 视觉圆形）
+          _buildUserAvatar(
+            context: context,
+            theme: theme,
+            isDark: isDark,
           ),
-          // 左右 Tab 标签点击区域
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    onTabChanged?.call(0);
-                  },
-                  child: Center(
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'MiSans',
-                        fontSize: 12.5,
-                        // 采用 w600 保持饱满立体，避免 w700 在小字号下浓重糊墨；保留字体自然行高以呈现舒展字形
-                        fontWeight: selectedIndex == 0
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                        letterSpacing: 0.2,
-                        color: selectedIndex == 0
-                            ? Colors.white
-                            : (isDark
-                                ? Colors.white.withAlpha(220)
-                                : Colors.black87),
-                      ),
-                      child: const Text('番剧'),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    onTabChanged?.call(1);
-                  },
-                  child: Center(
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'MiSans',
-                        fontSize: 12.5,
-                        fontWeight: selectedIndex == 1
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                        letterSpacing: 0.2,
-                        color: selectedIndex == 1
-                            ? Colors.white
-                            : (isDark
-                                ? Colors.white.withAlpha(220)
-                                : Colors.black87),
-                      ),
-                      child: const Text('连载'),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          const SizedBox(width: 10),
+
+          // 右侧：横向撑满的胶囊形搜索条
+          Expanded(
+            child: _buildSearchBar(
+              theme: theme,
+              isDark: isDark,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onSearchTap?.call();
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCircleIconButton({
-    required IconData icon,
-    required VoidCallback onTap,
+  /// 铺满式胶囊搜索栏：等高 30px，与左侧 30×30 头像精细对齐
+  Widget _buildSearchBar({
+    required ThemeData theme,
     required bool isDark,
-    String? tooltip,
-    double iconSize = 16.5,
+    required VoidCallback onTap,
+    Widget? trailing,
   }) {
-    final button = Material(
+    return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(100),
         child: Container(
-          // 等高 30px，与左侧分段滑块和右侧头像严格对齐
-          width: 30,
           height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: isDark
-                ? Colors.white.withAlpha(31)
-                : Colors.black.withAlpha(18),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Icon(
-              icon,
-              size: iconSize,
-              color: isDark ? Colors.white : Colors.black87,
+                ? Colors.white.withAlpha(22)
+                : Colors.black.withAlpha(12),
+            borderRadius: BorderRadius.circular(100),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withAlpha(20)
+                  : Colors.black.withAlpha(10),
+              width: 0.8,
             ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.search_rounded,
+                size: 16,
+                color: isDark ? Colors.white60 : Colors.black45,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '搜索番剧、剧场版、特别篇...',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'MiSans',
+                    fontSize: 12,
+                    color: isDark ? Colors.white54 : Colors.black45,
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 6),
+                trailing,
+              ],
+            ],
           ),
         ),
       ),
     );
-
-    if (tooltip != null) {
-      return Tooltip(message: tooltip, child: button);
-    }
-    return button;
   }
 
   Widget _buildUserAvatar({
@@ -253,48 +272,56 @@ class HomeTopBar extends StatelessWidget {
     required ThemeData theme,
     required bool isDark,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          if (onAvatarTap != null) {
-            onAvatarTap!();
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('用户登录功能暂未开放'),
-                duration: Duration(seconds: 1),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        },
-        borderRadius: BorderRadius.circular(100),
-        child: Container(
-          // 等高 30px，与整个极简控制条融为一体
-          width: 30,
-          height: 30,
-          padding: const EdgeInsets.all(1.5),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: theme.colorScheme.primary.withAlpha(128),
-              width: 1.2,
-            ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isDark
-                  ? const Color(0xFF2C2C2E)
-                  : const Color(0xFFF2F2F7),
-            ),
-            child: const ClipOval(
-              child: Icon(
-                Icons.person_rounded,
-                size: 16,
-                color: Color(0xFF9CA3AF),
+    return Tooltip(
+      message: '个人中心',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            if (onAvatarTap != null) {
+              onAvatarTap!();
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('用户登录功能暂未开放'),
+                  duration: Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          borderRadius: BorderRadius.circular(22),
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Center(
+              child: Container(
+                width: 30,
+                height: 30,
+                padding: const EdgeInsets.all(1.2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withAlpha(128),
+                    width: 1.0,
+                  ),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDark
+                        ? const Color(0xFF2C2C2E)
+                        : const Color(0xFFF2F2F7),
+                  ),
+                  child: const ClipOval(
+                    child: Icon(
+                      Icons.person_rounded,
+                      size: 16.5,
+                      color: Color(0xFF9CA3AF),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

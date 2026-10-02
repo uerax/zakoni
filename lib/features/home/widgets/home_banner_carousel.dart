@@ -15,12 +15,18 @@ class HomeBannerCarousel extends StatefulWidget {
   final List<BangumiItem> items;
   final int maxCount;
   final Duration autoPlayInterval;
+  final double? height;
+  final EdgeInsetsGeometry? padding;
+  final double? borderRadius;
 
   const HomeBannerCarousel({
     super.key,
     required this.items,
     this.maxCount = 5,
     this.autoPlayInterval = const Duration(seconds: 4),
+    this.height,
+    this.padding,
+    this.borderRadius,
   });
 
   @override
@@ -94,12 +100,12 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
         final isNarrow = screenWidth < 600;
 
         // 手机端几乎吃满宽度（左右微边距 10px），平板及电脑宽屏居中并限宽 840px
-        final double horizontalPadding = isNarrow ? 10.0 : 20.0;
-        final double bannerHeight = isNarrow ? 195.0 : 250.0;
-        final double borderRadiusValue = isNarrow ? 14.0 : 18.0;
+        final double horizontalPadding = widget.padding != null ? 0.0 : (isNarrow ? 10.0 : 20.0);
+        final double bannerHeight = widget.height ?? (isNarrow ? 195.0 : 250.0);
+        final double borderRadiusValue = widget.borderRadius ?? (isNarrow ? 14.0 : 18.0);
 
         Widget content = Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          padding: widget.padding ?? EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: SizedBox(
             height: bannerHeight,
             child: Listener(
@@ -116,41 +122,46 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                 _isInteracting = false;
                 _startAutoPlay();
               },
-              child: Stack(
-                children: [
-                  // 1. 轮播视图核心（PageView.builder 懒加载构建）
-                  PageView.builder(
-                    controller: _pageController,
-                    itemCount: items.length,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _currentIndex = index;
-                      });
-                    },
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      return _buildBannerCard(
-                        context: context,
-                        item: item,
-                        borderRadius: BorderRadius.circular(borderRadiusValue),
-                      );
-                    },
-                  ),
-
-                  // 2. 右下角动态平滑胶囊指示器
-                  if (items.length > 1)
-                    Positioned(
-                      right: 14,
-                      bottom: 12,
-                      child: _buildPageIndicator(items.length),
+              // 关键：外层强制进行抗锯齿圆角裁剪，防止 PageView 在横向滑动切换过程中卡片两端露出直角矩形硬切边
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(borderRadiusValue),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  children: [
+                    // 1. 轮播视图核心（PageView.builder 懒加载构建）
+                    PageView.builder(
+                      controller: _pageController,
+                      itemCount: items.length,
+                      onPageChanged: (index) {
+                        setState(() {
+                          _currentIndex = index;
+                        });
+                      },
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return _buildBannerCard(
+                          context: context,
+                          item: item,
+                          borderRadius: BorderRadius.circular(borderRadiusValue),
+                        );
+                      },
                     ),
-                ],
+
+                    // 2. 右下角动态平滑胶囊指示器
+                    if (items.length > 1)
+                      Positioned(
+                        right: 14,
+                        bottom: 12,
+                        child: _buildPageIndicator(items.length),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
         );
 
-        if (!isNarrow) {
+        if (!isNarrow && widget.height == null) {
           content = Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 860),
@@ -275,7 +286,16 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
 
 /// 1:1 轮播图流光骨架屏
 class ShimmerBannerCarousel extends StatelessWidget {
-  const ShimmerBannerCarousel({super.key});
+  final double? height;
+  final EdgeInsetsGeometry? padding;
+  final double? borderRadius;
+
+  const ShimmerBannerCarousel({
+    super.key,
+    this.height,
+    this.padding,
+    this.borderRadius,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -284,12 +304,12 @@ class ShimmerBannerCarousel extends StatelessWidget {
         final screenWidth = constraints.maxWidth;
         final isNarrow = screenWidth < 600;
 
-        final double horizontalPadding = isNarrow ? 10.0 : 20.0;
-        final double bannerHeight = isNarrow ? 195.0 : 250.0;
-        final double borderRadiusValue = isNarrow ? 14.0 : 18.0;
+        final double horizontalPadding = padding != null ? 0.0 : (isNarrow ? 10.0 : 20.0);
+        final double bannerHeight = height ?? (isNarrow ? 195.0 : 250.0);
+        final double borderRadiusValue = borderRadius ?? (isNarrow ? 14.0 : 18.0);
 
         Widget skeleton = Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          padding: padding ?? EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: ShimmerLoading(
             child: Container(
               height: bannerHeight,
@@ -301,7 +321,7 @@ class ShimmerBannerCarousel extends StatelessWidget {
           ),
         );
 
-        if (!isNarrow) {
+        if (!isNarrow && height == null) {
           skeleton = Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 860),

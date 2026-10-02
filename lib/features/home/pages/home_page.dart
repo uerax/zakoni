@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import '../../../core/models/bangumi/bangumi_calendar.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
-import '../../timeline/pages/timeline_page.dart';
 import '../widgets/home_banner_carousel.dart';
+import '../widgets/home_desktop_hero.dart';
 import '../widgets/home_top_bar.dart';
 import '../widgets/rank_horizontal_section.dart';
+import '../widgets/today_anime_shelf.dart';
 
 class HomePage extends StatefulWidget {
   final BangumiClient client;
@@ -27,8 +29,18 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   // 业务配置：精选探索模块预留开关（后续完善后可直接切为 true 开启）
   static const bool _showExploreSection = false;
 
-  late Future<({List<BangumiItem> tv, List<BangumiItem> movies, List<BangumiItem> ova})> _dataFuture;
-  int _headerTabIndex = 0; // 0: 番剧, 1: 连载
+  late Future<({
+    List<BangumiItem> today,
+    String weekdayName,
+    List<BangumiItem> tv,
+    List<BangumiItem> movies,
+    List<BangumiItem> ova,
+  })> _dataFuture;
+
+  final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier<double>(0.0);
+  bool _isTopBarVisible = true;
+  double _downScrollAccumulator = 0.0;
+  double _upScrollAccumulator = 0.0;
 
   // 保证页面切走后状态保活不被销毁，切回 0ms 瞬间呈现，不重复请求网络
   @override
@@ -40,6 +52,12 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _scrollOffsetNotifier.dispose();
+    super.dispose();
+  }
+
   void _loadData({bool forceRefresh = false}) {
     setState(() {
       _dataFuture = _fetchHomeData(forceRefresh: forceRefresh);
@@ -47,25 +65,61 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   }
 
   void _onShelfViewAllTap(String category) {
-    // 点击末端“浏览全部”专属探索卡片：通知外层主壳切换到底栏“分类”标签页并定位分类
+    // 点击“浏览全部”快捷入口：通知外层主壳切换到底栏“分类”标签页并定位分类
     if (widget.onNavigateToCategory != null) {
       widget.onNavigateToCategory!(category);
     }
   }
 
-  Future<({List<BangumiItem> tv, List<BangumiItem> movies, List<BangumiItem> ova})> _fetchHomeData({
+  Future<({
+    List<BangumiItem> today,
+    String weekdayName,
+    List<BangumiItem> tv,
+    List<BangumiItem> movies,
+    List<BangumiItem> ova,
+  })> _fetchHomeData({
     bool forceRefresh = false,
   }) async {
     final results = await Future.wait([
+      widget.client.getCalendar(forceRefresh: forceRefresh),
       widget.client.getTrending(limit: 18, forceRefresh: forceRefresh),
       widget.client.getHotMovies(limit: 18, forceRefresh: forceRefresh),
       widget.client.getHotOva(limit: 18, forceRefresh: forceRefresh),
     ]);
 
+    final calendarDays = results[0] as List<BangumiCalendarDay>;
+    final tv = results[1] as List<BangumiItem>;
+    final movies = results[2] as List<BangumiItem>;
+    final ova = results[3] as List<BangumiItem>;
+
+    final now = DateTime.now();
+    final todayWeekday = now.weekday; // 1=Mon .. 7=Sun
+    const weekLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    final weekdayName = weekLabels[(todayWeekday - 1).clamp(0, 6)];
+
+    final todayItems = calendarDays
+        .firstWhere(
+          (d) => d.weekday.id == todayWeekday,
+          orElse: () => calendarDays.isNotEmpty
+              ? calendarDays[0]
+              : BangumiCalendarDay(
+                  weekday: BangumiWeekday(
+                    id: todayWeekday,
+                    en: '',
+                    cn: weekdayName,
+                    ja: '',
+                  ),
+                  items: const [],
+                ),
+        )
+        .items;
+
     return (
-      tv: results[0],
-      movies: results[1],
-      ova: results[2],
+      today: todayItems,
+      weekdayName: weekdayName,
+      tv: tv,
+      movies: movies,
+      ova: ova,
     );
   }
 
@@ -104,36 +158,72 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             ),
           ),
 
-          // 1. 底层：内容区域（IndexedStack 保活番剧大厅与连载周历，双向切换 0 延迟）
+          // 1. 底层：内容流区域（包裹滚动通知监听，驱动顶部栏毛玻璃与 Quick-Return 平滑显隐）
           Positioned.fill(
-            child: IndexedStack(
-              index: _headerTabIndex,
-              children: [
-                _buildAnimeContent(context, theme, safeTop),
-                TimelinePage(
-                  key: ValueKey('timeline_${widget.client.sourcePreset.name}'),
-                  client: widget.client,
-                  showAppBar: false,
-                ),
-              ],
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification.metrics.axis == Axis.vertical) {
+                  _scrollOffsetNotifier.value = notification.metrics.pixels;
+
+                  final isDesktop = MediaQuery.sizeOf(context).width >= 840;
+
+                  if (isDesktop) {
+                    // 桌面端无条件常驻吸顶显示，绝不执行上下收起动画
+                    if (!_isTopBarVisible) {
+                      setState(() {
+                        _isTopBarVisible = true;
+                      });
+                    }
+                  } else if (notification is ScrollUpdateNotification) {
+                    final currentPixels = notification.metrics.pixels;
+                    final delta = notification.scrollDelta ?? 0.0;
+
+                    // 1. 顶部零点保护：距离顶部 10px 以内无条件强制显现
+                    if (currentPixels <= 10) {
+                      if (!_isTopBarVisible) {
+                        setState(() {
+                          _isTopBarVisible = true;
+                        });
+                      }
+                      _downScrollAccumulator = 0.0;
+                      _upScrollAccumulator = 0.0;
+                    }
+                    // 2. 向下滑动（内容向上走，阅读浏览模式）：累积下滚超过 20px 触发平滑收起
+                    else if (delta > 1.5) {
+                      _downScrollAccumulator += delta;
+                      _upScrollAccumulator = 0.0;
+                      if (_downScrollAccumulator > 20.0 && _isTopBarVisible) {
+                        setState(() {
+                          _isTopBarVisible = false;
+                        });
+                      }
+                    }
+                    // 3. 向上滑动（内容向下走，意图回滚或搜索）：累积上滚超过 12px 触发快速召回显现
+                    else if (delta < -1.5) {
+                      _upScrollAccumulator += delta.abs();
+                      _downScrollAccumulator = 0.0;
+                      if (_upScrollAccumulator > 12.0 && !_isTopBarVisible) {
+                        setState(() {
+                          _isTopBarVisible = true;
+                        });
+                      }
+                    }
+                  }
+                }
+                return false;
+              },
+              child: _buildAnimeContent(context, theme, safeTop),
             ),
           ),
 
-          // 2. 顶层：悬浮的毛玻璃顶部胶囊导航栏
+          // 2. 顶层：B 站式全宽平滑延伸沉浸顶部导航栏（支持下滑收起上滑显现）
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: HomeTopBar(
-                selectedIndex: _headerTabIndex,
-                onTabChanged: (index) {
-                  setState(() {
-                    _headerTabIndex = index;
-                  });
-                },
-              ),
+            child: HomeTopBar(
+              isVisible: _isTopBarVisible,
+              scrollOffsetNotifier: _scrollOffsetNotifier,
             ),
           ),
         ],
@@ -142,11 +232,17 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _buildAnimeContent(BuildContext context, ThemeData theme, double safeTop) {
-    return FutureBuilder<({List<BangumiItem> tv, List<BangumiItem> movies, List<BangumiItem> ova})>(
+    return FutureBuilder<({
+      List<BangumiItem> today,
+      String weekdayName,
+      List<BangumiItem> tv,
+      List<BangumiItem> movies,
+      List<BangumiItem> ova,
+    })>(
       future: _dataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          // 彻底告别粗暴转圈菊花：以 1:1 动态流光骨架屏无缝垫底，呈现现代 iOS 级即时响应感
+          // 1:1 动态流光骨架屏无缝垫底，呈现即时响应感
           return _buildShimmerSkeleton(context, theme, safeTop);
         }
 
@@ -182,12 +278,15 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         }
 
         final data = snapshot.data;
+        final today = data?.today ?? [];
+        final weekdayName = data?.weekdayName ?? '今日';
         final tv = data?.tv ?? [];
         final movies = data?.movies ?? [];
         final ova = data?.ova ?? [];
 
         // 精选探索流预留数据（开关开启时使用）
         final exploreItems = <BangumiItem>[
+          ...today,
           ...tv,
           ...movies,
           ...ova,
@@ -205,24 +304,62 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             // 核心防卡顿防线：精确限制可视区外预加载距离（250px），未进入视口的卡片不发起网络下载
             scrollCacheExtent: const ScrollCacheExtent.pixels(250),
             slivers: [
-              // 顶部预留安全高度（状态栏 + 极简胶囊栏整体高度 48px），首屏内容紧贴胶囊下沿，上滑时穿透并呈现高斯模糊
+              // 顶部预留安全高度（状态栏 + 顶栏高度 42px），首屏内容在滚动时穿透并呈现高斯模糊磨砂效果
               SliverToBoxAdapter(
-                child: SizedBox(height: safeTop + 48),
+                child: SizedBox(height: safeTop + 42),
               ),
 
-              // 顶部精选横幅轮播图（取热门 TV 番剧前 5 部，手机端几乎吃满，平板/电脑居中）
-              if (tv.isNotEmpty) ...[
-                const SliverToBoxAdapter(child: SizedBox(height: 8)),
-                SliverToBoxAdapter(
-                  child: HomeBannerCarousel(items: tv),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 8)),
-              ],
+              // 顶部轮播与今日放送：响应式双模式（宽屏模式下左右分栏，窄屏模式下纵向流）
+              SliverToBoxAdapter(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isDesktop = constraints.maxWidth >= 840;
 
-              // 货架 1：热门 TV 番剧独立货架（Netflix / Apple TV 经典货架陈列）
+                    if (isDesktop && (tv.isNotEmpty || today.isNotEmpty)) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 12),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1200),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: HomeDesktopHero(
+                                bannerItems: tv,
+                                todayItems: today,
+                                weekdayName: weekdayName,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    // 移动端/窄屏模式（原布局保持不变）
+                    return Column(
+                      children: [
+                        if (tv.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          HomeBannerCarousel(items: tv),
+                          const SizedBox(height: 10),
+                        ],
+                        if (today.isNotEmpty) ...[
+                          TodayAnimeShelf(
+                            items: today,
+                            weekdayName: weekdayName,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ),
+
+              // 货架 1：热门 TV 番剧独立货架
               SliverToBoxAdapter(
                 child: AnimeHorizontalShelf(
-                  title: '🏆 热门 TV 番剧',
+                  icon: Icons.tv_rounded,
+                  title: '热门 TV 番剧',
                   items: tv,
                   defaultStatType: 'heat',
                   viewAllSubtitle: '浏览全部 TV',
@@ -234,7 +371,8 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               // 货架 2：热门剧场版独立货架
               SliverToBoxAdapter(
                 child: AnimeHorizontalShelf(
-                  title: '🎬 热门剧场版',
+                  icon: Icons.movie_filter_rounded,
+                  title: '热门剧场版',
                   items: movies,
                   defaultStatType: 'collect',
                   viewAllSubtitle: '浏览全部剧场版',
@@ -246,7 +384,8 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               // 货架 3：热门 OVA / 特别篇独立货架
               SliverToBoxAdapter(
                 child: AnimeHorizontalShelf(
-                  title: '📀 热门 OVA / 特别篇',
+                  icon: Icons.album_rounded,
+                  title: '热门 OVA / 特别篇',
                   items: ova,
                   defaultStatType: 'collect',
                   viewAllSubtitle: '浏览全部 OVA',
@@ -260,19 +399,25 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                   child: SizedBox(height: 12),
                 ),
 
-                // 纵向双列探索板块大标题（iOS HIG 报刊式大标题排印）
+                // 纵向双列探索板块大标题
                 if (uniqueExploreItems.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                       child: Row(
                         children: [
+                          Icon(
+                            Icons.explore_rounded,
+                            size: 18,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 7),
                           Text(
-                            '✨ 精选探索',
+                            '精选探索',
                             style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
                               color: theme.textTheme.titleLarge?.color,
                             ),
                           ),
@@ -290,7 +435,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                     ),
                   ),
 
-                // 纵向双列精选瀑布流网格（搭载按压物理回弹卡片与 Animaku 语义三色标签）
+                // 纵向双列精选瀑布流网格
                 if (uniqueExploreItems.isNotEmpty)
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -322,7 +467,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
     );
   }
 
-  /// 1:1 动态流光骨架屏结构：对应 3 行独立货架的平滑加载占位
+  /// 1:1 动态流光骨架屏结构：对应轮播图、今日更新与 3 行独立货架的平滑加载占位
   Widget _buildShimmerSkeleton(BuildContext context, ThemeData theme, double safeTop) {
     Widget buildShelfSkeletonRow(String title) {
       return Column(
@@ -332,7 +477,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: ShimmerLoading(
               child: Container(
-                height: 20,
+                height: 18,
                 width: 140,
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -361,13 +506,40 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         physics: const NeverScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
-            child: SizedBox(height: safeTop + 48),
+            child: SizedBox(height: safeTop + 42),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
-          const SliverToBoxAdapter(
-            child: ShimmerBannerCarousel(),
+          SliverToBoxAdapter(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isDesktop = constraints.maxWidth >= 840;
+
+                if (isDesktop) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 12),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1200),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: ShimmerDesktopHero(),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return const Column(
+                  children: [
+                    SizedBox(height: 8),
+                    ShimmerBannerCarousel(),
+                    SizedBox(height: 10),
+                    ShimmerTodayShelf(),
+                    SizedBox(height: 12),
+                  ],
+                );
+              },
+            ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
           // 3 行独立货架骨架流光
           SliverToBoxAdapter(
             child: buildShelfSkeletonRow('TV 番剧'),
@@ -391,7 +563,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                 child: ShimmerLoading(
                   child: Container(
-                    height: 20,
+                    height: 18,
                     width: 120,
                     decoration: BoxDecoration(
                       color: Colors.white,

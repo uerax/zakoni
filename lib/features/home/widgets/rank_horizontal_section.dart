@@ -27,6 +27,7 @@ class AnimeHorizontalShelf extends StatefulWidget {
   static const Color doingColor = Color(0xFFFBBF24);
   static const Color collectColor = Color(0xFF34D399);
 
+  final IconData? icon;
   final String title;
   final List<BangumiItem> items;
   final VoidCallback? onViewAllTap;
@@ -36,6 +37,7 @@ class AnimeHorizontalShelf extends StatefulWidget {
 
   const AnimeHorizontalShelf({
     super.key,
+    this.icon,
     required this.title,
     required this.items,
     this.onViewAllTap,
@@ -142,22 +144,66 @@ class _AnimeHorizontalShelfState extends State<AnimeHorizontalShelf> {
     );
   }
 
-  /// 纯净大气的原生大标题（彻底摒弃粗糙的 Web 字样“更多 >”）
+  /// 规范排印的原生大标题 + 矢量图标与直达“全部”入口
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-      child: Text(
-        widget.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.5,
-          color: theme.textTheme.titleLarge?.color,
-        ),
+      child: Row(
+        children: [
+          if (widget.icon != null) ...[
+            Icon(
+              widget.icon,
+              size: 18,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 7),
+          ],
+          Expanded(
+            child: Text(
+              widget.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+                color: theme.textTheme.titleLarge?.color,
+              ),
+            ),
+          ),
+          if (widget.onViewAllTap != null)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.onViewAllTap,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '全部',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(width: 1),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

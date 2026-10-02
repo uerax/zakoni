@@ -37,27 +37,17 @@ void main() {
     await tester.pumpWidget(ZakoniApp(client: client));
     await tester.pumpAndSettle();
 
-    // 检查顶部胶囊栏：番剧、连载
-    expect(find.text('番剧'), findsOneWidget);
-    expect(find.text('连载'), findsOneWidget);
+    // 检查顶部全宽沉浸式栏：搜索栏占位文字
+    expect(find.text('搜索番剧、剧场版、特别篇...'), findsOneWidget);
 
-    // 检查首屏独立货架大标题
-    expect(find.text('🏆 热门 TV 番剧'), findsOneWidget);
-    expect(find.text('🎬 热门剧场版'), findsOneWidget);
+    // 检查首屏独立货架大标题（规范排印，无 Emoji）
+    expect(find.text('热门 TV 番剧'), findsOneWidget);
+    expect(find.text('热门剧场版'), findsOneWidget);
 
     // 向下滚动页面，验证第 3 个货架（OVA）视口懒加载正常挂载
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
     await tester.pumpAndSettle();
-    expect(find.text('📀 热门 OVA / 特别篇'), findsOneWidget);
-
-    // 切换到顶部“连载”标签（连载新番周历）
-    await tester.tap(find.text('连载'));
-    await tester.pumpAndSettle();
-
-    // 切回顶部“番剧”标签
-    await tester.tap(find.text('番剧'));
-    await tester.pumpAndSettle();
-    expect(find.text('🏆 热门 TV 番剧', skipOffstage: false), findsOneWidget);
+    expect(find.text('热门 OVA / 特别篇'), findsOneWidget);
 
     // 切换到底部“分类”（四宫格图标）
     await tester.tap(find.byIcon(Icons.grid_view_outlined));
@@ -103,5 +93,24 @@ void main() {
     await tester.tap(find.byIcon(Icons.home_outlined));
     await tester.pumpAndSettle();
     expect(find.text('⊞ 分类索引', skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('HomePage adapts to desktop mode with HomeDesktopHero when width >= 840', (WidgetTester tester) async {
+    final dio = Dio();
+    dio.httpClientAdapter = ImmediateMockAdapter();
+    final client = BangumiClient(dio: dio);
+
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(ZakoniApp(client: client));
+    await tester.pumpAndSettle();
+
+    expect(find.text('搜索番剧、剧场版、特别篇...'), findsOneWidget);
+    expect(find.text('热门 TV 番剧'), findsOneWidget);
   });
 }
