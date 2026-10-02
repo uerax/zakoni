@@ -696,7 +696,6 @@ class _SettingsPageState extends State<SettingsPage> {
                             )
                           : _buildIconBox(Icons.wallpaper_rounded, const Color(0xFF3A86FF)),
                       title: '背景壁纸',
-                      subtitle: _getWallpaperStatusText(appMgr),
                       showDivider: false,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -717,50 +716,47 @@ class _SettingsPageState extends State<SettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildWallpaperScopeSelector(theme),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _pickCustomWallpaper,
-                                icon: const Icon(Icons.photo_outlined, size: 15),
-                                label: Text(
-                                  _wallpaperScope == 'all' ? '设置全局壁纸' : '设置本页壁纸',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                              ),
-                            ),
-                            if (_hasCurrentScopeWallpaper(appMgr)) ...[
-                              const SizedBox(width: 8),
-                              IconButton.outlined(
-                                onPressed: _confirmClearWallpaper,
-                                icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
-                                tooltip: '清除壁纸',
-                                style: IconButton.styleFrom(
-                                  side: BorderSide(color: Colors.redAccent.withAlpha(90)),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  padding: const EdgeInsets.all(7),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
                         if (appMgr.hasWallpaperForPage(_wallpaperScope == 'all' ? null : _wallpaperScope)) ...[
                           const SizedBox(height: 10),
                           SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.tonalIcon(
-                              onPressed: _reopenCropDialog,
-                              icon: const Icon(Icons.crop_free_rounded, size: 16),
-                              label: const Text('调整壁纸取景', style: TextStyle(fontSize: 12)),
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
+                            height: 36,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 36,
+                                    child: FilledButton.tonalIcon(
+                                      onPressed: _reopenCropDialog,
+                                      icon: const Icon(Icons.crop_free_rounded, size: 16),
+                                      label: const Text('调整画面取景', style: TextStyle(fontSize: 12)),
+                                      style: FilledButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (_hasCurrentScopeWallpaper(appMgr)) ...[
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 36,
+                                    height: 36,
+                                    child: OutlinedButton(
+                                      onPressed: _confirmClearWallpaper,
+                                      style: OutlinedButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        side: BorderSide(color: Colors.redAccent.withAlpha(100)),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                      child: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        size: 18,
+                                        color: Colors.redAccent,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -971,19 +967,6 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ),
     );
-  }
-
-  String _getWallpaperStatusText(AppearanceManager appMgr) {
-    if (_wallpaperScope == 'all') {
-      return appMgr.globalWallpaperPath != null ? '已设置全局壁纸' : '未设置全局壁纸';
-    }
-    if (appMgr.isPageOverridden(_wallpaperScope)) {
-      return '已设置本页专属壁纸';
-    }
-    if (appMgr.globalWallpaperPath != null) {
-      return '当前跟随全局壁纸';
-    }
-    return '未设置壁纸';
   }
 
   bool _hasCurrentScopeWallpaper(AppearanceManager appMgr) {
