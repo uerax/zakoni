@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'core/network/bangumi_client.dart';
 import 'core/utils/font_manager.dart';
@@ -22,6 +23,38 @@ class ZakoniApp extends StatelessWidget {
       listenable: FontManager.instance,
       builder: (context, _) {
         final currentFont = FontManager.instance.activeFontFamily;
+        final fontFallback = FontManager.fallbackFontFamilies;
+
+        final cupertinoTextTheme = CupertinoTextThemeData(
+          textStyle: TextStyle(
+            fontFamily: currentFont,
+            fontFamilyFallback: fontFallback,
+          ),
+          actionTextStyle: TextStyle(
+            fontFamily: currentFont,
+            fontFamilyFallback: fontFallback,
+          ),
+          tabLabelTextStyle: TextStyle(
+            fontFamily: currentFont,
+            fontFamilyFallback: fontFallback,
+          ),
+          navTitleTextStyle: TextStyle(
+            fontFamily: currentFont,
+            fontFamilyFallback: fontFallback,
+          ),
+          navLargeTitleTextStyle: TextStyle(
+            fontFamily: currentFont,
+            fontFamilyFallback: fontFallback,
+          ),
+          pickerTextStyle: TextStyle(
+            fontFamily: currentFont,
+            fontFamilyFallback: fontFallback,
+          ),
+          dateTimePickerTextStyle: TextStyle(
+            fontFamily: currentFont,
+            fontFamilyFallback: fontFallback,
+          ),
+        );
 
         return MaterialApp(
           title: 'Zakoni 动漫',
@@ -30,19 +63,31 @@ class ZakoniApp extends StatelessWidget {
           theme: ThemeData(
             useMaterial3: true,
             fontFamily: currentFont,
+            fontFamilyFallback: fontFallback,
             colorScheme: ColorScheme.fromSeed(
               seedColor: primaryColor,
               primary: primaryColor,
               brightness: Brightness.light,
             ),
+            cupertinoOverrideTheme: CupertinoThemeData(
+              primaryColor: primaryColor,
+              brightness: Brightness.light,
+              textTheme: cupertinoTextTheme,
+            ),
           ),
           darkTheme: ThemeData(
             useMaterial3: true,
             fontFamily: currentFont,
+            fontFamilyFallback: fontFallback,
             colorScheme: ColorScheme.fromSeed(
               seedColor: primaryColor,
               primary: primaryColor,
               brightness: Brightness.dark,
+            ),
+            cupertinoOverrideTheme: CupertinoThemeData(
+              primaryColor: primaryColor,
+              brightness: Brightness.dark,
+              textTheme: cupertinoTextTheme,
             ),
           ),
           themeMode: ThemeMode.system,

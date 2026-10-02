@@ -32,7 +32,7 @@ class AppearanceManager extends ChangeNotifier {
 
   // 壁纸视觉调节参数
   double _wallpaperOpacity = 0.18;
-  double _wallpaperBlur = 6.0;
+  double _wallpaperBlur = 1.0;
 
   String? get customIconPath => _customIconPath;
   String? get globalWallpaperPath => _globalWallpaperPath;

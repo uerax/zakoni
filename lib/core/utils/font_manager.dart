@@ -3,8 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 enum AppFontType {
-  harmony('HarmonyOS Sans', '鸿蒙黑体 (内置推荐)'),
-  system('', '系统默认字体'),
+  harmony('HarmonyOS Sans', '鸿蒙黑体'),
+  system('Microsoft YaHei', '系统默认'),
   custom('CustomFont', '自定义导入字体');
 
   final String fontFamily;
@@ -15,12 +15,19 @@ enum AppFontType {
 
 /// 全局字体管理器：
 /// 1. 默认内置使用鸿蒙黑体 (HarmonyOS Sans)；
-/// 2. 支持一键切回系统字体；
+/// 2. 支持切回系统默认无衬线字体（Windows 采用微软雅黑，规避回退至中易宋体）；
 /// 3. 支持在运行时通过 FontLoader 动态载入用户上传的本地 .ttf / .otf 字体文件，免重启即时全局生效。
 class FontManager extends ChangeNotifier {
   static final FontManager instance = FontManager._internal();
 
   FontManager._internal();
+
+  static const List<String> fallbackFontFamilies = [
+    'Microsoft YaHei',
+    'PingFang SC',
+    'Noto Sans SC',
+    'sans-serif',
+  ];
 
   AppFontType _currentType = AppFontType.harmony;
   String? _customFontPath;
@@ -36,7 +43,14 @@ class FontManager extends ChangeNotifier {
       case AppFontType.harmony:
         return AppFontType.harmony.fontFamily;
       case AppFontType.system:
-        return null;
+        if (kIsWeb) return 'sans-serif';
+        if (defaultTargetPlatform == TargetPlatform.windows) {
+          return 'Microsoft YaHei';
+        } else if (defaultTargetPlatform == TargetPlatform.macOS ||
+            defaultTargetPlatform == TargetPlatform.iOS) {
+          return 'PingFang SC';
+        }
+        return 'Noto Sans SC';
       case AppFontType.custom:
         return AppFontType.custom.fontFamily;
     }
@@ -69,5 +83,15 @@ class FontManager extends ChangeNotifier {
       debugPrint('加载自定义字体失败: $e');
       return false;
     }
+  }
+
+  /// 移除已导入的自定义字体并自动切回默认推荐字体
+  void clearCustomFont() {
+    _customFontPath = null;
+    _customFontName = '未选择文件';
+    if (_currentType == AppFontType.custom) {
+      _currentType = AppFontType.harmony;
+    }
+    notifyListeners();
   }
 }
