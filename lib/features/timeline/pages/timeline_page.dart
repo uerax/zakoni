@@ -326,7 +326,17 @@ class _KeepAliveDayViewState extends State<_KeepAliveDayView>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = (constraints.maxWidth ~/ 180).clamp(2, 6);
+        final width = constraints.maxWidth;
+        final int crossAxisCount;
+        if (width < 500) {
+          crossAxisCount = 3;
+        } else if (width < 750) {
+          crossAxisCount = 4;
+        } else if (width < 1000) {
+          crossAxisCount = 5;
+        } else {
+          crossAxisCount = 6;
+        }
 
         return GridView.builder(
           key: PageStorageKey<String>(
@@ -336,14 +346,14 @@ class _KeepAliveDayViewState extends State<_KeepAliveDayView>
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: 0.62,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            childAspectRatio: crossAxisCount >= 3 ? 0.58 : 0.62,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
           ),
           itemCount: widget.dayData.items.length,
           itemBuilder: (context, index) {
             final item = widget.dayData.items[index];
-            return AnimeCard(item: item);
+            return AnimeCard(item: item, compact: true);
           },
         );
       },

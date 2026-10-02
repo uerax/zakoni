@@ -6,11 +6,13 @@ import 'cached_anime_image.dart';
 class AnimeCard extends StatelessWidget {
   final BangumiItem item;
   final VoidCallback? onTap;
+  final bool compact;
 
   const AnimeCard({
     super.key,
     required this.item,
     this.onTap,
+    this.compact = false,
   });
 
   @override
@@ -23,7 +25,7 @@ class AnimeCard extends StatelessWidget {
       onTap: onTap ?? () => showAnimeDetailSheet(context, item),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(compact ? 8 : 12),
           color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
           boxShadow: [
             BoxShadow(
@@ -59,7 +61,7 @@ class AnimeCard extends StatelessWidget {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    height: 38,
+                    height: compact ? 28 : 38,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -76,24 +78,31 @@ class AnimeCard extends StatelessWidget {
                   // 右上角评分角标
                   if (item.ratingScore > 0)
                     Positioned(
-                      top: 6,
-                      right: 6,
+                      top: compact ? 4 : 6,
+                      right: compact ? 4 : 6,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: compact ? 4 : 6,
+                          vertical: compact ? 1.5 : 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withAlpha(180),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(compact ? 3 : 4),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.star_rounded, size: 13, color: Colors.amber),
-                            const SizedBox(width: 2),
+                            Icon(
+                              Icons.star_rounded,
+                              size: compact ? 10 : 13,
+                              color: Colors.amber,
+                            ),
+                            SizedBox(width: compact ? 1.5 : 2),
                             Text(
                               '${item.ratingScore}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 11,
+                                fontSize: compact ? 9.5 : 11,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -104,13 +113,16 @@ class AnimeCard extends StatelessWidget {
                   // 左下角状态/已看/在看/热度角标（Animaku 原生三色语义规范）
                   if (bottomStat != null)
                     Positioned(
-                      bottom: 5,
-                      left: 6,
+                      bottom: compact ? 4 : 5,
+                      left: compact ? 4 : 6,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: compact ? 4 : 5,
+                          vertical: compact ? 1.5 : 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withAlpha(140),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(compact ? 3 : 4),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -121,16 +133,16 @@ class AnimeCard extends StatelessWidget {
                               bottomStat.count,
                               style: TextStyle(
                                 color: bottomStat.color,
-                                fontSize: 10,
+                                fontSize: compact ? 8.5 : 10,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(width: 2),
+                            SizedBox(width: compact ? 1.5 : 2),
                             Text(
                               bottomStat.label,
                               style: TextStyle(
                                 color: Colors.white.withAlpha(210),
-                                fontSize: 9,
+                                fontSize: compact ? 8 : 9,
                               ),
                             ),
                           ],
@@ -141,7 +153,9 @@ class AnimeCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: compact
+                  ? const EdgeInsets.symmetric(horizontal: 6.0, vertical: 5.0)
+                  : const EdgeInsets.all(8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -151,7 +165,7 @@ class AnimeCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize: 12.5,
+                      fontSize: compact ? 11.5 : 12.5,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -161,7 +175,7 @@ class AnimeCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
-                      fontSize: 10,
+                      fontSize: compact ? 9 : 10,
                     ),
                   ),
                 ],
