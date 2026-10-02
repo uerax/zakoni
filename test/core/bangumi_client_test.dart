@@ -220,5 +220,50 @@ void main() {
       );
       expect(requestedFilters.last.containsKey('rank'), false);
     });
+
+    test('searchWithTotal caches query response and avoids redundant network requests', () async {
+      int requestCount = 0;
+      dio = Dio(BaseOptions(baseUrl: 'https://api.bgm.tv'));
+      dio.httpClientAdapter = MockAdapter((options) {
+        requestCount++;
+        return {
+          'statusCode': 200,
+          'data': {
+            'total': 1,
+            'limit': 20,
+            'offset': 0,
+            'data': [
+              {
+                'id': 2001,
+                'type': 2,
+                'name': 'Cached Anime',
+                'name_cn': '缓存动画',
+              }
+            ]
+          }
+        };
+      });
+      client = BangumiClient(dio: dio);
+
+      // 首次请求：应触发网络调用
+      final first = await client.searchWithTotal('', tags: ['科幻'], sort: 'heat');
+      expect(requestCount, 1);
+      expect(first.items.first.nameCn, '缓存动画');
+
+      // 同一参数再次请求：应直接命中内存缓存，requestCount 依然为 1
+      final second = await client.searchWithTotal('', tags: ['科幻'], sort: 'heat');
+      expect(requestCount, 1);
+      expect(second.items.first.nameCn, '缓存动画');
+
+      // 同步探测 peekSearchCache：无需异步等待即可瞬间拿到缓存
+      final peeked = client.peekSearchCache('', tags: ['科幻'], sort: 'heat');
+      expect(peeked, isNotNull);
+      expect(peeked!.items.first.id, 2001);
+
+      // forceRefresh = true 时强刷穿透缓存：requestCount 增加到 2
+      final forced = await client.searchWithTotal('', tags: ['科幻'], sort: 'heat', forceRefresh: true);
+      expect(requestCount, 2);
+      expect(forced.items.first.id, 2001);
+    });
   });
 }

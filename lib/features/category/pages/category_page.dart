@@ -76,6 +76,20 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
     final state = ref.watch(categoryControllerProvider(widget.initialCategory));
     final controller = ref.read(categoryControllerProvider(widget.initialCategory).notifier);
 
+    // 筛选切换时轻量回滚至列表顶部，保障视觉连贯
+    ref.listen(
+      categoryControllerProvider(widget.initialCategory).select((s) => s.filter),
+      (prev, next) {
+        if (prev != null && prev != next && _scrollController.hasClients) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      },
+    );
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -105,11 +119,12 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
           SafeArea(
             bottom: false,
             child: RefreshIndicator(
-              onRefresh: controller.fetchFirstPage,
+              onRefresh: () => controller.fetchFirstPage(forceRefresh: true),
               displacement: 20,
               color: theme.colorScheme.primary,
               child: CustomScrollView(
                 controller: _scrollController,
+                cacheExtent: 180.0,
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
                 ),
@@ -145,14 +160,29 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: Text(
-                        state.buildFilterSummary(),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurfaceVariant.withAlpha(200),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              state.buildFilterSummary(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurfaceVariant.withAlpha(200),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (state.isLoading && state.items.isNotEmpty)
+                            SizedBox(
+                              width: 13,
+                              height: 13,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.8,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),

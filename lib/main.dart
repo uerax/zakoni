@@ -8,6 +8,10 @@ import 'core/utils/scroll_behavior.dart';
 import 'features/main_navigation_shell.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // 调优 Flutter 全局 ImageCache 显存上限，防止长列表无限滑动将大量解码位图积压在内存引发 OOM
+  PaintingBinding.instance.imageCache.maximumSize = 100;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024; // 50MB 显存水线
   runApp(const ZakoniApp());
 }
 

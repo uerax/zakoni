@@ -25,8 +25,10 @@ class CategoryContentView extends ConsumerWidget {
     );
     final controller = ref.read(categoryControllerProvider(initialCategory).notifier);
 
-    // 1. 初次或切换条件加载中：呈现与 AnimeCard 1:1 的高性能流光骨架屏
-    if (isLoading) {
+    // 1. 仅在首次完全无数据且加载中时：呈现骨架屏
+    // 关键体验改造：当屏幕已有数据时（items.isNotEmpty），切换分类绝不销毁列表换骨架屏！
+    // 保持旧列表在屏平滑过渡，新数据就绪后瞬间替换，彻底消除白屏与骨架屏闪烁！
+    if (isLoading && items.isEmpty) {
       return SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         sliver: SliverLayoutBuilder(
@@ -130,33 +132,40 @@ class CategoryContentView extends ConsumerWidget {
     }
 
     // 4. 正常数据呈现：自适应 3 列（移动端推荐）/ 4~6 列（宽屏）网格瀑布流
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      sliver: SliverLayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.crossAxisExtent;
-          final count = width < 500 ? 3 : (width < 750 ? 4 : (width < 1000 ? 5 : 6));
+    // 当切换分类加载时仅施加 0.72 柔和透明度反馈，不销毁列表，无感替换
+    return SliverAnimatedOpacity(
+      opacity: isLoading ? 0.72 : 1.0,
+      duration: const Duration(milliseconds: 180),
+      sliver: SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        sliver: SliverLayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.crossAxisExtent;
+            final count = width < 500 ? 3 : (width < 750 ? 4 : (width < 1000 ? 5 : 6));
 
-          return SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: count,
-              childAspectRatio: 0.58,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final item = items[index];
-                return AnimeCard(
-                  key: ValueKey('anime_cat_${item.id}'),
-                  item: item,
-                  compact: true,
-                );
-              },
-              childCount: items.length,
-            ),
-          );
-        },
+            return SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: count,
+                childAspectRatio: 0.58,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final item = items[index];
+                  return AnimeCard(
+                    key: ValueKey('anime_cat_${item.id}'),
+                    item: item,
+                    compact: true,
+                  );
+                },
+                childCount: items.length,
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
+              ),
+            );
+          },
+        ),
       ),
     );
   }

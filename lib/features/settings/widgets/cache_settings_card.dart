@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import '../../../core/network/anime_image_cache_manager.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/utils/font_manager.dart';
 import 'ios_settings_card.dart';
@@ -15,47 +16,52 @@ class CacheSettingsCard extends StatefulWidget {
 }
 
 class _CacheSettingsCardState extends State<CacheSettingsCard> {
-  String _cacheSizeStr = '计算中...';
+  String _imageCacheSizeStr = '0.0 MB';
+  String _dataCacheSizeStr = '0.0 MB';
 
   @override
   void initState() {
     super.initState();
-    _updateCacheSize();
+    _updateCacheSizes();
   }
 
-  Future<void> _updateCacheSize() async {
-    try {
-      final sizeInBytes = await DefaultCacheManager().store.getCacheSize();
-      if (!mounted) return;
-      setState(() {
-        if (sizeInBytes <= 0) {
-          _cacheSizeStr = '0.0 MB';
-        } else if (sizeInBytes < 1024 * 1024) {
-          _cacheSizeStr = '${(sizeInBytes / 1024).toStringAsFixed(1)} KB';
-        } else {
-          _cacheSizeStr = '${(sizeInBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-        }
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _cacheSizeStr = '0.0 MB';
-        });
-      }
+  String _formatBytes(int bytes) {
+    if (bytes <= 0) return '0.0 MB';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
     }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  Future<void> _performClearCache() async {
+  Future<void> _updateCacheSizes() async {
+    int imgBytes = 0;
+    try {
+      imgBytes += await DefaultCacheManager().store.getCacheSize();
+      imgBytes += await AnimeImageCacheManager.instance.store.getCacheSize();
+    } catch (_) {}
+
+    final dataBytes = widget.client.dataCacheSizeBytes;
+
+    if (!mounted) return;
+    setState(() {
+      _imageCacheSizeStr = _formatBytes(imgBytes);
+      _dataCacheSizeStr = _formatBytes(dataBytes);
+    });
+  }
+
+  Future<void> _performClearImageCache() async {
     try {
       await DefaultCacheManager().emptyCache();
+      try {
+        await AnimeImageCacheManager.instance.emptyCache();
+      } catch (_) {}
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
-      widget.client.clearCache();
-      await _updateCacheSize();
+      await _updateCacheSizes();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('已清空本地缓存'),
+          content: Text('已清空图片缓存'),
           duration: Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
@@ -64,7 +70,7 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('清理缓存失败: $e'),
+          content: Text('清理图片缓存失败: $e'),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
@@ -72,7 +78,29 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
     }
   }
 
-  void _confirmClearCache() {
+  void _performClearDataCache() {
+    try {
+      widget.client.clearCache();
+      _updateCacheSizes();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已清空数据缓存'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('清理数据缓存失败: $e'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _confirmClearImageCache() {
     final currentFont = FontManager.instance.activeFontFamily;
     final fontFallback = FontManager.fallbackFontFamilies;
     final baseStyle = TextStyle(
@@ -90,16 +118,10 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
           ),
         ),
         child: CupertinoAlertDialog(
-          title: Text(
-            '清空本地缓存',
-            style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-          ),
+          title: Text('清空图片缓存', style: baseStyle.copyWith(fontWeight: FontWeight.bold)),
           content: Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '当前缓存占用 $_cacheSizeStr。\n清空后将释放本地存储空间，重新浏览时将拉取最新数据。',
-              style: baseStyle,
-            ),
+            child: Text('当前图片缓存占用 $_imageCacheSizeStr，确认清空？', style: baseStyle),
           ),
           actions: [
             CupertinoDialogAction(
@@ -110,12 +132,51 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
               isDestructiveAction: true,
               onPressed: () {
                 Navigator.of(ctx).pop();
-                _performClearCache();
+                _performClearImageCache();
               },
-              child: Text(
-                '确认清空',
-                style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-              ),
+              child: Text('确认清空', style: baseStyle.copyWith(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmClearDataCache() {
+    final currentFont = FontManager.instance.activeFontFamily;
+    final fontFallback = FontManager.fallbackFontFamilies;
+    final baseStyle = TextStyle(
+      fontFamily: currentFont,
+      fontFamilyFallback: fontFallback,
+    );
+
+    showCupertinoDialog(
+      context: context,
+      builder: (ctx) => CupertinoTheme(
+        data: CupertinoTheme.of(ctx).copyWith(
+          textTheme: CupertinoTextThemeData(
+            textStyle: baseStyle,
+            actionTextStyle: baseStyle,
+          ),
+        ),
+        child: CupertinoAlertDialog(
+          title: Text('清空数据缓存', style: baseStyle.copyWith(fontWeight: FontWeight.bold)),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('当前数据缓存占用 $_dataCacheSizeStr，确认清空？', style: baseStyle),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('取消', style: baseStyle),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _performClearDataCache();
+              },
+              child: Text('确认清空', style: baseStyle.copyWith(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -136,16 +197,16 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
           children: [
             IosSettingsTile(
               leading: const IosSettingsIconBox(
-                icon: Icons.cleaning_services_rounded,
+                icon: Icons.image_outlined,
                 bg: Color(0xFFE63946),
               ),
-              title: '本地缓存',
-              showDivider: false,
+              title: '图片缓存',
+              showDivider: true,
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    _cacheSizeStr,
+                    _imageCacheSizeStr,
                     style: TextStyle(
                       fontSize: 14,
                       color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
@@ -155,7 +216,30 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
                   const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
                 ],
               ),
-              onTap: _confirmClearCache,
+              onTap: _confirmClearImageCache,
+            ),
+            IosSettingsTile(
+              leading: const IosSettingsIconBox(
+                icon: Icons.storage_rounded,
+                bg: Color(0xFF0077B6),
+              ),
+              title: '数据缓存',
+              showDivider: false,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _dataCacheSizeStr,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+                ],
+              ),
+              onTap: _confirmClearDataCache,
             ),
           ],
         ),

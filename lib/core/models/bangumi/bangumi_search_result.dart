@@ -16,6 +16,13 @@ class BangumiSearchResult {
 
   bool get hasMore => offset + items.length < total;
 
+  Map<String, dynamic> toJson() => {
+        'items': items.map((e) => e.toJson()).toList(),
+        'total': total,
+        'limit': limit,
+        'offset': offset,
+      };
+
   static const empty = BangumiSearchResult(
     items: [],
     total: 0,

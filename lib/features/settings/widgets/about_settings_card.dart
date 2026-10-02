@@ -22,23 +22,9 @@ class AboutSettingsCard extends StatelessWidget {
                 bg: Color(0xFF6C757D),
               ),
               title: '版本号',
-              trailing: Text(
-                'v${AppConstants.appVersion} (Build ${AppConstants.buildNumber})',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
-                ),
-              ),
-            ),
-            IosSettingsTile(
-              leading: const IosSettingsIconBox(
-                icon: Icons.api_rounded,
-                bg: Color(0xFF6C757D),
-              ),
-              title: '数据来源',
               showDivider: false,
               trailing: Text(
-                'Bangumi API',
+                'v${AppConstants.appVersion} (Build ${AppConstants.buildNumber})',
                 style: TextStyle(
                   fontSize: 14,
                   color: theme.colorScheme.onSurfaceVariant.withAlpha(160),

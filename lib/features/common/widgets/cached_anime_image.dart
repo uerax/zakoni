@@ -1,13 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../../../core/network/anime_image_cache_manager.dart';
 import '../../../core/utils/image_utils.dart';
 
 /// 高性能动漫封面图片组件：
-/// 1. 采用原生 Image + CachedNetworkImageProvider 双层架构；
-///    之所以不使用封装的 CachedNetworkImage 部件，是因为原生 Image 能够利用 Flutter 渲染管线的
-///    绘制延迟机制（仅当 Widget 即将绘制进入视口时才触发解码），并且避免为每个卡片实例化两套动画控制器与状态。
-/// 2. 使用 ResizeImage.resizeIfNeeded 将解码宽度限制在合理像素，杜绝数十张大图打爆显存与 GC 卡顿。
-/// 3. 搭配轻量 frameBuilder 即时占位色块，首屏与高速滚动 0 掉帧。
+/// 1. 采用专用的 AnimeImageCacheManager，磁盘容量达 3000 张，支持 60 天长效落盘存储；
+/// 2. 使用 memCacheWidth 限制解码位图宽度，杜绝过量采样撑爆显存；
+/// 3. 采用超快 120ms 平滑淡入，消除图片反复加载的灰色色块突兀闪烁感。
 class CachedAnimeImage extends StatelessWidget {
   final String imageUrl;
   final double? width;
@@ -22,7 +21,7 @@ class CachedAnimeImage extends StatelessWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
-    this.resizeWidth = 400,
+    this.resizeWidth = 220,
     this.borderRadius,
   });
 
@@ -39,35 +38,27 @@ class CachedAnimeImage extends StatelessWidget {
       );
     }
 
-    final imageWidget = Image(
-      image: ResizeImage.resizeIfNeeded(
-        resizeWidth,
-        null,
-        CachedNetworkImageProvider(targetUrl),
-      ),
+    Widget imageWidget = CachedNetworkImage(
+      imageUrl: targetUrl,
+      cacheManager: AnimeImageCacheManager.instance,
       width: width,
       height: height,
       fit: fit,
-      gaplessPlayback: true,
+      memCacheWidth: resizeWidth,
       filterQuality: FilterQuality.medium,
-      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-        // 同步从内存/已解码帧直接秒出，不走任何过渡；未载入时呈现纯色骨架底色
-        if (wasSynchronouslyLoaded || frame != null) {
-          return child;
-        }
-        return _buildPlaceholder(context, theme);
-      },
-      errorBuilder: (context, error, stackTrace) {
-        return _buildPlaceholder(
-          context,
-          theme,
-          child: const Icon(Icons.broken_image_rounded, color: Colors.grey, size: 26),
-        );
-      },
+      fadeInDuration: const Duration(milliseconds: 120),
+      fadeOutDuration: const Duration(milliseconds: 120),
+      useOldImageOnUrlChange: true,
+      placeholder: (context, url) => _buildPlaceholder(context, theme),
+      errorWidget: (context, url, error) => _buildPlaceholder(
+        context,
+        theme,
+        child: const Icon(Icons.broken_image_rounded, color: Colors.grey, size: 26),
+      ),
     );
 
     if (borderRadius != null) {
-      return ClipRRect(
+      imageWidget = ClipRRect(
         borderRadius: borderRadius!,
         child: imageWidget,
       );

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import '../constants/app_constants.dart';
@@ -35,11 +36,37 @@ class BangumiClient {
   String _baseUrl;
   BangumiSourcePreset _sourcePreset = BangumiSourcePreset.mirror;
 
-  // 内存防抖缓存，避免同一会话在页面/Tab之间切换时无意义地重复请求接口
-  final _calendarCache = TimedCache<List<BangumiCalendarDay>>();
-  final _trendingCache = TimedCache<List<BangumiItem>>();
-  final _moviesCache = TimedCache<List<BangumiItem>>();
-  final _ovaCache = TimedCache<List<BangumiItem>>();
+  // 按照 Animaku 规范对齐 TTL 的内存缓存池
+  // 1. 每日放送：按季更替，24 小时缓存
+  final _calendarCache = TimedCache<List<BangumiCalendarDay>>(maxAge: const Duration(hours: 24));
+  // 2. 热门 / 剧场版 / OVA：12 小时缓存
+  final _trendingCache = TimedCache<List<BangumiItem>>(maxAge: const Duration(hours: 12));
+  final _moviesCache = TimedCache<List<BangumiItem>>(maxAge: const Duration(hours: 12));
+  final _ovaCache = TimedCache<List<BangumiItem>>(maxAge: const Duration(hours: 12));
+
+  // 3. 搜索与分类检索分页缓存：2 小时缓存，最多保留 150 条分页查询
+  final _searchCache = TimedKeyedCache<String, BangumiSearchResult>(
+    maxAge: const Duration(hours: 2),
+    maxEntries: 150,
+  );
+  // 4. 条目详情：6 小时缓存，最多保留 100 条
+  final _subjectCache = TimedKeyedCache<int, BangumiItem>(
+    maxAge: const Duration(hours: 6),
+    maxEntries: 100,
+  );
+  // 5. 剧集列表：2 小时缓存，最多保留 100 条
+  final _episodesCache = TimedKeyedCache<String, List<BangumiEpisode>>(
+    maxAge: const Duration(hours: 2),
+    maxEntries: 100,
+  );
+  // 6. 吐槽与评论列表：3 小时缓存，最多保留 100 条
+  final _commentsCache = TimedKeyedCache<String, List<BangumiComment>>(
+    maxAge: const Duration(hours: 3),
+    maxEntries: 100,
+  );
+
+  // Single-Flight 机制：并发重复请求去重
+  final Map<String, Future<dynamic>> _inflight = {};
 
   BangumiClient({
     String? baseUrl,
@@ -81,11 +108,59 @@ class BangumiClient {
     _dio.options.baseUrl = newBaseUrl;
   }
 
+  /// 获取当前客户端在内存中缓存的 API 查询响应总数
+  int get totalCachedQueries =>
+      (_calendarCache.value != null ? 1 : 0) +
+      (_trendingCache.value != null ? 1 : 0) +
+      (_moviesCache.value != null ? 1 : 0) +
+      (_ovaCache.value != null ? 1 : 0) +
+      _searchCache.length +
+      _subjectCache.length +
+      _episodesCache.length +
+      _commentsCache.length;
+
+  /// 估算当前客户端在内存中缓存的 API 响应数据字节大小
+  int get dataCacheSizeBytes {
+    int bytes = 0;
+    try {
+      if (_calendarCache.value != null) {
+        bytes += utf8.encode(jsonEncode(_calendarCache.value!.map((d) => d.toJson()).toList())).length;
+      }
+      if (_trendingCache.value != null) {
+        bytes += utf8.encode(jsonEncode(_trendingCache.value!.map((i) => i.toJson()).toList())).length;
+      }
+      if (_moviesCache.value != null) {
+        bytes += utf8.encode(jsonEncode(_moviesCache.value!.map((i) => i.toJson()).toList())).length;
+      }
+      if (_ovaCache.value != null) {
+        bytes += utf8.encode(jsonEncode(_ovaCache.value!.map((i) => i.toJson()).toList())).length;
+      }
+      for (final search in _searchCache.values) {
+        bytes += utf8.encode(jsonEncode(search.toJson())).length;
+      }
+      for (final subject in _subjectCache.values) {
+        bytes += utf8.encode(jsonEncode(subject.toJson())).length;
+      }
+      for (final eps in _episodesCache.values) {
+        bytes += utf8.encode(jsonEncode(eps.map((e) => e.toJson()).toList())).length;
+      }
+      for (final comments in _commentsCache.values) {
+        bytes += utf8.encode(jsonEncode(comments.map((c) => c.toJson()).toList())).length;
+      }
+    } catch (_) {}
+    return bytes;
+  }
+
   void clearCache() {
     _calendarCache.clear();
     _trendingCache.clear();
     _moviesCache.clear();
     _ovaCache.clear();
+    _searchCache.clear();
+    _subjectCache.clear();
+    _episodesCache.clear();
+    _commentsCache.clear();
+    _inflight.clear();
   }
 
   /// 获取每日放送时间表 (周一至周日)，带 30 分钟内存持久化缓存
@@ -224,48 +299,96 @@ class BangumiClient {
     return _ovaCache.staleValue ?? const [];
   }
 
-  /// 获取番剧条目详情
-  Future<BangumiItem> getSubject(int subjectId) async {
-    try {
-      final res = await _dio.get('/v0/subjects/$subjectId');
-      if (res.data is Map<String, dynamic>) {
-        return BangumiItem.fromJson(res.data as Map<String, dynamic>);
+  /// 获取番剧条目详情 (带 6 小时内存缓存与 Single-Flight 并发合并)
+  Future<BangumiItem> getSubject(int subjectId, {bool forceRefresh = false}) async {
+    if (!forceRefresh) {
+      final cached = _subjectCache.get(subjectId);
+      if (cached != null) return cached;
+    }
+
+    final inflightKey = 'subject_$subjectId';
+    if (_inflight.containsKey(inflightKey)) {
+      return await (_inflight[inflightKey] as Future<BangumiItem>);
+    }
+
+    final future = () async {
+      try {
+        final res = await _dio.get('/v0/subjects/$subjectId');
+        if (res.data is Map<String, dynamic>) {
+          final item = BangumiItem.fromJson(res.data as Map<String, dynamic>);
+          _subjectCache.set(subjectId, item);
+          return item;
+        }
+        throw const BangumiApiException('响应格式不正确');
+      } on DioException catch (e) {
+        final stale = _subjectCache.getStale(subjectId);
+        if (stale != null) return stale;
+        throw _handleDioError('获取番剧详情失败 (ID: $subjectId)', e);
       }
-      throw const BangumiApiException('响应格式不正确');
-    } on DioException catch (e) {
-      throw _handleDioError('获取番剧详情失败 (ID: $subjectId)', e);
+    }();
+
+    _inflight[inflightKey] = future;
+    try {
+      return await future;
+    } finally {
+      _inflight.remove(inflightKey);
     }
   }
 
-  /// 获取番剧剧集列表 (默认 type=0 为正片，1 为 SP)
+  /// 获取番剧剧集列表 (默认 type=0 为正片，1 为 SP，带 2 小时内存缓存)
   Future<List<BangumiEpisode>> getEpisodes(
     int subjectId, {
     int type = 0,
     int limit = 100,
     int offset = 0,
+    bool forceRefresh = false,
   }) async {
-    try {
-      final res = await _dio.get(
-        '/v0/episodes',
-        queryParameters: {
-          'subject_id': subjectId,
-          'type': type,
-          'limit': limit,
-          'offset': offset,
-        },
-      );
+    final cacheKey = '${subjectId}_${type}_${limit}_$offset';
+    if (!forceRefresh) {
+      final cached = _episodesCache.get(cacheKey);
+      if (cached != null) return cached;
+    }
 
-      final data = res.data;
-      if (data is Map<String, dynamic> && data['data'] is List) {
-        final list = data['data'] as List;
-        return list
-            .whereType<Map<String, dynamic>>()
-            .map((ep) => BangumiEpisode.fromJson(ep))
-            .toList();
+    final inflightKey = 'episodes_$cacheKey';
+    if (_inflight.containsKey(inflightKey)) {
+      return await (_inflight[inflightKey] as Future<List<BangumiEpisode>>);
+    }
+
+    final Future<List<BangumiEpisode>> future = () async {
+      try {
+        final res = await _dio.get(
+          '/v0/episodes',
+          queryParameters: {
+            'subject_id': subjectId,
+            'type': type,
+            'limit': limit,
+            'offset': offset,
+          },
+        );
+
+        final data = res.data;
+        if (data is Map<String, dynamic> && data['data'] is List) {
+          final list = data['data'] as List;
+          final eps = list
+              .whereType<Map<String, dynamic>>()
+              .map((ep) => BangumiEpisode.fromJson(ep))
+              .toList();
+          _episodesCache.set(cacheKey, eps);
+          return eps;
+        }
+        return const <BangumiEpisode>[];
+      } on DioException catch (e) {
+        final stale = _episodesCache.getStale(cacheKey);
+        if (stale != null) return stale;
+        throw _handleDioError('获取剧集列表失败 (ID: $subjectId)', e);
       }
-      return const [];
-    } on DioException catch (e) {
-      throw _handleDioError('获取剧集列表失败 (ID: $subjectId)', e);
+    }();
+
+    _inflight[inflightKey] = future;
+    try {
+      return await future;
+    } finally {
+      _inflight.remove(inflightKey);
     }
   }
 
@@ -279,6 +402,7 @@ class BangumiClient {
     int? year,
     List<String>? airDate,
     int type = 2, // 2 = 动画
+    bool forceRefresh = false,
   }) async {
     final result = await searchWithTotal(
       keyword,
@@ -289,11 +413,51 @@ class BangumiClient {
       year: year,
       airDate: airDate,
       type: type,
+      forceRefresh: forceRefresh,
     );
     return result.items;
   }
 
-  /// 结构化搜索并返回分页与总数结果 (供分类/探索瀑布流与高级筛选使用)
+  String _buildSearchCacheKey({
+    required String keyword,
+    required String? sort,
+    required List<String>? tags,
+    required int? year,
+    required List<String>? airDate,
+    required int type,
+    required int limit,
+    required int offset,
+  }) {
+    final sortedTags = tags != null ? ([...tags]..sort()).join(',') : '';
+    final sortedAirDate = airDate != null ? ([...airDate]..sort()).join(',') : '';
+    return '$keyword|$sort|$sortedTags|$year|$sortedAirDate|$type|$limit|$offset';
+  }
+
+  /// 同步检查是否有未过期的搜索/分类缓存结果（用于切换分类时 0ms 瞬间呈现，消除骨架屏闪烁）
+  BangumiSearchResult? peekSearchCache(
+    String keyword, {
+    int limit = 20,
+    int offset = 0,
+    String? sort,
+    List<String>? tags,
+    int? year,
+    List<String>? airDate,
+    int type = 2,
+  }) {
+    final cacheKey = _buildSearchCacheKey(
+      keyword: keyword.trim(),
+      sort: sort,
+      tags: tags,
+      year: year,
+      airDate: airDate,
+      type: type,
+      limit: limit,
+      offset: offset,
+    );
+    return _searchCache.peek(cacheKey);
+  }
+
+  /// 结构化搜索并返回分页与总数结果 (供分类/探索瀑布流与高级筛选使用，带 2 小时内存缓存与容灾)
   Future<BangumiSearchResult> searchWithTotal(
     String keyword, {
     int limit = 20,
@@ -303,122 +467,185 @@ class BangumiClient {
     int? year,
     List<String>? airDate,
     int type = 2, // 2 = 动画
+    bool forceRefresh = false,
   }) async {
     final trimmed = keyword.trim();
-    final payload = BangumiSearchQueryBuilder.buildPayload(
-      keyword: keyword,
+    final cacheKey = _buildSearchCacheKey(
+      keyword: trimmed,
       sort: sort,
       tags: tags,
       year: year,
       airDate: airDate,
       type: type,
+      limit: limit,
+      offset: offset,
     );
 
-    if (payload == null) {
-      return BangumiSearchResult.empty;
+    if (!forceRefresh) {
+      final cached = _searchCache.get(cacheKey);
+      if (cached != null) return cached;
     }
 
-    final isSortByDate = sort == 'date' || sort == 'airdate';
+    final inflightKey = 'search_$cacheKey';
+    if (_inflight.containsKey(inflightKey)) {
+      return await (_inflight[inflightKey] as Future<BangumiSearchResult>);
+    }
 
-    try {
-      final res = await _dio.post(
-        '/v0/search/subjects',
-        data: payload,
-        queryParameters: {
-          'limit': limit,
-          'offset': offset,
-        },
+    final future = () async {
+      final payload = BangumiSearchQueryBuilder.buildPayload(
+        keyword: keyword,
+        sort: sort,
+        tags: tags,
+        year: year,
+        airDate: airDate,
+        type: type,
       );
 
-      final data = res.data;
-      if (data is Map<String, dynamic> && data['data'] is List) {
-        final list = data['data'] as List;
-        final items = list
-            .whereType<Map<String, dynamic>>()
-            .map((item) => BangumiItem.fromJson(item))
-            .toList();
-
-        if (isSortByDate) {
-          items.sort((a, b) => b.airDate.compareTo(a.airDate));
-        }
-
-        final total = (data['total'] is num)
-            ? (data['total'] as num).toInt()
-            : (offset + items.length);
-
-        return BangumiSearchResult(
-          items: items,
-          total: total,
-          limit: limit,
-          offset: offset,
-        );
+      if (payload == null) {
+        return BangumiSearchResult.empty;
       }
-      return BangumiSearchResult.empty;
-    } on DioException catch (e) {
-      if (trimmed.isEmpty) {
-        throw _handleDioError('筛选番剧列表失败', e);
-      }
-      // 容错: 关键词搜索失败时尝试旧版搜索接口作为回退
-      developer.log('v0 search 失败，尝试旧版回退: ${e.message}');
+
+      final isSortByDate = sort == 'date' || sort == 'airdate';
+
       try {
-        final fallbackRes = await _dio.get(
-          '/search/subject/${Uri.encodeComponent(trimmed)}',
+        final res = await _dio.post(
+          '/v0/search/subjects',
+          data: payload,
           queryParameters: {
-            'type': type,
-            'responseGroup': 'small',
-            'max_results': limit,
-            'start': offset,
+            'limit': limit,
+            'offset': offset,
           },
         );
-        final list = fallbackRes.data?['list'];
-        if (list is List) {
+
+        final data = res.data;
+        if (data is Map<String, dynamic> && data['data'] is List) {
+          final list = data['data'] as List;
           final items = list
               .whereType<Map<String, dynamic>>()
               .map((item) => BangumiItem.fromJson(item))
               .toList();
-          final total = (fallbackRes.data?['results'] is num)
-              ? (fallbackRes.data['results'] as num).toInt()
+
+          if (isSortByDate) {
+            items.sort((a, b) => b.airDate.compareTo(a.airDate));
+          }
+
+          final total = (data['total'] is num)
+              ? (data['total'] as num).toInt()
               : (offset + items.length);
-          return BangumiSearchResult(
+
+          final result = BangumiSearchResult(
             items: items,
             total: total,
             limit: limit,
             offset: offset,
           );
+          _searchCache.set(cacheKey, result);
+          return result;
         }
-      } catch (_) {
-        // 忽略回退失败，抛出主要异常
+        return BangumiSearchResult.empty;
+      } on DioException catch (e) {
+        final stale = _searchCache.getStale(cacheKey);
+        if (stale != null) return stale;
+
+        if (trimmed.isEmpty) {
+          throw _handleDioError('筛选番剧列表失败', e);
+        }
+        // 容错: 关键词搜索失败时尝试旧版搜索接口作为回退
+        developer.log('v0 search 失败，尝试旧版回退: ${e.message}');
+        try {
+          final fallbackRes = await _dio.get(
+            '/search/subject/${Uri.encodeComponent(trimmed)}',
+            queryParameters: {
+              'type': type,
+              'responseGroup': 'small',
+              'max_results': limit,
+              'start': offset,
+            },
+          );
+          final list = fallbackRes.data?['list'];
+          if (list is List) {
+            final items = list
+                .whereType<Map<String, dynamic>>()
+                .map((item) => BangumiItem.fromJson(item))
+                .toList();
+            final total = (fallbackRes.data?['results'] is num)
+                ? (fallbackRes.data['results'] as num).toInt()
+                : (offset + items.length);
+            final result = BangumiSearchResult(
+              items: items,
+              total: total,
+              limit: limit,
+              offset: offset,
+            );
+            _searchCache.set(cacheKey, result);
+            return result;
+          }
+        } catch (_) {
+          // 忽略回退失败，抛出主要异常
+        }
+        throw _handleDioError('搜索番剧失败: "$trimmed"', e);
       }
-      throw _handleDioError('搜索番剧失败: "$trimmed"', e);
+    }();
+
+    _inflight[inflightKey] = future;
+    try {
+      return await future;
+    } finally {
+      _inflight.remove(inflightKey);
     }
   }
 
-  /// 获取条目吐槽与讨论
+  /// 获取条目吐槽与讨论 (带 3 小时内存缓存)
   Future<List<BangumiComment>> getComments(
     int subjectId, {
     int limit = 20,
     int offset = 0,
+    bool forceRefresh = false,
   }) async {
-    try {
-      final res = await _dio.get(
-        '/v0/subjects/$subjectId/comments',
-        queryParameters: {
-          'limit': limit,
-          'offset': offset,
-        },
-      );
+    final cacheKey = '${subjectId}_${limit}_$offset';
+    if (!forceRefresh) {
+      final cached = _commentsCache.get(cacheKey);
+      if (cached != null) return cached;
+    }
 
-      final data = res.data;
-      if (data is Map<String, dynamic> && data['data'] is List) {
-        final list = data['data'] as List;
-        return list
-            .whereType<Map<String, dynamic>>()
-            .map((c) => BangumiComment.fromJson(c))
-            .toList();
+    final inflightKey = 'comments_$cacheKey';
+    if (_inflight.containsKey(inflightKey)) {
+      return await (_inflight[inflightKey] as Future<List<BangumiComment>>);
+    }
+
+    final Future<List<BangumiComment>> future = () async {
+      try {
+        final res = await _dio.get(
+          '/v0/subjects/$subjectId/comments',
+          queryParameters: {
+            'limit': limit,
+            'offset': offset,
+          },
+        );
+
+        final data = res.data;
+        if (data is Map<String, dynamic> && data['data'] is List) {
+          final list = data['data'] as List;
+          final comments = list
+              .whereType<Map<String, dynamic>>()
+              .map((c) => BangumiComment.fromJson(c))
+              .toList();
+          _commentsCache.set(cacheKey, comments);
+          return comments;
+        }
+        return const <BangumiComment>[];
+      } on DioException catch (e) {
+        final stale = _commentsCache.getStale(cacheKey);
+        if (stale != null) return stale;
+        throw _handleDioError('获取评论失败 (ID: $subjectId)', e);
       }
-      return const [];
-    } on DioException catch (e) {
-      throw _handleDioError('获取评论失败 (ID: $subjectId)', e);
+    }();
+
+    _inflight[inflightKey] = future;
+    try {
+      return await future;
+    } finally {
+      _inflight.remove(inflightKey);
     }
   }
 

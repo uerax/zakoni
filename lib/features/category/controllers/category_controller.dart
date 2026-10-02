@@ -4,7 +4,7 @@ import '../../../core/providers/bangumi_providers.dart';
 import '../models/category_constants.dart';
 import 'category_state.dart';
 
-final categoryControllerProvider = NotifierProvider.autoDispose
+final categoryControllerProvider = NotifierProvider
     .family<CategoryController, CategoryState, String?>(
   CategoryController.new,
 );
@@ -24,28 +24,53 @@ class CategoryController extends Notifier<CategoryState> {
   }
 
   /// 构建当前筛选条件的日期与参数，向 Bangumi 发起第一页请求
-  Future<void> fetchFirstPage() async {
+  /// 若本地已有缓存，则 0ms 同步秒出，彻底消除骨架屏闪烁
+  Future<void> fetchFirstPage({bool forceRefresh = false}) async {
     final seq = ++_requestSeq;
+    final filter = state.filter;
+    final tagList = (filter.selectedTag != null && filter.selectedTag != '全部')
+        ? [filter.selectedTag!]
+        : null;
+
+    List<String>? airDate;
+    int? yearParam;
+
+    if (filter.selectedMonth != null && filter.selectedMonth! > 0) {
+      final targetYear = filter.selectedYear ?? CategoryConstants.currentYear;
+      yearParam = targetYear;
+      airDate = CategoryConstants.seasonAirDate(targetYear, filter.selectedMonth!);
+    } else if (filter.selectedYear != null) {
+      yearParam = filter.selectedYear;
+    }
+
+    final client = ref.read(bangumiClientProvider);
+
+    // 关键体验优化：若命中未过期缓存且非下拉强制刷新，直接 0ms 瞬间切换，不打回骨架屏
+    if (!forceRefresh) {
+      final cached = client.peekSearchCache(
+        '',
+        tags: tagList,
+        year: yearParam,
+        airDate: airDate,
+        sort: filter.selectedSort,
+        limit: CategoryConstants.pageSize,
+        offset: 0,
+      );
+      if (cached != null) {
+        state = state.copyWith(
+          items: cached.items,
+          total: cached.total,
+          hasMore: cached.hasMore,
+          isLoading: false,
+          errorMessage: null,
+        );
+        return;
+      }
+    }
+
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      final filter = state.filter;
-      final tagList = (filter.selectedTag != null && filter.selectedTag != '全部')
-          ? [filter.selectedTag!]
-          : null;
-
-      List<String>? airDate;
-      int? yearParam;
-
-      if (filter.selectedMonth != null && filter.selectedMonth! > 0) {
-        final targetYear = filter.selectedYear ?? CategoryConstants.currentYear;
-        yearParam = targetYear;
-        airDate = CategoryConstants.seasonAirDate(targetYear, filter.selectedMonth!);
-      } else if (filter.selectedYear != null) {
-        yearParam = filter.selectedYear;
-      }
-
-      final client = ref.read(bangumiClientProvider);
       final result = await client.searchWithTotal(
         '',
         tags: tagList,
@@ -54,6 +79,7 @@ class CategoryController extends Notifier<CategoryState> {
         sort: filter.selectedSort,
         limit: CategoryConstants.pageSize,
         offset: 0,
+        forceRefresh: forceRefresh,
       );
 
       if (seq != _requestSeq) return;
