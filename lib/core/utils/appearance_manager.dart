@@ -280,7 +280,14 @@ class AppearanceManager extends ChangeNotifier {
   Widget buildWallpaperLayer({String? pageKey}) {
     final wallpaperPath = getWallpaperForPage(pageKey);
     if (wallpaperPath == null) {
-      return const SizedBox.shrink();
+      // 特殊处理说明：
+      // 在外层 Stack(fit: StackFit.expand) 容器中，非 Positioned 组件会被强制拉伸参与尺寸测算；
+      // 显式包裹 Positioned.fill(child: SizedBox.shrink()) 并指定明确 key，
+      // 确保无壁纸时始终以明确的零开销定位层占位，彻底杜绝图层切换时的布局测算跳跃或渲染缓存残留。
+      return const Positioned.fill(
+        key: ValueKey('wallpaper_layer_none'),
+        child: SizedBox.shrink(),
+      );
     }
 
     final file = File(wallpaperPath);
@@ -308,6 +315,7 @@ class AppearanceManager extends ChangeNotifier {
     }
 
     return Positioned.fill(
+      key: ValueKey('wallpaper_layer_${pageKey}_$wallpaperPath'),
       child: IgnorePointer(
         child: RepaintBoundary(
           child: Opacity(
