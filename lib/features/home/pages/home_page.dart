@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/network/bangumi_client.dart';
-import '../../../core/utils/appearance_manager.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
 import '../../timeline/pages/timeline_page.dart';
