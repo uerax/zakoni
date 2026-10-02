@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zakoni/core/constants/app_constants.dart';
 import 'package:zakoni/core/models/bangumi/bangumi_collection.dart';
 import 'package:zakoni/core/network/bangumi_client.dart';
 
@@ -38,6 +39,15 @@ void main() {
   group('BangumiClient tests with MockAdapter', () {
     late Dio dio;
     late BangumiClient client;
+
+    test('defaultUserAgent matches Bangumi API developer guidelines', () {
+      expect(BangumiClient.defaultUserAgent, contains('uerax/zakoni/${AppConstants.appVersion}'));
+      expect(BangumiClient.defaultUserAgent, contains('https://github.com/uerax/zakoni'));
+      expect(
+        BangumiClient.buildUserAgent(version: '2.0.0', platform: 'Android'),
+        'uerax/zakoni/2.0.0 (Android) (https://github.com/uerax/zakoni)',
+      );
+    });
 
     test('getCalendar parses mock response', () async {
       dio = Dio(BaseOptions(baseUrl: 'https://api.bgm.tv'));
@@ -134,6 +144,53 @@ void main() {
         'mock_token',
       );
       expect(success, true);
+    });
+
+    test('searchWithTotal sends filter/sort payload and returns total & items', () async {
+      dio = Dio(BaseOptions(baseUrl: 'https://api.bgm.tv'));
+      dio.httpClientAdapter = MockAdapter((options) {
+        expect(options.path, '/v0/search/subjects');
+        expect(options.queryParameters['limit'], 24);
+        expect(options.queryParameters['offset'], 0);
+        final payload = options.data as Map<String, dynamic>;
+        expect(payload['sort'], 'heat');
+        final filter = payload['filter'] as Map<String, dynamic>;
+        expect(filter['type'], [2]);
+        expect(filter['tag'], ['热血']);
+        expect(filter['air_date'], ['>=2024-04-01', '<2024-07-01']);
+        return {
+          'statusCode': 200,
+          'data': {
+            'total': 42,
+            'limit': 24,
+            'offset': 0,
+            'data': [
+              {
+                'id': 1001,
+                'name': 'Hot Anime',
+                'name_cn': '热血动画',
+                'air_date': '2024-04-05',
+              }
+            ]
+          }
+        };
+      });
+      client = BangumiClient(dio: dio);
+
+      final res = await client.searchWithTotal(
+        '',
+        tags: ['热血'],
+        airDate: ['>=2024-04-01', '<2024-07-01'],
+        sort: 'heat',
+        limit: 24,
+        offset: 0,
+      );
+
+      expect(res.total, 42);
+      expect(res.hasMore, true);
+      expect(res.items.length, 1);
+      expect(res.items.first.id, 1001);
+      expect(res.items.first.nameCn, '热血动画');
     });
   });
 }

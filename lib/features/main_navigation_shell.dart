@@ -19,6 +19,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   late final BangumiClient _client;
   int _currentIndex = 0;
   int _refreshKey = 0;
+  String? _targetCategory;
 
   @override
   void initState() {
@@ -61,13 +62,15 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     client: _client,
                     onNavigateToCategory: (category) {
                       setState(() {
+                        _targetCategory = category;
                         _currentIndex = 1;
                       });
                     },
                   ),
                   CategoryPage(
-                    key: ValueKey('category_$_refreshKey'),
+                    key: ValueKey('category_${_refreshKey}_$_targetCategory'),
                     client: _client,
+                    initialCategory: _targetCategory,
                   ),
                   SettingsPage(
                     client: _client,

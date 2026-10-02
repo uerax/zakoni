@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/utils/appearance_manager.dart';
 import '../../../core/utils/font_manager.dart';
@@ -722,45 +723,50 @@ class _SettingsPageState extends State<SettingsPage> {
                         _buildWallpaperScopeSelector(theme),
                         if (appMgr.hasWallpaperForPage(_wallpaperScope == 'all' ? null : _wallpaperScope)) ...[
                           const SizedBox(height: 10),
-                          SizedBox(
-                            height: 36,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: SizedBox(
-                                    height: 36,
-                                    child: FilledButton.tonalIcon(
-                                      onPressed: _reopenCropDialog,
-                                      icon: const Icon(Icons.crop_free_rounded, size: 16),
-                                      label: const Text('调整画面取景', style: TextStyle(fontSize: 12)),
-                                      style: FilledButton.styleFrom(
-                                        padding: EdgeInsets.zero,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 340),
+                              child: SizedBox(
+                                height: 36,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 36,
+                                        child: FilledButton.tonalIcon(
+                                          onPressed: _reopenCropDialog,
+                                          icon: const Icon(Icons.crop_free_rounded, size: 16),
+                                          label: const Text('调整画面取景', style: TextStyle(fontSize: 12)),
+                                          style: FilledButton.styleFrom(
+                                            padding: EdgeInsets.zero,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                    if (_hasCurrentScopeWallpaper(appMgr)) ...[
+                                      const SizedBox(width: 8),
+                                      SizedBox(
+                                        width: 36,
+                                        height: 36,
+                                        child: OutlinedButton(
+                                          onPressed: _confirmClearWallpaper,
+                                          style: OutlinedButton.styleFrom(
+                                            padding: EdgeInsets.zero,
+                                            side: BorderSide(color: Colors.redAccent.withAlpha(100)),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                          child: const Icon(
+                                            Icons.delete_outline_rounded,
+                                            size: 18,
+                                            color: Colors.redAccent,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                                if (_hasCurrentScopeWallpaper(appMgr)) ...[
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: 36,
-                                    height: 36,
-                                    child: OutlinedButton(
-                                      onPressed: _confirmClearWallpaper,
-                                      style: OutlinedButton.styleFrom(
-                                        padding: EdgeInsets.zero,
-                                        side: BorderSide(color: Colors.redAccent.withAlpha(100)),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      ),
-                                      child: const Icon(
-                                        Icons.delete_outline_rounded,
-                                        size: 18,
-                                        color: Colors.redAccent,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -821,7 +827,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     leading: _buildIconBox(Icons.info_outline_rounded, const Color(0xFF6C757D)),
                     title: '版本号',
                     trailing: Text(
-                      'v1.0.0 (Build 1)',
+                      'v${AppConstants.appVersion} (Build ${AppConstants.buildNumber})',
                       style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurfaceVariant.withAlpha(160)),
                     ),
                   ),
@@ -989,48 +995,71 @@ class _SettingsPageState extends State<SettingsPage> {
       ('settings', '设置'),
     ];
 
-    return Container(
-      height: 32,
-      padding: const EdgeInsets.all(2.5),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10),
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Row(
-        children: scopes.map((item) {
-          final isSelected = _wallpaperScope == item.$1;
-          return Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                setState(() {
-                  _wallpaperScope = item.$1;
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(100),
-                  color: isSelected ? theme.colorScheme.primary : Colors.transparent,
-                ),
-                child: Center(
-                  child: Text(
-                    item.$2,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark ? Colors.white70 : Colors.black87),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final isMobile = width < 500;
+
+        final selector = Container(
+          height: 32,
+          padding: const EdgeInsets.all(2.5),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10),
+            borderRadius: BorderRadius.circular(100),
+          ),
+          child: Row(
+            mainAxisSize: isMobile ? MainAxisSize.max : MainAxisSize.min,
+            children: scopes.map((item) {
+              final isSelected = _wallpaperScope == item.$1;
+              final button = GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() {
+                    _wallpaperScope = item.$1;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  padding: isMobile ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(100),
+                    color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                  ),
+                  child: Center(
+                    child: Text(
+                      item.$2,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark ? Colors.white70 : Colors.black87),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+
+              if (isMobile) {
+                return Expanded(child: button);
+              } else {
+                return SizedBox(
+                  width: 80,
+                  child: button,
+                );
+              }
+            }).toList(),
+          ),
+        );
+
+        if (!isMobile) {
+          return Center(
+            child: selector,
           );
-        }).toList(),
-      ),
+        }
+        return selector;
+      },
     );
   }
 }

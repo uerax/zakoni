@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
+import '../constants/app_constants.dart';
 import '../models/bangumi/bangumi_calendar.dart';
 import '../models/bangumi/bangumi_collection.dart';
 import '../models/bangumi/bangumi_comment.dart';
@@ -38,9 +39,43 @@ class BangumiApiException implements Exception {
   String toString() => 'BangumiApiException: [$statusCode] $message';
 }
 
+/// Bangumi 搜索与分类检索分页结果封装
+class BangumiSearchResult {
+  final List<BangumiItem> items;
+  final int total;
+  final int limit;
+  final int offset;
+
+  const BangumiSearchResult({
+    required this.items,
+    required this.total,
+    required this.limit,
+    required this.offset,
+  });
+
+  bool get hasMore => offset + items.length < total;
+
+  static const empty = BangumiSearchResult(
+    items: [],
+    total: 0,
+    limit: 20,
+    offset: 0,
+  );
+}
+
 class BangumiClient {
-  /// 遵循 Bangumi API 准则必须配置合规的 User-Agent
-  static const String defaultUserAgent = 'Animaku/Zakoni-App (https://github.com/animaku/zakoni)';
+  /// 遵循 Bangumi API 开发者准则规范配置合规的 User-Agent
+  /// 包含开发者个人 ID、应用名称、动态版本号变量及项目主页
+  static String get defaultUserAgent => AppConstants.bangumiUserAgent;
+
+  /// 支持按动态版本号与可选平台标识构造合规 User-Agent
+  static String buildUserAgent({
+    String version = AppConstants.appVersion,
+    String? platform,
+  }) {
+    final platformInfo = platform != null ? ' ($platform)' : '';
+    return '${AppConstants.developerId}/${AppConstants.appName}/$version$platformInfo (${AppConstants.projectUrl})';
+  }
 
   final Dio _dio;
   String _baseUrl;
@@ -315,6 +350,30 @@ class BangumiClient {
     List<String>? airDate,
     int type = 2, // 2 = 动画
   }) async {
+    final result = await searchWithTotal(
+      keyword,
+      limit: limit,
+      offset: offset,
+      sort: sort,
+      tags: tags,
+      year: year,
+      airDate: airDate,
+      type: type,
+    );
+    return result.items;
+  }
+
+  /// 结构化搜索并返回分页与总数结果 (供分类/探索瀑布流与高级筛选使用)
+  Future<BangumiSearchResult> searchWithTotal(
+    String keyword, {
+    int limit = 20,
+    int offset = 0,
+    String? sort,
+    List<String>? tags,
+    int? year,
+    List<String>? airDate,
+    int type = 2, // 2 = 动画
+  }) async {
     final trimmed = keyword.trim();
     // 只有当没有关键词、也没有任何筛选过滤条件时才直接返回空
     if (trimmed.isEmpty &&
@@ -322,12 +381,17 @@ class BangumiClient {
         year == null &&
         (airDate == null || airDate.isEmpty) &&
         sort == null) {
-      return const [];
+      return BangumiSearchResult.empty;
     }
+
+    // 处理排序逻辑：Bangumi 官方 v0 不支持 date 排序，参照 animaku 上游使用 heat，客户端本地按放送日期倒序
+    final isSortByDate = sort == 'date' || sort == 'airdate';
+    final upstreamSort = isSortByDate ? 'heat' : sort;
 
     try {
       final filter = <String, dynamic>{
         'type': [type],
+        'nsfw': false,
       };
       if (tags != null && tags.isNotEmpty) {
         filter['tag'] = tags;
@@ -338,6 +402,9 @@ class BangumiClient {
       if (airDate != null && airDate.isNotEmpty) {
         filter['air_date'] = airDate;
       }
+      if (upstreamSort == 'rank' || upstreamSort == 'score') {
+        filter['rank'] = ['>0', '<=99999'];
+      }
 
       final payload = <String, dynamic>{
         'filter': filter,
@@ -345,8 +412,8 @@ class BangumiClient {
       if (trimmed.isNotEmpty) {
         payload['keyword'] = trimmed;
       }
-      if (sort != null) {
-        payload['sort'] = sort;
+      if (upstreamSort != null && upstreamSort.isNotEmpty) {
+        payload['sort'] = upstreamSort;
       }
 
       final res = await _dio.post(
@@ -361,12 +428,27 @@ class BangumiClient {
       final data = res.data;
       if (data is Map<String, dynamic> && data['data'] is List) {
         final list = data['data'] as List;
-        return list
+        final items = list
             .whereType<Map<String, dynamic>>()
             .map((item) => BangumiItem.fromJson(item))
             .toList();
+
+        if (isSortByDate) {
+          items.sort((a, b) => b.airDate.compareTo(a.airDate));
+        }
+
+        final total = (data['total'] is num)
+            ? (data['total'] as num).toInt()
+            : (offset + items.length);
+
+        return BangumiSearchResult(
+          items: items,
+          total: total,
+          limit: limit,
+          offset: offset,
+        );
       }
-      return const [];
+      return BangumiSearchResult.empty;
     } on DioException catch (e) {
       if (trimmed.isEmpty) {
         throw _handleDioError('筛选番剧列表失败', e);
@@ -385,10 +467,19 @@ class BangumiClient {
         );
         final list = fallbackRes.data?['list'];
         if (list is List) {
-          return list
+          final items = list
               .whereType<Map<String, dynamic>>()
               .map((item) => BangumiItem.fromJson(item))
               .toList();
+          final total = (fallbackRes.data?['results'] is num)
+              ? (fallbackRes.data['results'] as num).toInt()
+              : (offset + items.length);
+          return BangumiSearchResult(
+            items: items,
+            total: total,
+            limit: limit,
+            offset: offset,
+          );
         }
       } catch (_) {
         // 忽略回退失败，抛出主要异常
