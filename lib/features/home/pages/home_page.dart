@@ -5,6 +5,7 @@ import '../../../core/network/bangumi_client.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
 import '../../timeline/pages/timeline_page.dart';
+import '../widgets/home_banner_carousel.dart';
 import '../widgets/home_top_bar.dart';
 import '../widgets/rank_horizontal_section.dart';
 
@@ -209,6 +210,15 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                 child: SizedBox(height: safeTop + 48),
               ),
 
+              // 顶部精选横幅轮播图（取热门 TV 番剧前 5 部，手机端几乎吃满，平板/电脑居中）
+              if (tv.isNotEmpty) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                SliverToBoxAdapter(
+                  child: HomeBannerCarousel(items: tv),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              ],
+
               // 货架 1：热门 TV 番剧独立货架（Netflix / Apple TV 经典货架陈列）
               SliverToBoxAdapter(
                 child: AnimeHorizontalShelf(
@@ -353,6 +363,11 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
           SliverToBoxAdapter(
             child: SizedBox(height: safeTop + 48),
           ),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          const SliverToBoxAdapter(
+            child: ShimmerBannerCarousel(),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
           // 3 行独立货架骨架流光
           SliverToBoxAdapter(
             child: buildShelfSkeletonRow('TV 番剧'),

@@ -251,6 +251,7 @@ class BangumiClient {
         tags: const ['剧场版'],
         sort: 'heat',
         limit: limit,
+        forceRefresh: forceRefresh,
       );
       if (items.isNotEmpty) {
         _moviesCache.set(items, items.length * 1500);
@@ -274,6 +275,7 @@ class BangumiClient {
         tags: const ['OVA'],
         sort: 'heat',
         limit: limit,
+        forceRefresh: forceRefresh,
       );
       if (items.isNotEmpty) {
         _ovaCache.set(items, items.length * 1500);

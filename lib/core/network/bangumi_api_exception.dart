@@ -10,7 +10,7 @@ class BangumiApiException implements Exception {
   factory BangumiApiException.fromDio(String prefix, DioException e) {
     final status = e.response?.statusCode;
     final resData = e.response?.data;
-    String message = e.message ?? '未知网络异常';
+    String message = e.message ?? e.error?.toString() ?? '未知网络异常';
 
     if (resData is Map && resData.containsKey('description')) {
       message = resData['description'].toString();

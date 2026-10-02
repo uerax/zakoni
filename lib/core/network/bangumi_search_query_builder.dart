@@ -51,10 +51,11 @@ class BangumiSearchQueryBuilder {
 
     final payload = <String, dynamic>{
       'filter': filter,
+      // 特殊处理说明：
+      // 参照 AniBaka 实践，Bangumi v0 检索接口对于无关键词的纯标签/分类筛选，
+      // 若不提供 keyword 会被服务端直接拒绝或超时，必须传递 '*' 保持纯过滤搜索 (filter-only search)。
+      'keyword': trimmed.isNotEmpty ? trimmed : '*',
     };
-    if (trimmed.isNotEmpty) {
-      payload['keyword'] = trimmed;
-    }
     if (upstreamSort != null && upstreamSort.isNotEmpty) {
       payload['sort'] = upstreamSort;
     }

@@ -14,6 +14,7 @@ class CachedAnimeImage extends StatefulWidget {
   final double? width;
   final double? height;
   final BoxFit fit;
+  final Alignment alignment;
   final int resizeWidth;
   final BorderRadius? borderRadius;
   final int loadDelayMs;
@@ -24,6 +25,7 @@ class CachedAnimeImage extends StatefulWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
     this.resizeWidth = 220,
     this.borderRadius,
     this.loadDelayMs = 0,
@@ -102,6 +104,7 @@ class _CachedAnimeImageState extends State<CachedAnimeImage> {
       width: widget.width,
       height: widget.height,
       fit: widget.fit,
+      alignment: widget.alignment,
       memCacheWidth: widget.resizeWidth,
       filterQuality: FilterQuality.medium,
       fadeInDuration: const Duration(milliseconds: 100),
