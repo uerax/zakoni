@@ -1,0 +1,167 @@
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../network/bangumi_source_preset.dart';
+import '../utils/appearance_manager.dart';
+import '../utils/font_manager.dart';
+
+/// 全局本地配置持久化服务：
+/// 负责保存与恢复用户的网络线路、字体偏好以及个性化外观设置（壁纸、图标、裁剪矩阵等）
+class AppPreferences {
+  AppPreferences._();
+
+  static const _kSourcePreset = 'pref_network_source_preset';
+  static const _kFontType = 'pref_font_type';
+  static const _kCustomFontPath = 'pref_custom_font_path';
+  static const _kCustomFontName = 'pref_custom_font_name';
+
+  static const _kCustomIconPath = 'pref_custom_icon_path';
+  static const _kGlobalWallpaperPath = 'pref_global_wallpaper_path';
+  static const _kPageWallpapers = 'pref_page_wallpapers';
+  static const _kWallpaperAlignX = 'pref_wallpaper_align_x';
+  static const _kWallpaperAlignY = 'pref_wallpaper_align_y';
+  static const _kWallpaperScale = 'pref_wallpaper_scale';
+  static const _kWallpaperOpacity = 'pref_wallpaper_opacity';
+  static const _kWallpaperBlur = 'pref_wallpaper_blur';
+
+  static SharedPreferences? _prefs;
+
+  /// 初始化本地持久化实例，并在应用启动时自动还原各项用户偏好
+  static Future<void> init() async {
+    _prefs = await SharedPreferences.getInstance();
+    await _restorePreferences();
+  }
+
+  /// 恢复持久化配置到对应的单例管理器中
+  static Future<void> _restorePreferences() async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+
+    // 1. 恢复字体偏好
+    final fontTypeStr = prefs.getString(_kFontType);
+    final customFontPath = prefs.getString(_kCustomFontPath);
+    final customFontName = prefs.getString(_kCustomFontName);
+    if (fontTypeStr != null) {
+      final matchedType = AppFontType.values.firstWhere(
+        (t) => t.name == fontTypeStr,
+        orElse: () => AppFontType.harmony,
+      );
+      if (matchedType == AppFontType.custom && customFontPath != null) {
+        await FontManager.instance.loadFontFromFile(customFontPath);
+      } else {
+        FontManager.instance.setFontType(matchedType);
+      }
+      if (customFontName != null && FontManager.instance.customFontPath != null) {
+        // 保留之前选取的字体名称
+      }
+    }
+
+    // 2. 恢复外观偏好（图标、壁纸、参数）
+    final appMgr = AppearanceManager.instance;
+    final customIcon = prefs.getString(_kCustomIconPath);
+    if (customIcon != null) {
+      appMgr.restoreCustomIcon(customIcon);
+    }
+
+    final globalWallpaper = prefs.getString(_kGlobalWallpaperPath);
+    final pageWallpapersJson = prefs.getString(_kPageWallpapers);
+    Map<String, String>? pageWallpapers;
+    if (pageWallpapersJson != null) {
+      try {
+        final decoded = jsonDecode(pageWallpapersJson) as Map<String, dynamic>;
+        pageWallpapers = decoded.map((k, v) => MapEntry(k, v.toString()));
+      } catch (_) {}
+    }
+
+    final alignX = prefs.getDouble(_kWallpaperAlignX);
+    final alignY = prefs.getDouble(_kWallpaperAlignY);
+    final scale = prefs.getDouble(_kWallpaperScale);
+    final opacity = prefs.getDouble(_kWallpaperOpacity);
+    final blur = prefs.getDouble(_kWallpaperBlur);
+
+    appMgr.restoreWallpaperConfig(
+      globalWallpaper: globalWallpaper,
+      pageWallpapers: pageWallpapers,
+      alignX: alignX,
+      alignY: alignY,
+      scale: scale,
+      opacity: opacity,
+      blur: blur,
+    );
+  }
+
+  // --- 网络线路持久化 ---
+
+  static BangumiSourcePreset getInitialSourcePreset() {
+    final presetName = _prefs?.getString(_kSourcePreset);
+    if (presetName == BangumiSourcePreset.official.name) {
+      return BangumiSourcePreset.official;
+    }
+    return BangumiSourcePreset.mirror;
+  }
+
+  static Future<void> saveSourcePreset(BangumiSourcePreset preset) async {
+    await _prefs?.setString(_kSourcePreset, preset.name);
+  }
+
+  // --- 字体持久化 ---
+
+  static Future<void> saveFontType(AppFontType type) async {
+    await _prefs?.setString(_kFontType, type.name);
+  }
+
+  static Future<void> saveCustomFont({required String path, required String name}) async {
+    await _prefs?.setString(_kFontType, AppFontType.custom.name);
+    await _prefs?.setString(_kCustomFontPath, path);
+    await _prefs?.setString(_kCustomFontName, name);
+  }
+
+  static Future<void> clearCustomFont() async {
+    await _prefs?.remove(_kCustomFontPath);
+    await _prefs?.remove(_kCustomFontName);
+  }
+
+  // --- 外观持久化 ---
+
+  static Future<void> saveCustomIcon(String? iconPath) async {
+    if (iconPath != null) {
+      await _prefs?.setString(_kCustomIconPath, iconPath);
+    } else {
+      await _prefs?.remove(_kCustomIconPath);
+    }
+  }
+
+  static Future<void> saveWallpapers({
+    String? globalWallpaper,
+    Map<String, String>? pageWallpapers,
+  }) async {
+    if (globalWallpaper != null) {
+      await _prefs?.setString(_kGlobalWallpaperPath, globalWallpaper);
+    } else {
+      await _prefs?.remove(_kGlobalWallpaperPath);
+    }
+
+    if (pageWallpapers != null && pageWallpapers.isNotEmpty) {
+      await _prefs?.setString(_kPageWallpapers, jsonEncode(pageWallpapers));
+    } else {
+      await _prefs?.remove(_kPageWallpapers);
+    }
+  }
+
+  static Future<void> saveWallpaperTransform({
+    required double alignX,
+    required double alignY,
+    required double scale,
+  }) async {
+    await _prefs?.setDouble(_kWallpaperAlignX, alignX);
+    await _prefs?.setDouble(_kWallpaperAlignY, alignY);
+    await _prefs?.setDouble(_kWallpaperScale, scale);
+  }
+
+  static Future<void> saveWallpaperOpacity(double opacity) async {
+    await _prefs?.setDouble(_kWallpaperOpacity, opacity);
+  }
+
+  static Future<void> saveWallpaperBlur(double blur) async {
+    await _prefs?.setDouble(_kWallpaperBlur, blur);
+  }
+}

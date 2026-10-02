@@ -339,7 +339,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               physics: const NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: 4,
-              itemBuilder: (_, __) => const ShimmerRankCard(),
+              itemBuilder: (context, index) => const ShimmerRankCard(),
             ),
           ),
         ],
@@ -397,7 +397,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                   childAspectRatio: 0.65,
                 ),
                 delegate: SliverChildBuilderDelegate(
-                  (_, __) => const ShimmerAnimeCard(),
+                  (context, index) => const ShimmerAnimeCard(),
                   childCount: 6,
                 ),
               ),

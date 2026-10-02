@@ -25,9 +25,9 @@ class CategoryContentView extends ConsumerWidget {
     );
     final controller = ref.read(categoryControllerProvider(initialCategory).notifier);
 
-    // 1. 仅在首次完全无数据且加载中时：呈现骨架屏
-    // 关键体验改造：当屏幕已有数据时（items.isNotEmpty），切换分类绝不销毁列表换骨架屏！
-    // 保持旧列表在屏平滑过渡，新数据就绪后瞬间替换，彻底消除白屏与骨架屏闪烁！
+    // 1. 仅在冷启动且当前内存中完全无数据时：呈现骨架屏
+    // 特殊处理说明：当屏幕上已有旧数据时（items.isNotEmpty），切换分类绝不销毁列表换骨架屏！
+    // 保持旧列表在屏平滑过渡，新数据就绪后瞬间替换，彻底消除全屏白屏与骨架屏闪烁带来的严重卡顿感。
     if (isLoading && items.isEmpty) {
       return SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -35,6 +35,7 @@ class CategoryContentView extends ConsumerWidget {
           builder: (context, constraints) {
             final width = constraints.crossAxisExtent;
             final count = width < 500 ? 3 : (width < 750 ? 4 : (width < 1000 ? 5 : 6));
+            final skeletonCount = count * 2;
             return SliverGrid(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: count,
@@ -44,7 +45,7 @@ class CategoryContentView extends ConsumerWidget {
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) => const ShimmerAnimeCard(),
-                childCount: 12,
+                childCount: skeletonCount,
               ),
             );
           },
@@ -132,7 +133,7 @@ class CategoryContentView extends ConsumerWidget {
     }
 
     // 4. 正常数据呈现：自适应 3 列（移动端推荐）/ 4~6 列（宽屏）网格瀑布流
-    // 当切换分类加载时仅施加 0.72 柔和透明度反馈，不销毁列表，无感替换
+    // 特殊处理说明：当切换分类加载中时施加 0.72 柔和透明度反馈，不销毁列表，新数据就绪后无缝替换，保障视觉连贯性
     return SliverAnimatedOpacity(
       opacity: isLoading ? 0.72 : 1.0,
       duration: const Duration(milliseconds: 180),
@@ -153,10 +154,15 @@ class CategoryContentView extends ConsumerWidget {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final item = items[index];
+                  final row = index ~/ count;
+                  // 对齐 Animaku 梯形资源调度：首排 0ms 直出，后续排次阶梯错峰 35ms 递增，
+                  // 避免同屏 15+ 张图片瞬间同时调用磁盘 I/O 与 CPU 解码导致丢帧
+                  final delayMs = row == 0 ? 0 : (row * 35).clamp(0, 140);
                   return AnimeCard(
                     key: ValueKey('anime_cat_${item.id}'),
                     item: item,
                     compact: true,
+                    loadDelayMs: delayMs,
                   );
                 },
                 childCount: items.length,

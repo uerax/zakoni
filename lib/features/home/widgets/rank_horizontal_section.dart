@@ -1,7 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/bouncing_scale_card.dart';

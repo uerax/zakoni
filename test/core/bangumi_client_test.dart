@@ -206,19 +206,22 @@ void main() {
       });
       client = BangumiClient(dio: dio);
 
-      // 1. 历史已完结年份 (如 2020) 按 score 排序：应注入 rank > 0 过滤，保障榜单质量
+      // 1. 历史年份 (如 2020) 按 score 排序：统一注入 rank > 0 与 rating_count >= 50 过滤
       await client.searchWithTotal('', year: 2020, sort: 'score');
       expect(requestedFilters.first.containsKey('rank'), true);
       expect(requestedFilters.first['rank'], ['>0', '<=99999']);
+      expect(requestedFilters.first['rating_count'], ['>=50']);
 
-      // 2. 当前正在播出的当季新番 (年份 >= 当前年份) 按 score 排序：不注入 rank 过滤，确保全量展示新番
+      // 2. 当前当季新番按 score 排序：同样统一注入 rank > 0 与 rating_count >= 50 过滤，保障榜单质量
       await client.searchWithTotal(
         '',
         year: DateTime.now().year,
         airDate: ['>=${DateTime.now().year}-10-01', '<${DateTime.now().year + 1}-01-01'],
         sort: 'score',
       );
-      expect(requestedFilters.last.containsKey('rank'), false);
+      expect(requestedFilters.last.containsKey('rank'), true);
+      expect(requestedFilters.last['rank'], ['>0', '<=99999']);
+      expect(requestedFilters.last['rating_count'], ['>=50']);
     });
 
     test('searchWithTotal caches query response and avoids redundant network requests', () async {

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import '../services/app_preferences.dart';
 
 enum AppFontType {
   harmony('HarmonyOS Sans', '鸿蒙黑体'),
@@ -16,7 +17,8 @@ enum AppFontType {
 /// 全局字体管理器：
 /// 1. 默认内置使用鸿蒙黑体 (HarmonyOS Sans)；
 /// 2. 支持切回系统默认无衬线字体（Windows 采用微软雅黑，规避回退至中易宋体）；
-/// 3. 支持在运行时通过 FontLoader 动态载入用户上传的本地 .ttf / .otf 字体文件，免重启即时全局生效。
+/// 3. 支持在运行时通过 FontLoader 动态载入用户上传的本地 .ttf / .otf 字体文件，免重启即时全局生效；
+/// 4. 接入 AppPreferences 实现字体偏好与自定义字体路径落盘持久化。
 class FontManager extends ChangeNotifier {
   static final FontManager instance = FontManager._internal();
 
@@ -60,6 +62,7 @@ class FontManager extends ChangeNotifier {
   void setFontType(AppFontType type) {
     if (_currentType == type) return;
     _currentType = type;
+    AppPreferences.saveFontType(type);
     notifyListeners();
   }
 
@@ -77,6 +80,7 @@ class FontManager extends ChangeNotifier {
       _customFontPath = filePath;
       _customFontName = file.uri.pathSegments.last;
       _currentType = AppFontType.custom;
+      AppPreferences.saveCustomFont(path: filePath, name: _customFontName);
       notifyListeners();
       return true;
     } catch (e) {
@@ -92,6 +96,8 @@ class FontManager extends ChangeNotifier {
     if (_currentType == AppFontType.custom) {
       _currentType = AppFontType.harmony;
     }
+    AppPreferences.clearCustomFont();
+    AppPreferences.saveFontType(_currentType);
     notifyListeners();
   }
 }

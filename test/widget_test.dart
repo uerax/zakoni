@@ -76,4 +76,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('个性化外观'), findsOneWidget);
   });
+
+  testWidgets('MainNavigationShell lazy mounts tabs only on first tap', (WidgetTester tester) async {
+    final dio = Dio();
+    dio.httpClientAdapter = ImmediateMockAdapter();
+    final client = BangumiClient(dio: dio);
+
+    await tester.pumpWidget(ZakoniApp(client: client));
+    await tester.pump();
+
+    // 刚打开应用时（仅激活 Tab 0 首页）：分类页与设置页未挂载，杜绝后台偷跑网络
+    expect(find.text('⊞ 分类索引'), findsNothing);
+    expect(find.text('网络线路'), findsNothing);
+
+    // 首次点击分类 Tab：激活挂载分类页
+    await tester.tap(find.byIcon(Icons.grid_view_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('⊞ 分类索引'), findsOneWidget);
+
+    // 首次点击设置 Tab：激活挂载设置页
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('网络线路'), findsOneWidget);
+
+    // 切回首页后，已激活的分类页保持常驻保活
+    await tester.tap(find.byIcon(Icons.home_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('⊞ 分类索引', skipOffstage: false), findsOneWidget);
+  });
 }

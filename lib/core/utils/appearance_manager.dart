@@ -2,13 +2,15 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../services/app_preferences.dart';
 
 /// 全局外观与个性化管理器：
 /// 1. 管理应用图标（默认内置泡面猫耳 Logo，支持上传自定义图片与一键恢复默认）；
 /// 2. 管理全屏背景壁纸（支持“全局一键应用”或“各页面单独设置”多级继承）；
 /// 3. 支持壁纸视窗垂直对齐/裁剪定位（AlignmentY: -1.0 偏顶 .. 1.0 偏底，避免二次元插画人物被裁面部）；
 /// 4. 支持壁纸不透明度 (Opacity) 与高斯模糊 (Blur) 平滑微调；
-/// 5. 继承 ChangeNotifier，通过全局 ListenableBuilder 即时响应，免重启生效。
+/// 5. 继承 ChangeNotifier，通过全局 ListenableBuilder 即时响应，免重启生效；
+/// 6. 整合 AppPreferences 实现配置全量落盘持久化。
 class AppearanceManager extends ChangeNotifier {
   static final AppearanceManager instance = AppearanceManager._internal();
 
@@ -63,6 +65,33 @@ class AppearanceManager extends ChangeNotifier {
     return _pageWallpapers.containsKey(pageKey);
   }
 
+  // --- 持久化恢复方法（供 AppPreferences 初始化时调用） ---
+
+  void restoreCustomIcon(String path) {
+    _customIconPath = path;
+  }
+
+  void restoreWallpaperConfig({
+    String? globalWallpaper,
+    Map<String, String>? pageWallpapers,
+    double? alignX,
+    double? alignY,
+    double? scale,
+    double? opacity,
+    double? blur,
+  }) {
+    if (globalWallpaper != null) _globalWallpaperPath = globalWallpaper;
+    if (pageWallpapers != null) {
+      _pageWallpapers.clear();
+      _pageWallpapers.addAll(pageWallpapers);
+    }
+    if (alignX != null) _wallpaperAlignX = alignX;
+    if (alignY != null) _wallpaperAlignY = alignY;
+    if (scale != null) _wallpaperScale = scale;
+    if (opacity != null) _wallpaperOpacity = opacity;
+    if (blur != null) _wallpaperBlur = blur;
+  }
+
   // --- 应用图标相关方法 ---
 
   Future<bool> pickAndSetCustomIcon() async {
@@ -77,6 +106,7 @@ class AppearanceManager extends ChangeNotifier {
         final file = File(path);
         if (await file.exists()) {
           _customIconPath = path;
+          AppPreferences.saveCustomIcon(path);
           notifyListeners();
           return true;
         }
@@ -91,6 +121,7 @@ class AppearanceManager extends ChangeNotifier {
   void resetDefaultIcon() {
     if (_customIconPath == null) return;
     _customIconPath = null;
+    AppPreferences.saveCustomIcon(null);
     notifyListeners();
   }
 
@@ -103,6 +134,10 @@ class AppearanceManager extends ChangeNotifier {
     } else {
       _pageWallpapers[pageKey] = path;
     }
+    AppPreferences.saveWallpapers(
+      globalWallpaper: _globalWallpaperPath,
+      pageWallpapers: _pageWallpapers,
+    );
     notifyListeners();
   }
 
@@ -123,6 +158,10 @@ class AppearanceManager extends ChangeNotifier {
           } else {
             _pageWallpapers[pageKey] = path;
           }
+          AppPreferences.saveWallpapers(
+            globalWallpaper: _globalWallpaperPath,
+            pageWallpapers: _pageWallpapers,
+          );
           notifyListeners();
           return true;
         }
@@ -141,15 +180,18 @@ class AppearanceManager extends ChangeNotifier {
     } else {
       _pageWallpapers.remove(pageKey);
     }
+    AppPreferences.saveWallpapers(
+      globalWallpaper: _globalWallpaperPath,
+      pageWallpapers: _pageWallpapers,
+    );
     notifyListeners();
   }
 
-  /// 获取指定页面实际生效的壁纸文件对象
+  /// 获取指定页面实际生效的壁纸文件对象（不阻塞执行同步 I/O，由图像加载器自身异步处理）
   File? getWallpaperFileForPage(String? pageKey) {
     final path = getWallpaperForPage(pageKey);
     if (path == null) return null;
-    final file = File(path);
-    return file.existsSync() ? file : null;
+    return File(path);
   }
 
   /// 设置壁纸视窗交互式裁剪平移与缩放矩阵
@@ -161,18 +203,25 @@ class AppearanceManager extends ChangeNotifier {
     _wallpaperAlignX = alignX.clamp(-1.0, 1.0);
     _wallpaperAlignY = alignY.clamp(-1.0, 1.0);
     _wallpaperScale = scale.clamp(1.0, 3.5);
+    AppPreferences.saveWallpaperTransform(
+      alignX: _wallpaperAlignX,
+      alignY: _wallpaperAlignY,
+      scale: _wallpaperScale,
+    );
     notifyListeners();
   }
 
   /// 设置壁纸不透明度 (0.05 ~ 0.60)
   void setWallpaperOpacity(double val) {
     _wallpaperOpacity = val.clamp(0.05, 0.60);
+    AppPreferences.saveWallpaperOpacity(_wallpaperOpacity);
     notifyListeners();
   }
 
   /// 设置壁纸高斯模糊度 (0.0 ~ 20.0)
   void setWallpaperBlur(double val) {
     _wallpaperBlur = val.clamp(0.0, 20.0);
+    AppPreferences.saveWallpaperBlur(_wallpaperBlur);
     notifyListeners();
   }
 
@@ -188,8 +237,9 @@ class AppearanceManager extends ChangeNotifier {
         File(_customIconPath!),
         width: size,
         height: size,
+        cacheWidth: (size * 2).toInt(),
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Image.asset(
+        errorBuilder: (context, error, stackTrace) => Image.asset(
           defaultLogoAsset,
           width: size,
           height: size,
@@ -217,7 +267,10 @@ class AppearanceManager extends ChangeNotifier {
     );
   }
 
-  /// 全屏背景壁纸层构建器：按页面解析有效壁纸，结合用户在取景框中亲手微调的 Transform 视角与 ImageFiltered 滤镜稳定呈现
+  /// 全屏背景壁纸层构建器：
+  /// 1. 按页面解析有效壁纸，结合用户在取景框中的 Transform 与 ImageFiltered 滤镜稳定呈现；
+  /// 2. 限制 cacheWidth: 1080 进行下采样，杜绝 4K/8K 照片全量解压爆显存；
+  /// 3. 包裹 RepaintBoundary 建立独立绘制边界，阻断上层列表滑动触发的重复重绘与重滤波。
   Widget buildWallpaperLayer({String? pageKey}) {
     final wallpaperPath = getWallpaperForPage(pageKey);
     if (wallpaperPath == null) {
@@ -226,15 +279,15 @@ class AppearanceManager extends ChangeNotifier {
 
     final file = File(wallpaperPath);
 
-    // 核心渲染管线：先依据 Alignment 对齐用户选择的焦点，再等比缩放矩阵呈现，最后挂载原生高斯模糊滤镜
     Widget imageWidget = Transform.scale(
       scale: _wallpaperScale,
       alignment: Alignment(_wallpaperAlignX, _wallpaperAlignY),
       child: Image.file(
         file,
+        cacheWidth: 1080,
         fit: BoxFit.cover,
         alignment: Alignment(_wallpaperAlignX, _wallpaperAlignY),
-        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
       ),
     );
 
@@ -250,9 +303,11 @@ class AppearanceManager extends ChangeNotifier {
 
     return Positioned.fill(
       child: IgnorePointer(
-        child: Opacity(
-          opacity: _wallpaperOpacity,
-          child: imageWidget,
+        child: RepaintBoundary(
+          child: Opacity(
+            opacity: _wallpaperOpacity,
+            child: imageWidget,
+          ),
         ),
       ),
     );

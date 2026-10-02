@@ -261,7 +261,7 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
     final activeWallpaperFile = appMgr.getWallpaperFileForPage(
       _wallpaperScope == 'all' ? null : _wallpaperScope,
     );
-    final hasWallpaperImg = activeWallpaperFile != null && activeWallpaperFile.existsSync();
+    final hasWallpaperImg = activeWallpaperFile != null;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -282,6 +282,11 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
                   child: Image.file(
                     activeWallpaperFile,
                     fit: BoxFit.cover,
+                    cacheWidth: 56,
+                    errorBuilder: (context, error, stackTrace) => const IosSettingsIconBox(
+                      icon: Icons.wallpaper_rounded,
+                      bg: Color(0xFF3A86FF),
+                    ),
                   ),
                 )
               : const IosSettingsIconBox(

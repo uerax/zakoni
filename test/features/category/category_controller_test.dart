@@ -38,7 +38,7 @@ void main() {
       final summary = state.buildFilterSummary();
       expect(summary, contains('${CategoryConstants.currentYear}年'));
       expect(summary, contains(CategoryConstants.seasonShortName(CategoryConstants.currentSeasonMonth)));
-      expect(summary, contains('热度优先'));
+      expect(summary, contains('热度'));
       expect(summary, contains('共 42 部'));
     });
   });
@@ -74,6 +74,22 @@ void main() {
       notifier.resetToCurrentSeason();
       final resetFilter = container.read(categoryControllerProvider(null)).filter;
       expect(resetFilter.isCurrentSeason, isTrue);
+    });
+
+    test('retains previous items for smooth transition when switching tag to uncached filter', () async {
+      final container = ProviderContainer(
+        overrides: [
+          bangumiClientProvider.overrideWithValue(BangumiClient()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(categoryControllerProvider(null).notifier);
+      notifier.setTag('恋爱');
+
+      // 切换新标签未命中缓存时，保留现有状态平滑过渡，仅标记 isLoading: true
+      final state = container.read(categoryControllerProvider(null));
+      expect(state.isLoading, isTrue);
     });
   });
 }

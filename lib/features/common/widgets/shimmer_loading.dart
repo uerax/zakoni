@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// 全局高性能流光骨架屏（Shimmer）组件：
-/// 1. 采用纯原生 AnimationController + ShaderMask 实现，无需引入臃肿第三方依赖；
-/// 2. 动画控制器挂载于外层共享，子组件无论有多少个占位块均共享同一个着色器流动周期，性能极高。
+/// 1. 采用单层 ShaderMask 架构：外层包裹单一 ShaderMask，子组件内所有占位块共享同一个渲染图层；
+/// 2. 彻底消除同屏几十个独立 ShaderMask 离屏缓冲通道导致的显存压力与掉帧。
 class Shimmer extends StatefulWidget {
   final Widget child;
   final Duration duration;
@@ -13,20 +13,17 @@ class Shimmer extends StatefulWidget {
     this.duration = const Duration(milliseconds: 1500),
   });
 
-  static ShimmerState? of(BuildContext context) {
-    return context.findAncestorStateOfType<ShimmerState>();
+  /// 判断当前构建上下文中是否已存在全局 Shimmer 父级
+  static bool hasShimmerAncestor(BuildContext context) {
+    return context.findAncestorWidgetOfExactType<Shimmer>() != null;
   }
 
   @override
-  State<Shimmer> createState() => ShimmerState();
+  State<Shimmer> createState() => _ShimmerState();
 }
 
-class ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
+class _ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-
-  Listenable get shimmerChanges => _controller;
-
-  double get percent => _controller.value;
 
   @override
   void initState() {
@@ -41,7 +38,8 @@ class ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  LinearGradient get gradient {
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final baseColor = isDark
         ? const Color(0xFF2C2C2E)
@@ -50,18 +48,25 @@ class ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
         ? const Color(0xFF3A3A3C)
         : const Color(0xFFF2F2F7);
 
-    return LinearGradient(
-      colors: [baseColor, highlightColor, baseColor],
-      stops: const [0.1, 0.5, 0.9],
-      begin: const Alignment(-1.0, -0.3),
-      end: const Alignment(1.0, 0.3),
-      transform: _SlidingGradientTransform(slidePercent: percent),
-    );
-  }
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final gradient = LinearGradient(
+          colors: [baseColor, highlightColor, baseColor],
+          stops: const [0.1, 0.5, 0.9],
+          begin: const Alignment(-1.0, -0.3),
+          end: const Alignment(1.0, 0.3),
+          transform: _SlidingGradientTransform(slidePercent: _controller.value),
+        );
 
-  @override
-  Widget build(BuildContext context) {
-    return widget.child;
+        return ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (bounds) => gradient.createShader(bounds),
+          child: child,
+        );
+      },
+      child: widget.child,
+    );
   }
 }
 
@@ -76,7 +81,9 @@ class _SlidingGradientTransform extends GradientTransform {
   }
 }
 
-/// 流光骨架占位块渲染器：通过 ShaderMask 将父级 Shimmer 的流动高光映射到子组件上
+/// 流光骨架占位块渲染器：
+/// 当外层已有 Shimmer 时直接返回纯色占位块，零额外离屏缓冲通道；
+/// 当孤立存在时自动轻量包装。
 class ShimmerLoading extends StatelessWidget {
   final Widget child;
 
@@ -84,21 +91,10 @@ class ShimmerLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shimmer = Shimmer.of(context);
-    if (shimmer == null) return child;
-
-    return AnimatedBuilder(
-      animation: shimmer.shimmerChanges,
-      builder: (context, _) {
-        return ShaderMask(
-          blendMode: BlendMode.srcATop,
-          shaderCallback: (bounds) {
-            return shimmer.gradient.createShader(bounds);
-          },
-          child: child,
-        );
-      },
-    );
+    if (Shimmer.hasShimmerAncestor(context)) {
+      return child;
+    }
+    return Shimmer(child: child);
   }
 }
 
@@ -108,12 +104,11 @@ class ShimmerAnimeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
     final blockColor = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA);
 
-    return Card(
+    final card = Card(
       elevation: 1.5,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -123,11 +118,7 @@ class ShimmerAnimeCard extends StatelessWidget {
         children: [
           // 封面区域占位
           Expanded(
-            child: ShimmerLoading(
-              child: Container(
-                color: blockColor,
-              ),
-            ),
+            child: Container(color: blockColor),
           ),
           // 底部标题占位行
           Padding(
@@ -135,25 +126,21 @@ class ShimmerAnimeCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ShimmerLoading(
-                  child: Container(
-                    height: 14,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: blockColor,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
+                Container(
+                  height: 14,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: blockColor,
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
                 const SizedBox(height: 6),
-                ShimmerLoading(
-                  child: Container(
-                    height: 10,
-                    width: 70,
-                    decoration: BoxDecoration(
-                      color: blockColor,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
+                Container(
+                  height: 10,
+                  width: 70,
+                  decoration: BoxDecoration(
+                    color: blockColor,
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
               ],
@@ -162,6 +149,11 @@ class ShimmerAnimeCard extends StatelessWidget {
         ],
       ),
     );
+
+    if (Shimmer.hasShimmerAncestor(context)) {
+      return card;
+    }
+    return Shimmer(child: card);
   }
 }
 
@@ -177,7 +169,7 @@ class ShimmerRankCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final blockColor = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA);
 
-    return Padding(
+    final card = Padding(
       padding: const EdgeInsets.only(right: 12),
       child: SizedBox(
         width: cardWidth,
@@ -185,42 +177,41 @@ class ShimmerRankCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 封面占位
-            ShimmerLoading(
-              child: Container(
-                height: cardHeight,
-                decoration: BoxDecoration(
-                  color: blockColor,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+            Container(
+              height: cardHeight,
+              decoration: BoxDecoration(
+                color: blockColor,
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
             const SizedBox(height: 6),
             // 标题占位行 1
-            ShimmerLoading(
-              child: Container(
-                height: 12,
-                width: 100,
-                decoration: BoxDecoration(
-                  color: blockColor,
-                  borderRadius: BorderRadius.circular(3),
-                ),
+            Container(
+              height: 12,
+              width: 100,
+              decoration: BoxDecoration(
+                color: blockColor,
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
             const SizedBox(height: 4),
             // 标题占位行 2
-            ShimmerLoading(
-              child: Container(
-                height: 12,
-                width: 60,
-                decoration: BoxDecoration(
-                  color: blockColor,
-                  borderRadius: BorderRadius.circular(3),
-                ),
+            Container(
+              height: 12,
+              width: 60,
+              decoration: BoxDecoration(
+                color: blockColor,
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
           ],
         ),
       ),
     );
+
+    if (Shimmer.hasShimmerAncestor(context)) {
+      return card;
+    }
+    return Shimmer(child: card);
   }
 }

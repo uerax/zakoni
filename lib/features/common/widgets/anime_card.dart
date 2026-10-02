@@ -7,12 +7,14 @@ class AnimeCard extends StatelessWidget {
   final BangumiItem item;
   final VoidCallback? onTap;
   final bool compact;
+  final int loadDelayMs;
 
   const AnimeCard({
     super.key,
     required this.item,
     this.onTap,
     this.compact = false,
+    this.loadDelayMs = 0,
   });
 
   @override
@@ -55,6 +57,7 @@ class AnimeCard extends StatelessWidget {
                         : item.coverUrl,
                     fit: BoxFit.cover,
                     resizeWidth: compact ? 220 : 360,
+                    loadDelayMs: loadDelayMs,
                   ),
                   // 封面底部暗色渐变遮罩
                   Positioned(

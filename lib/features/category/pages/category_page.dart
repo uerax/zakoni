@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../controllers/category_controller.dart';
@@ -6,7 +7,6 @@ import '../widgets/category_content_view.dart';
 import '../widgets/category_filter_bar.dart';
 import '../widgets/category_genre_chips.dart';
 import '../widgets/category_header_bar.dart';
-import '../widgets/category_season_row.dart';
 
 class CategoryPage extends ConsumerStatefulWidget {
   final BangumiClient? client;
@@ -124,7 +124,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
               color: theme.colorScheme.primary,
               child: CustomScrollView(
                 controller: _scrollController,
-                cacheExtent: 180.0,
+                scrollCacheExtent: const ScrollCacheExtent.pixels(180),
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
                 ),
@@ -141,22 +141,12 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
 
                   const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-                  // 3. 第二行：年份与排序放在同一行（使用极速轻量原地 Dropdown 菜单）
+                  // 3. 第二行：年份、季度与排序下拉菜单栏（使用极速轻量原地 Dropdown 菜单）
                   SliverToBoxAdapter(
                     child: CategoryFilterBar(initialCategory: widget.initialCategory),
                   ),
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-                  // 4. 第三行：春夏秋冬季度栏（手机窄屏均分整行，宽屏/平板固定宽度 74dp 紧凑居左不拉伸）
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: CategorySeasonRow(initialCategory: widget.initialCategory),
-                    ),
-                  ),
-
-                  // 5. 动态状态与数量摘要副标题
+                  // 4. 动态状态与数量摘要副标题
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),

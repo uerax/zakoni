@@ -191,7 +191,7 @@ class _WallpaperCropDialogState extends State<WallpaperCropDialog> {
                               widget.imageFile,
                               fit: BoxFit.cover,
                               alignment: Alignment(_currentAlignX, _currentAlignY),
-                              errorBuilder: (_, __, ___) => const Center(
+                              errorBuilder: (context, error, stackTrace) => const Center(
                                 child: Text('图片加载失败', style: TextStyle(color: Colors.white70)),
                               ),
                             ),

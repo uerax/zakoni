@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/bangumi_providers.dart';
 import '../models/category_constants.dart';
@@ -12,11 +13,21 @@ final categoryControllerProvider = NotifierProvider
 class CategoryController extends Notifier<CategoryState> {
   final String? initialCategory;
   int _requestSeq = 0;
+  CancelToken? _cancelToken;
+  Timer? _debounceTimer;
+  bool _isDisposed = false;
 
   CategoryController([this.initialCategory]);
 
   @override
   CategoryState build() {
+    _isDisposed = false;
+    ref.onDispose(() {
+      _isDisposed = true;
+      _debounceTimer?.cancel();
+      _cancelToken?.cancel('notifier_disposed');
+    });
+
     final filter = CategoryFilter.fromInitial(initialCategory);
     // 在下一个 microtask 启动第一页数据加载，避免在 build 过程中同步修改状态
     Future.microtask(fetchFirstPage);
@@ -27,6 +38,13 @@ class CategoryController extends Notifier<CategoryState> {
   /// 若本地已有缓存，则 0ms 同步秒出，彻底消除骨架屏闪烁
   Future<void> fetchFirstPage({bool forceRefresh = false}) async {
     final seq = ++_requestSeq;
+
+    // 核心工程优化：若前序请求仍在网络线路上飞行，立即执行物理级 CancelToken 熔断，
+    // 释放客户端 Socket 与带宽，确保新选中的标签享有 100% 独立带宽
+    _cancelToken?.cancel('filter_changed');
+    final cancelToken = CancelToken();
+    _cancelToken = cancelToken;
+
     final filter = state.filter;
     final tagList = (filter.selectedTag != null && filter.selectedTag != '全部')
         ? [filter.selectedTag!]
@@ -45,7 +63,7 @@ class CategoryController extends Notifier<CategoryState> {
 
     final client = ref.read(bangumiClientProvider);
 
-    // 关键体验优化：若命中未过期缓存且非下拉强制刷新，直接 0ms 瞬间切换，不打回骨架屏
+    // 1. 若命中未过期缓存且非下拉强制刷新，直接 0ms 瞬间切换出新数据，不闪骨架屏
     if (!forceRefresh) {
       final cached = client.peekSearchCache(
         '',
@@ -68,7 +86,12 @@ class CategoryController extends Notifier<CategoryState> {
       }
     }
 
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    // 2. 关键体验优化（平滑过渡）：未命中缓存时坚决保留现有 items，绝不物理清空，
+    // 仅标记 isLoading 配合视图层微弱透明度过渡；仅在首屏冷加载完全无数据时才呈现骨架屏。
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: null,
+    );
 
     try {
       final result = await client.searchWithTotal(
@@ -80,9 +103,10 @@ class CategoryController extends Notifier<CategoryState> {
         limit: CategoryConstants.pageSize,
         offset: 0,
         forceRefresh: forceRefresh,
+        cancelToken: cancelToken,
       );
 
-      if (seq != _requestSeq) return;
+      if (_isDisposed || cancelToken.isCancelled || seq != _requestSeq) return;
 
       state = state.copyWith(
         items: result.items,
@@ -91,11 +115,72 @@ class CategoryController extends Notifier<CategoryState> {
         isLoading: false,
       );
     } catch (e) {
-      if (seq != _requestSeq) return;
+      if (_isDisposed || cancelToken.isCancelled || seq != _requestSeq) return;
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
       );
+    }
+  }
+
+  /// 筛选微防抖调度器：
+  /// 1. 优先同步探测本地内存缓存：若已命中缓存则 0ms 同步秒切，无任何迟滞感；
+  /// 2. 未命中缓存时，施加 180ms 轻量防抖，防止用户连续快速切换筛选时并发向 Bangumi 发送无谓的重叠请求。
+  void _triggerFetchWithDebounce({Duration delay = const Duration(milliseconds: 180)}) {
+    _debounceTimer?.cancel();
+
+    final filter = state.filter;
+    final tagList = (filter.selectedTag != null && filter.selectedTag != '全部')
+        ? [filter.selectedTag!]
+        : null;
+
+    List<String>? airDate;
+    int? yearParam;
+
+    if (filter.selectedMonth != null && filter.selectedMonth! > 0) {
+      final targetYear = filter.selectedYear ?? CategoryConstants.currentYear;
+      yearParam = targetYear;
+      airDate = CategoryConstants.seasonAirDate(targetYear, filter.selectedMonth!);
+    } else if (filter.selectedYear != null) {
+      yearParam = filter.selectedYear;
+    }
+
+    final client = ref.read(bangumiClientProvider);
+    final cached = client.peekSearchCache(
+      '',
+      tags: tagList,
+      year: yearParam,
+      airDate: airDate,
+      sort: filter.selectedSort,
+      limit: CategoryConstants.pageSize,
+      offset: 0,
+    );
+
+    if (cached != null) {
+      _cancelToken?.cancel('filter_changed');
+      state = state.copyWith(
+        items: cached.items,
+        total: cached.total,
+        hasMore: cached.hasMore,
+        isLoading: false,
+        errorMessage: null,
+      );
+      return;
+    }
+
+    // 未命中缓存：立即进入平滑过渡态，保留当前数据不白屏
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: null,
+    );
+
+    if (delay <= Duration.zero) {
+      fetchFirstPage();
+    } else {
+      _debounceTimer = Timer(delay, () {
+        if (_isDisposed) return;
+        fetchFirstPage();
+      });
     }
   }
 
@@ -133,6 +218,8 @@ class CategoryController extends Notifier<CategoryState> {
         offset: state.items.length,
       );
 
+      if (_isDisposed) return;
+
       state = state.copyWith(
         items: [...state.items, ...result.items],
         total: result.total,
@@ -140,6 +227,7 @@ class CategoryController extends Notifier<CategoryState> {
         isLoadingMore: false,
       );
     } catch (_) {
+      if (_isDisposed) return;
       state = state.copyWith(isLoadingMore: false);
     }
   }
@@ -151,7 +239,7 @@ class CategoryController extends Notifier<CategoryState> {
       filter: state.filter.copyWith(selectedTag: effectiveTag),
       isTagExpanded: false,
     );
-    fetchFirstPage();
+    _triggerFetchWithDebounce();
   }
 
   void setYear(int? year) {
@@ -159,7 +247,7 @@ class CategoryController extends Notifier<CategoryState> {
     state = state.copyWith(
       filter: state.filter.copyWith(selectedYear: year),
     );
-    fetchFirstPage();
+    _triggerFetchWithDebounce();
   }
 
   void setMonth(int? month) {
@@ -178,7 +266,7 @@ class CategoryController extends Notifier<CategoryState> {
         selectedYear: newYear,
       ),
     );
-    fetchFirstPage();
+    _triggerFetchWithDebounce();
   }
 
   void setSort(String sort) {
@@ -186,7 +274,7 @@ class CategoryController extends Notifier<CategoryState> {
     state = state.copyWith(
       filter: state.filter.copyWith(selectedSort: sort),
     );
-    fetchFirstPage();
+    _triggerFetchWithDebounce();
   }
 
   void toggleTagExpanded([bool? expanded]) {
@@ -207,7 +295,7 @@ class CategoryController extends Notifier<CategoryState> {
       ),
       isTagExpanded: false,
     );
-    fetchFirstPage();
+    _triggerFetchWithDebounce(delay: Duration.zero);
   }
 
   /// 复原到初始默认选项（若有 initialCategory 则恢复该分类，否则复原为当季新番默认选项）
@@ -217,6 +305,6 @@ class CategoryController extends Notifier<CategoryState> {
       filter: CategoryFilter.fromInitial(state.filter.initialCategory),
       isTagExpanded: false,
     );
-    fetchFirstPage();
+    _triggerFetchWithDebounce(delay: Duration.zero);
   }
 }

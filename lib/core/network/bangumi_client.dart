@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import '../constants/app_constants.dart';
@@ -9,6 +8,7 @@ import '../models/bangumi/bangumi_episode.dart';
 import '../models/bangumi/bangumi_item.dart';
 import '../models/bangumi/bangumi_search_result.dart';
 import '../models/bangumi/bangumi_user.dart';
+import '../services/app_preferences.dart';
 import '../utils/image_utils.dart';
 import '../utils/timed_cache.dart';
 import 'bangumi_api_exception.dart';
@@ -71,11 +71,11 @@ class BangumiClient {
   BangumiClient({
     String? baseUrl,
     Dio? dio,
-  })  : _baseUrl = baseUrl ?? BangumiSourcePreset.mirror.apiBase,
+  })  : _baseUrl = baseUrl ?? AppPreferences.getInitialSourcePreset().apiBase,
         _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: baseUrl ?? BangumiSourcePreset.mirror.apiBase,
+                baseUrl: baseUrl ?? AppPreferences.getInitialSourcePreset().apiBase,
                 connectTimeout: const Duration(seconds: 15),
                 receiveTimeout: const Duration(seconds: 15),
                 headers: {
@@ -84,12 +84,18 @@ class BangumiClient {
                 },
               ),
             ) {
-    if (baseUrl == BangumiSourcePreset.official.apiBase) {
-      _sourcePreset = BangumiSourcePreset.official;
-      setBangumiImageHost(BangumiSourcePreset.official.imageHost);
+    if (baseUrl != null) {
+      if (baseUrl == BangumiSourcePreset.official.apiBase) {
+        _sourcePreset = BangumiSourcePreset.official;
+        setBangumiImageHost(BangumiSourcePreset.official.imageHost);
+      } else {
+        _sourcePreset = BangumiSourcePreset.mirror;
+        setBangumiImageHost(BangumiSourcePreset.mirror.imageHost);
+      }
     } else {
-      _sourcePreset = BangumiSourcePreset.mirror;
-      setBangumiImageHost(BangumiSourcePreset.mirror.imageHost);
+      final initial = AppPreferences.getInitialSourcePreset();
+      _sourcePreset = initial;
+      setBangumiImageHost(initial.imageHost);
     }
   }
 
@@ -100,6 +106,7 @@ class BangumiClient {
     _sourcePreset = preset;
     updateBaseUrl(preset.apiBase);
     setBangumiImageHost(preset.imageHost);
+    AppPreferences.saveSourcePreset(preset);
     clearCache();
   }
 
@@ -119,37 +126,16 @@ class BangumiClient {
       _episodesCache.length +
       _commentsCache.length;
 
-  /// 估算当前客户端在内存中缓存的 API 响应数据字节大小
-  int get dataCacheSizeBytes {
-    int bytes = 0;
-    try {
-      if (_calendarCache.value != null) {
-        bytes += utf8.encode(jsonEncode(_calendarCache.value!.map((d) => d.toJson()).toList())).length;
-      }
-      if (_trendingCache.value != null) {
-        bytes += utf8.encode(jsonEncode(_trendingCache.value!.map((i) => i.toJson()).toList())).length;
-      }
-      if (_moviesCache.value != null) {
-        bytes += utf8.encode(jsonEncode(_moviesCache.value!.map((i) => i.toJson()).toList())).length;
-      }
-      if (_ovaCache.value != null) {
-        bytes += utf8.encode(jsonEncode(_ovaCache.value!.map((i) => i.toJson()).toList())).length;
-      }
-      for (final search in _searchCache.values) {
-        bytes += utf8.encode(jsonEncode(search.toJson())).length;
-      }
-      for (final subject in _subjectCache.values) {
-        bytes += utf8.encode(jsonEncode(subject.toJson())).length;
-      }
-      for (final eps in _episodesCache.values) {
-        bytes += utf8.encode(jsonEncode(eps.map((e) => e.toJson()).toList())).length;
-      }
-      for (final comments in _commentsCache.values) {
-        bytes += utf8.encode(jsonEncode(comments.map((c) => c.toJson()).toList())).length;
-      }
-    } catch (_) {}
-    return bytes;
-  }
+  /// O(1) 极速获取当前客户端在内存中缓存的 API 响应数据字节大小，彻底避免在 UI 线程全量 JSON 序列化导致卡顿
+  int get dataCacheSizeBytes =>
+      _calendarCache.estimatedBytes +
+      _trendingCache.estimatedBytes +
+      _moviesCache.estimatedBytes +
+      _ovaCache.estimatedBytes +
+      _searchCache.totalBytes +
+      _subjectCache.totalBytes +
+      _episodesCache.totalBytes +
+      _commentsCache.totalBytes;
 
   void clearCache() {
     _calendarCache.clear();
@@ -182,7 +168,7 @@ class BangumiClient {
       }).whereType<BangumiCalendarDay>().toList();
 
       if (days.isNotEmpty) {
-        _calendarCache.set(days);
+        _calendarCache.set(days, days.length * 1500);
       }
       return days;
     } on DioException catch (e) {
@@ -223,7 +209,7 @@ class BangumiClient {
             })
             .toList();
         if (items.isNotEmpty) {
-          _trendingCache.set(items);
+          _trendingCache.set(items, items.length * 1500);
           return items;
         }
       }
@@ -245,7 +231,7 @@ class BangumiClient {
         limit: limit,
       );
       if (items.isNotEmpty) {
-        _trendingCache.set(items);
+        _trendingCache.set(items, items.length * 1500);
         return items;
       }
     } catch (_) {}
@@ -267,7 +253,7 @@ class BangumiClient {
         limit: limit,
       );
       if (items.isNotEmpty) {
-        _moviesCache.set(items);
+        _moviesCache.set(items, items.length * 1500);
         return items;
       }
     } catch (e) {
@@ -290,7 +276,7 @@ class BangumiClient {
         limit: limit,
       );
       if (items.isNotEmpty) {
-        _ovaCache.set(items);
+        _ovaCache.set(items, items.length * 1500);
         return items;
       }
     } catch (e) {
@@ -316,7 +302,7 @@ class BangumiClient {
         final res = await _dio.get('/v0/subjects/$subjectId');
         if (res.data is Map<String, dynamic>) {
           final item = BangumiItem.fromJson(res.data as Map<String, dynamic>);
-          _subjectCache.set(subjectId, item);
+          _subjectCache.set(subjectId, item, 4096);
           return item;
         }
         throw const BangumiApiException('响应格式不正确');
@@ -373,7 +359,7 @@ class BangumiClient {
               .whereType<Map<String, dynamic>>()
               .map((ep) => BangumiEpisode.fromJson(ep))
               .toList();
-          _episodesCache.set(cacheKey, eps);
+          _episodesCache.set(cacheKey, eps, eps.length * 400 + 256);
           return eps;
         }
         return const <BangumiEpisode>[];
@@ -468,6 +454,7 @@ class BangumiClient {
     List<String>? airDate,
     int type = 2, // 2 = 动画
     bool forceRefresh = false,
+    CancelToken? cancelToken,
   }) async {
     final trimmed = keyword.trim();
     final cacheKey = _buildSearchCacheKey(
@@ -515,6 +502,7 @@ class BangumiClient {
             'limit': limit,
             'offset': offset,
           },
+          cancelToken: cancelToken,
         );
 
         final data = res.data;
@@ -539,11 +527,14 @@ class BangumiClient {
             limit: limit,
             offset: offset,
           );
-          _searchCache.set(cacheKey, result);
+          _searchCache.set(cacheKey, result, result.items.length * 1500 + 512);
           return result;
         }
         return BangumiSearchResult.empty;
       } on DioException catch (e) {
+        if (e.type == DioExceptionType.cancel) {
+          rethrow;
+        }
         final stale = _searchCache.getStale(cacheKey);
         if (stale != null) return stale;
 
@@ -561,6 +552,7 @@ class BangumiClient {
               'max_results': limit,
               'start': offset,
             },
+            cancelToken: cancelToken,
           );
           final list = fallbackRes.data?['list'];
           if (list is List) {
@@ -577,7 +569,7 @@ class BangumiClient {
               limit: limit,
               offset: offset,
             );
-            _searchCache.set(cacheKey, result);
+            _searchCache.set(cacheKey, result, result.items.length * 1500 + 512);
             return result;
           }
         } catch (_) {
@@ -630,7 +622,7 @@ class BangumiClient {
               .whereType<Map<String, dynamic>>()
               .map((c) => BangumiComment.fromJson(c))
               .toList();
-          _commentsCache.set(cacheKey, comments);
+          _commentsCache.set(cacheKey, comments, comments.length * 600 + 256);
           return comments;
         }
         return const <BangumiComment>[];

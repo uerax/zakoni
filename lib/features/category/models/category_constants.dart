@@ -30,10 +30,9 @@ class CategoryConstants {
   ];
 
   static const sortOptions = [
-    (key: 'heat', label: '热度优先', icon: '🔥'),
-    (key: 'score', label: '评分最高', icon: '⭐'),
-    (key: 'rank', label: '排名靠前', icon: '🏆'),
-    (key: 'date', label: '最新放送', icon: '🕒'),
+    (key: 'heat', label: '热度'),
+    (key: 'score', label: '评分'),
+    (key: 'date', label: '时间'),
   ];
 
   // 季度简明标签：精简为 图标 + 月份，适配所有手机屏幕宽度，绝不溢出换行

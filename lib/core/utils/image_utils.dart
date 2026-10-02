@@ -79,3 +79,24 @@ String preferResizedCover(
 
   return bangumiImageUrl(resized, overrideHost: imageHost);
 }
+
+/// 为图片生成协议与域名无关的通用磁盘缓存 Key：
+/// 剥离不同图床 Host（lain.bgm.tv / bgmimg.anibt.net 等）与前缀协议差异，
+/// 使得用户在切换镜像源或官方源时，本地磁盘已下载的图片缓存能够 100% 复用命中。
+String getBangumiImageCacheKey(String url) {
+  final src = url.trim();
+  if (src.isEmpty) return '';
+
+  // 匹配已知 Bangumi 图床与镜像的相对路径
+  final match = RegExp(
+    r'^(?:https?:)?//[^/?#]+(/(?:r/\d+/)?pic/.*)$',
+    caseSensitive: false,
+  ).firstMatch(src);
+
+  if (match != null) {
+    return 'bgm_img:${match.group(1)}';
+  }
+
+  // 非标准路径则降级使用去除协议的路径
+  return src.replaceFirst(RegExp(r'^https?:', caseSensitive: false), '');
+}

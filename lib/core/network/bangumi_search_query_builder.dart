@@ -39,21 +39,14 @@ class BangumiSearchQueryBuilder {
       filter['air_date'] = airDate;
     }
 
-    // 智能时间感知分流：提取当前检索的目标年份
-    int? effectiveYear = year;
-    if (effectiveYear == null && airDate != null && airDate.isNotEmpty) {
-      final match = RegExp(r'\d{4}').firstMatch(airDate.first);
-      if (match != null) {
-        effectiveYear = int.tryParse(match.group(0)!);
-      }
-    }
-
     // 特殊处理说明：
-    // 1. 历史已完结年份或全量大库搜索时，必须过滤 rank > 0，防止 Bangumi 数据库将未上榜的 rank=0 条目在升序排位中置顶；
-    // 2. 当前正在播出的当季新番（年份 >= 当前年份），绝大多数条目尚未结榜（rank 仍为 0），不加此过滤以确保完整展示当前季度的所有新番条目。
-    final isCurrentOrFuture = effectiveYear != null && effectiveYear >= DateTime.now().year;
-    if (!isCurrentOrFuture && (upstreamSort == 'rank' || upstreamSort == 'score')) {
+    // 按评分或排名排序时，全量过滤 rank > 0，防止 Bangumi 数据库将未上榜的 rank=0 条目在升序排位中置顶；
+    // 按评分排序时同时过滤评分人数少于 50 人的条目 (rating_count >= 50)，保障评分榜单质量，杜绝极少人评分的冷门/刷分条目
+    if (upstreamSort == 'rank' || upstreamSort == 'score') {
       filter['rank'] = ['>0', '<=99999'];
+    }
+    if (upstreamSort == 'score') {
+      filter['rating_count'] = ['>=50'];
     }
 
     final payload = <String, dynamic>{
