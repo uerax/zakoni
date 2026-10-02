@@ -212,16 +212,22 @@ class AppearanceManager extends ChangeNotifier {
   }
 
   /// 设置壁纸不透明度 (0.05 ~ 0.60)
-  void setWallpaperOpacity(double val) {
+  /// [save] 为 false 时仅更新内存并通知监听器，供拖拽交互实时渲染，提升流畅度并规避高频 I/O
+  void setWallpaperOpacity(double val, {bool save = true}) {
     _wallpaperOpacity = val.clamp(0.05, 0.60);
-    AppPreferences.saveWallpaperOpacity(_wallpaperOpacity);
+    if (save) {
+      AppPreferences.saveWallpaperOpacity(_wallpaperOpacity);
+    }
     notifyListeners();
   }
 
   /// 设置壁纸高斯模糊度 (0.0 ~ 20.0)
-  void setWallpaperBlur(double val) {
+  /// [save] 为 false 时仅更新内存并通知监听器，供拖拽交互实时渲染，提升流畅度并规避高频 I/O
+  void setWallpaperBlur(double val, {bool save = true}) {
     _wallpaperBlur = val.clamp(0.0, 20.0);
-    AppPreferences.saveWallpaperBlur(_wallpaperBlur);
+    if (save) {
+      AppPreferences.saveWallpaperBlur(_wallpaperBlur);
+    }
     notifyListeners();
   }
 

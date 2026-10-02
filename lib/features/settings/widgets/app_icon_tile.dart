@@ -84,27 +84,32 @@ class AppIconTile extends StatelessWidget {
     final theme = Theme.of(context);
     final appMgr = AppearanceManager.instance;
 
-    return IosSettingsTile(
-      leading: appMgr.buildAppLogoWidget(
-        size: 28,
-        borderRadius: 7,
-      ),
-      title: '应用图标',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            appMgr.hasCustomIcon ? '自定义' : '默认',
-            style: TextStyle(
-              fontSize: 14,
-              color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
-            ),
+    return ListenableBuilder(
+      listenable: appMgr,
+      builder: (context, _) {
+        return IosSettingsTile(
+          leading: appMgr.buildAppLogoWidget(
+            size: 28,
+            borderRadius: 7,
           ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
-        ],
-      ),
-      onTap: () => _showIconActionSheet(context),
+          title: '应用图标',
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                appMgr.hasCustomIcon ? '自定义' : '默认',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+            ],
+          ),
+          onTap: () => _showIconActionSheet(context),
+        );
+      },
     );
   }
 }

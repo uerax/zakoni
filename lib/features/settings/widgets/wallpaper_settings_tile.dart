@@ -15,7 +15,7 @@ class WallpaperSettingsTile extends StatefulWidget {
 }
 
 class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
-  String _wallpaperScope = 'all'; // 'all', 'home', 'category', 'settings'
+  String _wallpaperScope = 'all'; // 'all', 'home', 'category'
 
   Future<void> _pickCustomWallpaper() async {
     try {
@@ -52,7 +52,6 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
         'all' => '全局',
         'home' => '首页',
         'category' => '分类',
-        'settings' => '设置',
         _ => '',
       };
       ScaffoldMessenger.of(context).showSnackBar(
@@ -111,7 +110,6 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
       'all' => '全局壁纸',
       'home' => '首页专属壁纸',
       'category' => '分类页专属壁纸',
-      'settings' => '设置页专属壁纸',
       _ => '背景壁纸',
     };
 
@@ -182,7 +180,6 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
       ('all', '全部应用'),
       ('home', '首页'),
       ('category', '分类'),
-      ('settings', '设置'),
     ];
 
     return LayoutBuilder(
@@ -258,154 +255,172 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
     final theme = Theme.of(context);
     final appMgr = AppearanceManager.instance;
 
-    final activeWallpaperFile = appMgr.getWallpaperFileForPage(
-      _wallpaperScope == 'all' ? null : _wallpaperScope,
-    );
-    final hasWallpaperImg = activeWallpaperFile != null;
+    // 特殊处理说明：
+    // 使用 ListenableBuilder 显式直接监听 AppearanceManager 单例：
+    // 规避上层卡片树 const 常量构造引发的 Flutter Element update 短路机制，
+    // 确保拖拽不透明度/高斯模糊时，Slider Thumb 与数值百分比能实时 60/120fps 重绘刷新。
+    return ListenableBuilder(
+      listenable: appMgr,
+      builder: (context, _) {
+        final hasCurrentScopeImg = _hasCurrentScopeWallpaper(appMgr);
+        final activeWallpaperFile = hasCurrentScopeImg
+            ? appMgr.getWallpaperFileForPage(
+                _wallpaperScope == 'all' ? null : _wallpaperScope,
+              )
+            : null;
+        final hasWallpaperImg = activeWallpaperFile != null;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IosSettingsTile(
-          leading: hasWallpaperImg
-              ? Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(7),
-                    border: Border.all(
-                      color: theme.colorScheme.primary.withAlpha(120),
-                      width: 0.8,
-                    ),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Image.file(
-                    activeWallpaperFile,
-                    fit: BoxFit.cover,
-                    cacheWidth: 56,
-                    errorBuilder: (context, error, stackTrace) => const IosSettingsIconBox(
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IosSettingsTile(
+              leading: hasWallpaperImg
+                  ? Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(
+                          color: theme.colorScheme.primary.withAlpha(120),
+                          width: 0.8,
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.file(
+                        activeWallpaperFile,
+                        fit: BoxFit.cover,
+                        cacheWidth: 56,
+                        errorBuilder: (context, error, stackTrace) => const IosSettingsIconBox(
+                          icon: Icons.wallpaper_rounded,
+                          bg: Color(0xFF3A86FF),
+                        ),
+                      ),
+                    )
+                  : const IosSettingsIconBox(
                       icon: Icons.wallpaper_rounded,
                       bg: Color(0xFF3A86FF),
                     ),
-                  ),
-                )
-              : const IosSettingsIconBox(
-                  icon: Icons.wallpaper_rounded,
-                  bg: Color(0xFF3A86FF),
-                ),
-          title: '背景壁纸',
-          showDivider: false,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_hasCurrentScopeWallpaper(appMgr))
-                const Icon(Icons.check_rounded, color: Color(0xFF0077B6), size: 18),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
-            ],
-          ),
-          onTap: _pickCustomWallpaper,
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildWallpaperScopeSelector(theme),
-              if (appMgr.hasWallpaperForPage(_wallpaperScope == 'all' ? null : _wallpaperScope)) ...[
-                const SizedBox(height: 10),
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 340),
-                    child: SizedBox(
-                      height: 36,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: 36,
-                              child: FilledButton.tonalIcon(
-                                onPressed: _reopenCropDialog,
-                                icon: const Icon(Icons.crop_free_rounded, size: 16),
-                                label: const Text('调整画面取景', style: TextStyle(fontSize: 12)),
-                                style: FilledButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              title: '背景壁纸',
+              showDivider: false,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasCurrentScopeImg)
+                    const Icon(Icons.check_rounded, color: Color(0xFF0077B6), size: 18),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+                ],
+              ),
+              onTap: _pickCustomWallpaper,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildWallpaperScopeSelector(theme),
+                  // 特殊处理说明：
+                  // 只有当前作用域真正上传了壁纸图片时，才展示取景、清除与参数调节控件，
+                  // 与“清除专属壁纸”按钮的触发条件保持完全一致，避免未上传图片时误显调节项。
+                  if (hasCurrentScopeImg) ...[
+                    const SizedBox(height: 10),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 340),
+                        child: SizedBox(
+                          height: 36,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 36,
+                                  child: FilledButton.tonalIcon(
+                                    onPressed: _reopenCropDialog,
+                                    icon: const Icon(Icons.crop_free_rounded, size: 16),
+                                    label: const Text('调整画面取景', style: TextStyle(fontSize: 12)),
+                                    style: FilledButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 36,
+                                height: 36,
+                                child: OutlinedButton(
+                                  onPressed: _confirmClearWallpaper,
+                                  style: OutlinedButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    side: BorderSide(color: Colors.redAccent.withAlpha(100)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  child: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    size: 18,
+                                    color: Colors.redAccent,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          if (_hasCurrentScopeWallpaper(appMgr)) ...[
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 36,
-                              height: 36,
-                              child: OutlinedButton(
-                                onPressed: _confirmClearWallpaper,
-                                style: OutlinedButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  side: BorderSide(color: Colors.redAccent.withAlpha(100)),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                child: const Icon(
-                                  Icons.delete_outline_rounded,
-                                  size: 18,
-                                  color: Colors.redAccent,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '不透明度',
-                      style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '不透明度',
+                          style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                        Text(
+                          '${(appMgr.wallpaperOpacity * 100).toInt()}%',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
                     ),
-                    Text(
-                      '${(appMgr.wallpaperOpacity * 100).toInt()}%',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    // 特殊处理说明：
+                    // onChanged 期间 save: false 仅更新内存通知重绘（流畅 60/120fps），
+                    // onChangeEnd 释放时 save: true 执行本地 SharedPreferences 落盘，规避高频 I/O 阻塞。
+                    Slider(
+                      value: appMgr.wallpaperOpacity,
+                      min: 0.05,
+                      max: 0.60,
+                      divisions: 55,
+                      onChanged: (val) => appMgr.setWallpaperOpacity(val, save: false),
+                      onChangeEnd: (val) => appMgr.setWallpaperOpacity(val, save: true),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '高斯模糊',
+                          style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                        Text(
+                          '${appMgr.wallpaperBlur.toStringAsFixed(1)} px',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: appMgr.wallpaperBlur,
+                      min: 0.0,
+                      max: 20.0,
+                      divisions: 40,
+                      onChanged: (val) => appMgr.setWallpaperBlur(val, save: false),
+                      onChangeEnd: (val) => appMgr.setWallpaperBlur(val, save: true),
                     ),
                   ],
-                ),
-                Slider(
-                  value: appMgr.wallpaperOpacity,
-                  min: 0.05,
-                  max: 0.60,
-                  divisions: 55,
-                  onChanged: (val) => appMgr.setWallpaperOpacity(val),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '高斯模糊',
-                      style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                    Text(
-                      '${appMgr.wallpaperBlur.toStringAsFixed(1)} px',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                Slider(
-                  value: appMgr.wallpaperBlur,
-                  min: 0.0,
-                  max: 20.0,
-                  divisions: 40,
-                  onChanged: (val) => appMgr.setWallpaperBlur(val),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
