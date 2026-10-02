@@ -40,7 +40,10 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
       imgBytes += await AnimeImageCacheManager.instance.store.getCacheSize();
     } catch (_) {}
 
-    final dataBytes = widget.client.dataCacheSizeBytes;
+    int dataBytes = widget.client.dataCacheSizeBytes;
+    try {
+      dataBytes += await widget.client.getDiskDataCacheSizeBytes();
+    } catch (_) {}
 
     if (!mounted) return;
     setState(() {
@@ -78,10 +81,11 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
     }
   }
 
-  void _performClearDataCache() {
+  Future<void> _performClearDataCache() async {
     try {
       widget.client.clearCache();
-      _updateCacheSizes();
+      await _updateCacheSizes();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('已清空数据缓存'),
@@ -90,6 +94,7 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('清理数据缓存失败: $e'),

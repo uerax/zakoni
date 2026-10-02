@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../../../core/models/bangumi/bangumi_calendar.dart';
@@ -5,6 +6,7 @@ import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
+import '../../search/pages/search_page.dart';
 import '../widgets/home_banner_carousel.dart';
 import '../widgets/home_desktop_hero.dart';
 import '../widgets/home_top_bar.dart';
@@ -69,6 +71,14 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
     if (widget.onNavigateToCategory != null) {
       widget.onNavigateToCategory!(category);
     }
+  }
+
+  void _navigateToSearch([String? query]) {
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (context) => SearchPage(initialQuery: query),
+      ),
+    );
   }
 
   Future<({
@@ -224,6 +234,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             child: HomeTopBar(
               isVisible: _isTopBarVisible,
               scrollOffsetNotifier: _scrollOffsetNotifier,
+              onSearchTap: _navigateToSearch,
             ),
           ),
         ],

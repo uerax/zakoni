@@ -9,7 +9,8 @@ class BangumiSearchQueryBuilder {
     List<String>? tags,
     int? year,
     List<String>? airDate,
-    int type = 2, // 2 = 动画
+    int? type = 2, // 2 = 动画，传 null 且 types 为 null 时表示不限制类型
+    List<int>? types, // 多类型过滤（如 [2, 6] 动画+真人/特摄，优先级高于单个 type）
   }) {
     final trimmed = keyword.trim();
     // 只有当没有关键词、也没有任何筛选过滤条件时才直接返回 null (即无需发起请求)
@@ -26,9 +27,13 @@ class BangumiSearchQueryBuilder {
     final upstreamSort = isSortByDate ? 'heat' : sort;
 
     final filter = <String, dynamic>{
-      'type': [type],
       'nsfw': false,
     };
+    if (types != null && types.isNotEmpty) {
+      filter['type'] = types;
+    } else if (type != null) {
+      filter['type'] = [type];
+    }
     if (tags != null && tags.isNotEmpty) {
       filter['tag'] = tags;
     }

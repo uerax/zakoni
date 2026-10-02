@@ -16,6 +16,19 @@ class BangumiSearchResult {
 
   bool get hasMore => offset + items.length < total;
 
+  factory BangumiSearchResult.fromJson(Map<String, dynamic> json) {
+    final itemsList = (json['items'] as List?) ?? const [];
+    return BangumiSearchResult(
+      items: itemsList
+          .whereType<Map<String, dynamic>>()
+          .map((item) => BangumiItem.fromJson(item))
+          .toList(),
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      limit: (json['limit'] as num?)?.toInt() ?? 20,
+      offset: (json['offset'] as num?)?.toInt() ?? 0,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'items': items.map((e) => e.toJson()).toList(),
         'total': total,

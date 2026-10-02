@@ -22,6 +22,7 @@ class AppPreferences {
   static const _kWallpaperScale = 'pref_wallpaper_scale';
   static const _kWallpaperOpacity = 'pref_wallpaper_opacity';
   static const _kWallpaperBlur = 'pref_wallpaper_blur';
+  static const _kSearchHistory = 'pref_search_history';
 
   static SharedPreferences? _prefs;
 
@@ -163,5 +164,15 @@ class AppPreferences {
 
   static Future<void> saveWallpaperBlur(double blur) async {
     await _prefs?.setDouble(_kWallpaperBlur, blur);
+  }
+
+  // --- 搜索历史持久化 ---
+
+  static List<String> getSearchHistory() {
+    return _prefs?.getStringList(_kSearchHistory) ?? const [];
+  }
+
+  static Future<void> saveSearchHistory(List<String> history) async {
+    await _prefs?.setStringList(_kSearchHistory, history);
   }
 }

@@ -144,11 +144,12 @@ class BangumiItem {
       };
     }
 
-    final nameCnRaw = (json['name_cn'] ?? json['nameCN'] ?? json['name'] ?? '').toString();
+    final nameCnRaw = (json['name_cn'] ?? json['nameCN'] ?? json['nameCn'] ?? json['name'] ?? '').toString();
     final info = json['info']?.toString() ?? '';
     final fromInfo = parseBangumiInfoMeta(info);
 
-    String airDate = (json['date'] ??
+    String airDate = (json['airDate'] ??
+            json['date'] ??
             (json['airtime'] is Map ? (json['airtime'] as Map)['date'] : null) ??
             json['air_date'] ??
             '')
@@ -172,8 +173,25 @@ class BangumiItem {
       }
     }
 
-    final rawScore = rating['score'] as num?;
+    final rawScore = (rating['score'] ?? json['ratingScore']) as num?;
     final score = rawScore != null ? double.parse(rawScore.toStringAsFixed(1)) : 0.0;
+
+    final List<String> aliasList = [];
+    if (json['alias'] is List) {
+      for (final a in (json['alias'] as List)) {
+        if (a != null) aliasList.add(a.toString());
+      }
+    } else {
+      aliasList.addAll(parseBangumiAliases(json));
+    }
+
+    final rank = (rating['rank'] is num)
+        ? (rating['rank'] as num).toInt()
+        : ((json['rank'] is num) ? (json['rank'] as num).toInt() : 0);
+
+    final votes = (rating['total'] is num)
+        ? (rating['total'] as num).toInt()
+        : ((json['votes'] is num) ? (json['votes'] as num).toInt() : 0);
 
     return BangumiItem(
       id: (json['id'] is num) ? (json['id'] as num).toInt() : int.tryParse('${json['id']}') ?? 0,
@@ -183,12 +201,12 @@ class BangumiItem {
       summary: decodeHtmlEntities(json['summary']?.toString() ?? ''),
       airDate: airDate,
       airWeekday: dateToWeekday(airDate),
-      rank: (rating['rank'] is num) ? (rating['rank'] as num).toInt() : 0,
+      rank: rank,
       images: imagesMap,
       tags: tagsList,
-      alias: parseBangumiAliases(json),
+      alias: aliasList,
       ratingScore: score,
-      votes: (rating['total'] is num) ? (rating['total'] as num).toInt() : 0,
+      votes: votes,
       info: info.isNotEmpty ? info : null,
       eps: eps,
       totalEpisodes: totalEpisodes,

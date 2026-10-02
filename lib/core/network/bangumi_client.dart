@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import '../constants/app_constants.dart';
@@ -12,6 +13,7 @@ import '../services/app_preferences.dart';
 import '../utils/image_utils.dart';
 import '../utils/timed_cache.dart';
 import 'bangumi_api_exception.dart';
+import 'bangumi_data_disk_cache_manager.dart';
 import 'bangumi_search_query_builder.dart';
 import 'bangumi_source_preset.dart';
 import 'bangumi_user_agent.dart';
@@ -64,6 +66,15 @@ class BangumiClient {
     maxAge: const Duration(hours: 3),
     maxEntries: 100,
   );
+
+  // L2 磁盘持久化缓存池（安全惰性加载，规避无 UI 绑定的测试环境崩溃）
+  BangumiDataDiskCacheManager? get _diskCache {
+    try {
+      return BangumiDataDiskCacheManager.instance;
+    } catch (_) {
+      return null;
+    }
+  }
 
   // Single-Flight 机制：并发重复请求去重
   final Map<String, Future<dynamic>> _inflight = {};
@@ -147,12 +158,30 @@ class BangumiClient {
     _episodesCache.clear();
     _commentsCache.clear();
     _inflight.clear();
+    unawaited(_diskCache?.clearAll() ?? Future.value());
   }
 
-  /// 获取每日放送时间表 (周一至周日)，带 30 分钟内存持久化缓存
+  /// 获取当前磁盘数据缓存的总字节大小
+  Future<int> getDiskDataCacheSizeBytes() async =>
+      (await _diskCache?.getDiskSizeBytes()) ?? 0;
+
+  /// 获取每日放送时间表 (周一至周日)，带 24 小时磁盘与内存多级持久化缓存
   Future<List<BangumiCalendarDay>> getCalendar({bool forceRefresh = false}) async {
-    if (!forceRefresh && _calendarCache.value != null) {
-      return _calendarCache.value!;
+    if (!forceRefresh) {
+      if (_calendarCache.value != null) {
+        return _calendarCache.value!;
+      }
+      final diskData = await _diskCache?.getJson('bangumi_calendar');
+      if (diskData is List) {
+        final days = diskData
+            .whereType<Map<String, dynamic>>()
+            .map((day) => BangumiCalendarDay.fromJson(day))
+            .toList();
+        if (days.isNotEmpty) {
+          _calendarCache.set(days, days.length * 1500);
+          return days;
+        }
+      }
     }
 
     try {
@@ -169,6 +198,11 @@ class BangumiClient {
 
       if (days.isNotEmpty) {
         _calendarCache.set(days, days.length * 1500);
+        unawaited(_diskCache?.putJson(
+          'bangumi_calendar',
+          days.map((d) => d.toJson()).toList(),
+          maxAge: const Duration(hours: 24),
+        ) ?? Future.value());
       }
       return days;
     } on DioException catch (e) {
@@ -177,10 +211,23 @@ class BangumiClient {
     }
   }
 
-  /// 获取首页热门番剧列表 (带内存缓存与多源降级容灾)
+  /// 获取首页热门番剧列表 (带 12 小时磁盘与内存多级持久化缓存)
   Future<List<BangumiItem>> getTrending({int limit = 18, bool forceRefresh = false}) async {
-    if (!forceRefresh && _trendingCache.value != null) {
-      return _trendingCache.value!;
+    if (!forceRefresh) {
+      if (_trendingCache.value != null) {
+        return _trendingCache.value!;
+      }
+      final diskData = await _diskCache?.getJson('bangumi_trending_$limit');
+      if (diskData is List) {
+        final items = diskData
+            .whereType<Map<String, dynamic>>()
+            .map((item) => BangumiItem.fromJson(item))
+            .toList();
+        if (items.isNotEmpty) {
+          _trendingCache.set(items, items.length * 1500);
+          return items;
+        }
+      }
     }
 
     // 1. 优先尝试 next.bgm.tv /p1/trending/subjects (若无跨域限制或在原生平台)
@@ -210,6 +257,11 @@ class BangumiClient {
             .toList();
         if (items.isNotEmpty) {
           _trendingCache.set(items, items.length * 1500);
+          unawaited(_diskCache?.putJson(
+            'bangumi_trending_$limit',
+            items.map((i) => i.toJson()).toList(),
+            maxAge: const Duration(hours: 12),
+          ) ?? Future.value());
           return items;
         }
       }
@@ -232,6 +284,11 @@ class BangumiClient {
       );
       if (items.isNotEmpty) {
         _trendingCache.set(items, items.length * 1500);
+        unawaited(_diskCache?.putJson(
+          'bangumi_trending_$limit',
+          items.map((i) => i.toJson()).toList(),
+          maxAge: const Duration(hours: 12),
+        ) ?? Future.value());
         return items;
       }
     } catch (_) {}
@@ -389,7 +446,8 @@ class BangumiClient {
     List<String>? tags,
     int? year,
     List<String>? airDate,
-    int type = 2, // 2 = 动画
+    int? type = 2, // 2 = 动画
+    List<int>? types,
     bool forceRefresh = false,
   }) async {
     final result = await searchWithTotal(
@@ -401,6 +459,7 @@ class BangumiClient {
       year: year,
       airDate: airDate,
       type: type,
+      types: types,
       forceRefresh: forceRefresh,
     );
     return result.items;
@@ -412,13 +471,15 @@ class BangumiClient {
     required List<String>? tags,
     required int? year,
     required List<String>? airDate,
-    required int type,
+    required int? type,
+    List<int>? types,
     required int limit,
     required int offset,
   }) {
     final sortedTags = tags != null ? ([...tags]..sort()).join(',') : '';
     final sortedAirDate = airDate != null ? ([...airDate]..sort()).join(',') : '';
-    return '$keyword|$sort|$sortedTags|$year|$sortedAirDate|$type|$limit|$offset';
+    final typesStr = types != null ? ([...types]..sort()).join(',') : (type?.toString() ?? 'all');
+    return '$keyword|$sort|$sortedTags|$year|$sortedAirDate|$typesStr|$limit|$offset';
   }
 
   /// 同步检查是否有未过期的搜索/分类缓存结果（用于切换分类时 0ms 瞬间呈现，消除骨架屏闪烁）
@@ -430,7 +491,8 @@ class BangumiClient {
     List<String>? tags,
     int? year,
     List<String>? airDate,
-    int type = 2,
+    int? type = 2,
+    List<int>? types,
   }) {
     final cacheKey = _buildSearchCacheKey(
       keyword: keyword.trim(),
@@ -439,6 +501,7 @@ class BangumiClient {
       year: year,
       airDate: airDate,
       type: type,
+      types: types,
       limit: limit,
       offset: offset,
     );
@@ -454,7 +517,8 @@ class BangumiClient {
     List<String>? tags,
     int? year,
     List<String>? airDate,
-    int type = 2, // 2 = 动画
+    int? type = 2, // 2 = 动画
+    List<int>? types,
     bool forceRefresh = false,
     CancelToken? cancelToken,
   }) async {
@@ -466,6 +530,7 @@ class BangumiClient {
       year: year,
       airDate: airDate,
       type: type,
+      types: types,
       limit: limit,
       offset: offset,
     );
@@ -473,6 +538,14 @@ class BangumiClient {
     if (!forceRefresh) {
       final cached = _searchCache.get(cacheKey);
       if (cached != null) return cached;
+
+      // 尝试从 L2 磁盘缓存读取（未过期则直接命中，回填 L1）
+      final diskJson = await _diskCache?.getJson(cacheKey);
+      if (diskJson is Map<String, dynamic>) {
+        final result = BangumiSearchResult.fromJson(diskJson);
+        _searchCache.set(cacheKey, result, result.items.length * 1500 + 512);
+        return result;
+      }
     }
 
     final inflightKey = 'search_$cacheKey';
@@ -488,6 +561,7 @@ class BangumiClient {
         year: year,
         airDate: airDate,
         type: type,
+        types: types,
       );
 
       if (payload == null) {
@@ -530,6 +604,12 @@ class BangumiClient {
             offset: offset,
           );
           _searchCache.set(cacheKey, result, result.items.length * 1500 + 512);
+
+          // 异步写入 L2 磁盘缓存：剧场版/OVA 设为 12 小时 TTL，常规搜索与分类设为 2 小时 TTL
+          final isHotList = tags != null && (tags.contains('剧场版') || tags.contains('OVA'));
+          final ttl = isHotList ? const Duration(hours: 12) : const Duration(hours: 2);
+          unawaited(_diskCache?.putJson(cacheKey, result.toJson(), maxAge: ttl) ?? Future.value());
+
           return result;
         }
         return BangumiSearchResult.empty;
@@ -572,6 +652,7 @@ class BangumiClient {
               offset: offset,
             );
             _searchCache.set(cacheKey, result, result.items.length * 1500 + 512);
+            unawaited(_diskCache?.putJson(cacheKey, result.toJson(), maxAge: const Duration(hours: 2)) ?? Future.value());
             return result;
           }
         } catch (_) {
