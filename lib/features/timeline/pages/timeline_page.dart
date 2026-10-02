@@ -19,9 +19,15 @@ class TimelinePage extends StatefulWidget {
 
 class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClientMixin {
   late Future<List<BangumiCalendarDay>> _calendarFuture;
+  ScrollController? _chipScrollController;
+  ScrollController get _effectiveChipScrollController =>
+      _chipScrollController ??= ScrollController();
   int _selectedDayIndex = 0;
 
   static const _weekLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  static const double _chipWidth = 60.0;
+  static const double _chipGap = 8.0;
+  static const double _hPadding = 16.0;
 
   // 保证时间表页面切走后再切回时不重新销毁、不重新触发网络请求
   @override
@@ -34,6 +40,41 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
     final todayWeekday = DateTime.now().weekday;
     _selectedDayIndex = (todayWeekday - 1).clamp(0, 6);
     _loadCalendar();
+
+    // 页面初次完成渲染后，将当前选中的星期自动滚动至可视区居中
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _scrollToSelectedChip(animate: false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _chipScrollController?.dispose();
+    super.dispose();
+  }
+
+  void _scrollToSelectedChip({bool animate = true}) {
+    final controller = _effectiveChipScrollController;
+    if (!controller.hasClients) return;
+
+    final maxScroll = controller.position.maxScrollExtent;
+    final minScroll = controller.position.minScrollExtent;
+    final viewportWidth = controller.position.viewportDimension;
+
+    final itemCenter = _hPadding + _selectedDayIndex * (_chipWidth + _chipGap) + (_chipWidth / 2);
+    final targetOffset = (itemCenter - viewportWidth / 2).clamp(minScroll, maxScroll);
+
+    if (animate) {
+      controller.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      controller.jumpTo(targetOffset);
+    }
   }
 
   void _loadCalendar({bool forceRefresh = false}) {
@@ -57,7 +98,7 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
           SizedBox(height: safeTop + 48),
           Container(
             height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: _buildWeekdayChips(theme, isDark),
           ),
           Expanded(
@@ -87,7 +128,7 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
           preferredSize: const Size.fromHeight(48),
           child: Container(
             height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: _buildWeekdayChips(theme, isDark),
           ),
         ),
@@ -99,53 +140,63 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
   Widget _buildWeekdayChips(ThemeData theme, bool isDark) {
     final activeColor = theme.colorScheme.primary;
 
-    return Row(
-      children: List.generate(7, (index) {
-        final isSelected = _selectedDayIndex == index;
-        final isToday = (DateTime.now().weekday - 1) == index;
+    return SingleChildScrollView(
+      controller: _effectiveChipScrollController,
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: _hPadding),
+      child: Row(
+        children: List.generate(7, (index) {
+          final isSelected = _selectedDayIndex == index;
+          final isToday = (DateTime.now().weekday - 1) == index;
 
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: ChoiceChip(
-              label: Center(
-                child: Text(
-                  _weekLabels[index],
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected
-                        ? Colors.white
-                        : (isToday ? activeColor : (isDark ? Colors.white70 : Colors.black87)),
+          return Padding(
+            padding: EdgeInsets.only(right: index == 6 ? 0 : _chipGap),
+            child: SizedBox(
+              width: _chipWidth,
+              child: ChoiceChip(
+                label: Center(
+                  child: Text(
+                    _weekLabels[index],
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected
+                          ? Colors.white
+                          : (isToday ? activeColor : (isDark ? Colors.white70 : Colors.black87)),
+                    ),
                   ),
                 ),
-              ),
-              selected: isSelected,
-              selectedColor: activeColor,
-              backgroundColor: isDark ? Colors.white.withAlpha(18) : Colors.black.withAlpha(12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(100),
-                side: BorderSide(
-                  color: isSelected
-                      ? Colors.transparent
-                      : (isToday
-                          ? activeColor.withAlpha(120)
-                          : (isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(12))),
+                selected: isSelected,
+                selectedColor: activeColor,
+                backgroundColor: isDark ? Colors.white.withAlpha(18) : Colors.black.withAlpha(12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(100),
+                  side: BorderSide(
+                    color: isSelected
+                        ? Colors.transparent
+                        : (isToday
+                            ? activeColor.withAlpha(120)
+                            : (isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(12))),
+                  ),
                 ),
+                showCheckmark: false,
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() {
+                      _selectedDayIndex = index;
+                    });
+                    _scrollToSelectedChip(animate: true);
+                  }
+                },
               ),
-              showCheckmark: false,
-              padding: EdgeInsets.zero,
-              onSelected: (selected) {
-                if (selected) {
-                  setState(() {
-                    _selectedDayIndex = index;
-                  });
-                }
-              },
             ),
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     );
   }
 
