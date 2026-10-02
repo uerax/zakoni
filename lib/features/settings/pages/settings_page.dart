@@ -6,6 +6,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/utils/appearance_manager.dart';
 import '../../../core/utils/font_manager.dart';
+import '../../../core/utils/image_utils.dart';
 import '../../common/widgets/wallpaper_crop_dialog.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -63,8 +64,11 @@ class _SettingsPageState extends State<SettingsPage> {
       _currentPreset = preset;
     });
     widget.client.setSourcePreset(preset);
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
     widget.onSettingsChanged?.call();
     _updateCacheSize();
+    debugPrint('【网络线路切换成功】生效预设: ${preset.name}, API Base: ${widget.client.baseUrl}, 当前图片Host: $currentBangumiImageHost');
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

@@ -103,13 +103,13 @@ class BangumiItem {
       images['grid'] ??
       '';
 
-  /// 列表缩略图（优先 common/medium，并自动挂载 Anycast 镜像与 400px 尺寸优化，防止内存爆炸）
+  /// 列表缩略图（优先 large，并通过 preferResizedCover 动态挂接 400px 高清切片，杜绝使用 150px 模糊小图）
   String get thumbnailUrl {
-    final raw = images['common'] ??
+    final raw = images['large'] ??
+        images['common'] ??
         images['medium'] ??
         images['small'] ??
         images['grid'] ??
-        images['large'] ??
         '';
     return preferResizedCover(raw, maxEdge: 400);
   }

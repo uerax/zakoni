@@ -52,7 +52,7 @@ class AnimeCard extends StatelessWidget {
                         ? item.thumbnailUrl
                         : item.coverUrl,
                     fit: BoxFit.cover,
-                    resizeWidth: 320,
+                    resizeWidth: 400,
                   ),
                   // 封面底部暗色渐变遮罩
                   Positioned(

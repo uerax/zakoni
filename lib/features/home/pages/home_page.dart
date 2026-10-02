@@ -110,7 +110,11 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               index: _headerTabIndex,
               children: [
                 _buildAnimeContent(context, theme, safeTop),
-                TimelinePage(client: widget.client, showAppBar: false),
+                TimelinePage(
+                  key: ValueKey('timeline_${widget.client.sourcePreset.name}'),
+                  client: widget.client,
+                  showAppBar: false,
+                ),
               ],
             ),
           ),

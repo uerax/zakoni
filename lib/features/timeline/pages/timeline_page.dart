@@ -84,6 +84,14 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
   }
 
   @override
+  void didUpdateWidget(TimelinePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.client.sourcePreset != widget.client.sourcePreset) {
+      _loadCalendar(forceRefresh: true);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
@@ -275,7 +283,11 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
                     ),
             );
 
-            return _KeepAliveDayView(dayData: dayData);
+            return _KeepAliveDayView(
+              key: ValueKey('day_${weekdayId}_${widget.client.sourcePreset.name}'),
+              dayData: dayData,
+              presetName: widget.client.sourcePreset.name,
+            );
           }),
         );
       },
@@ -285,8 +297,13 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
 
 class _KeepAliveDayView extends StatefulWidget {
   final BangumiCalendarDay dayData;
+  final String presetName;
 
-  const _KeepAliveDayView({required this.dayData});
+  const _KeepAliveDayView({
+    super.key,
+    required this.dayData,
+    required this.presetName,
+  });
 
   @override
   State<_KeepAliveDayView> createState() => _KeepAliveDayViewState();
@@ -312,7 +329,9 @@ class _KeepAliveDayViewState extends State<_KeepAliveDayView>
         final crossAxisCount = (constraints.maxWidth ~/ 180).clamp(2, 6);
 
         return GridView.builder(
-          key: PageStorageKey<String>('day_${widget.dayData.weekday.id}'),
+          key: PageStorageKey<String>(
+            'day_${widget.dayData.weekday.id}_${widget.presetName}',
+          ),
           // 底部留出 96px，配合底栏 extendBody: true 悬浮毛玻璃穿透
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

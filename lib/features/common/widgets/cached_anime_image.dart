@@ -22,7 +22,7 @@ class CachedAnimeImage extends StatelessWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
-    this.resizeWidth = 300,
+    this.resizeWidth = 400,
     this.borderRadius,
   });
 
@@ -49,7 +49,7 @@ class CachedAnimeImage extends StatelessWidget {
       height: height,
       fit: fit,
       gaplessPlayback: true,
-      filterQuality: FilterQuality.low,
+      filterQuality: FilterQuality.medium,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
         // 同步从内存/已解码帧直接秒出，不走任何过渡；未载入时呈现纯色骨架底色
         if (wasSynchronouslyLoaded || frame != null) {

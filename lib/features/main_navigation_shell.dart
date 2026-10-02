@@ -18,31 +18,12 @@ class MainNavigationShell extends StatefulWidget {
 class _MainNavigationShellState extends State<MainNavigationShell> {
   late final BangumiClient _client;
   int _currentIndex = 0;
-
-  late final List<Widget> _pages;
+  int _refreshKey = 0;
 
   @override
   void initState() {
     super.initState();
     _client = widget.client ?? BangumiClient();
-    _pages = [
-      HomePage(
-        client: _client,
-        onNavigateToCategory: (category) {
-          // 从首页货架“浏览全部”平滑导航至底栏“分类”页面
-          setState(() {
-            _currentIndex = 1;
-          });
-        },
-      ),
-      CategoryPage(client: _client),
-      SettingsPage(
-        client: _client,
-        onSettingsChanged: () {
-          setState(() {});
-        },
-      ),
-    ];
   }
 
   @override
@@ -71,10 +52,34 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               ),
               // 1. 全局或页面专属自定义背景壁纸（支持各页面单独覆盖与视窗裁剪）
               AppearanceManager.instance.buildWallpaperLayer(pageKey: pageKey),
-              // 2. 使用 IndexedStack 保活所有主要页面，切换导航栏时 0 延迟，且完整保留各自的滚动位置
+              // 2. 使用 IndexedStack 保活所有主要页面，切换导航栏时 0 延迟；切换线路时根据 _refreshKey 彻底重建
               IndexedStack(
                 index: _currentIndex,
-                children: _pages,
+                children: [
+                  HomePage(
+                    key: ValueKey('home_$_refreshKey'),
+                    client: _client,
+                    onNavigateToCategory: (category) {
+                      setState(() {
+                        _currentIndex = 1;
+                      });
+                    },
+                  ),
+                  CategoryPage(
+                    key: ValueKey('category_$_refreshKey'),
+                    client: _client,
+                  ),
+                  SettingsPage(
+                    client: _client,
+                    onSettingsChanged: () {
+                      PaintingBinding.instance.imageCache.clear();
+                      PaintingBinding.instance.imageCache.clearLiveImages();
+                      setState(() {
+                        _refreshKey++;
+                      });
+                    },
+                  ),
+                ],
               ),
             ],
           ),
