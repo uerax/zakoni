@@ -43,7 +43,7 @@ class AppPreferences {
     if (fontTypeStr != null) {
       final matchedType = AppFontType.values.firstWhere(
         (t) => t.name == fontTypeStr,
-        orElse: () => AppFontType.harmony,
+        orElse: () => AppFontType.misans,
       );
       if (matchedType == AppFontType.custom && customFontPath != null) {
         await FontManager.instance.loadFontFromFile(customFontPath);

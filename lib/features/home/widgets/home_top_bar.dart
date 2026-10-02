@@ -156,7 +156,7 @@ class HomeTopBar extends StatelessWidget {
                     child: AnimatedDefaultTextStyle(
                       duration: const Duration(milliseconds: 200),
                       style: TextStyle(
-                        fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'HarmonyOS Sans',
+                        fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'MiSans',
                         fontSize: 12.5,
                         // 采用 w600 保持饱满立体，避免 w700 在小字号下浓重糊墨；保留字体自然行高以呈现舒展字形
                         fontWeight: selectedIndex == 0
@@ -185,7 +185,7 @@ class HomeTopBar extends StatelessWidget {
                     child: AnimatedDefaultTextStyle(
                       duration: const Duration(milliseconds: 200),
                       style: TextStyle(
-                        fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'HarmonyOS Sans',
+                        fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'MiSans',
                         fontSize: 12.5,
                         fontWeight: selectedIndex == 1
                             ? FontWeight.w600

@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../services/app_preferences.dart';
 
 enum AppFontType {
-  harmony('HarmonyOS Sans', '鸿蒙黑体'),
+  misans('MiSans', 'MiSans'),
   system('Microsoft YaHei', '系统默认'),
   custom('CustomFont', '自定义导入字体');
 
@@ -15,7 +15,7 @@ enum AppFontType {
 }
 
 /// 全局字体管理器：
-/// 1. 默认内置使用鸿蒙黑体 (HarmonyOS Sans)；
+/// 1. 默认内置使用小米字体 (MiSans)；
 /// 2. 支持切回系统默认无衬线字体（Windows 采用微软雅黑，规避回退至中易宋体）；
 /// 3. 支持在运行时通过 FontLoader 动态载入用户上传的本地 .ttf / .otf 字体文件，免重启即时全局生效；
 /// 4. 接入 AppPreferences 实现字体偏好与自定义字体路径落盘持久化。
@@ -31,7 +31,7 @@ class FontManager extends ChangeNotifier {
     'sans-serif',
   ];
 
-  AppFontType _currentType = AppFontType.harmony;
+  AppFontType _currentType = AppFontType.misans;
   String? _customFontPath;
   String _customFontName = '未选择文件';
 
@@ -42,8 +42,8 @@ class FontManager extends ChangeNotifier {
   /// 当前生效的全局 fontFamily 标识符
   String? get activeFontFamily {
     switch (_currentType) {
-      case AppFontType.harmony:
-        return AppFontType.harmony.fontFamily;
+      case AppFontType.misans:
+        return AppFontType.misans.fontFamily;
       case AppFontType.system:
         if (kIsWeb) return 'sans-serif';
         if (defaultTargetPlatform == TargetPlatform.windows) {
@@ -94,7 +94,7 @@ class FontManager extends ChangeNotifier {
     _customFontPath = null;
     _customFontName = '未选择文件';
     if (_currentType == AppFontType.custom) {
-      _currentType = AppFontType.harmony;
+      _currentType = AppFontType.misans;
     }
     AppPreferences.clearCustomFont();
     AppPreferences.saveFontType(_currentType);

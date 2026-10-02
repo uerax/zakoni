@@ -80,7 +80,7 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
           content: Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              '确定要移除【${fontMgr.customFontName}】吗？字体将恢复为默认鸿蒙黑体。',
+              '确定要移除【${fontMgr.customFontName}】吗？字体将恢复为默认 MiSans。',
               style: baseStyle,
             ),
           ),
@@ -131,11 +131,11 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
                 icon: Icons.font_download_rounded,
                 bg: Color(0xFFE76F51),
               ),
-              title: '鸿蒙黑体',
-              trailing: fontMgr.currentType == AppFontType.harmony
+              title: 'MiSans',
+              trailing: fontMgr.currentType == AppFontType.misans
                   ? const Icon(Icons.check_rounded, color: Color(0xFF0077B6), size: 20)
                   : null,
-              onTap: () => fontMgr.setFontType(AppFontType.harmony),
+              onTap: () => fontMgr.setFontType(AppFontType.misans),
             ),
             IosSettingsTile(
               leading: const IosSettingsIconBox(
