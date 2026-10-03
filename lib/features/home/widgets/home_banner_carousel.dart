@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
+import '../../../core/models/home/recommend_item.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/bouncing_scale_card.dart';
 import '../../common/widgets/cached_anime_image.dart';
@@ -10,9 +11,11 @@ import '../../common/widgets/shimmer_loading.dart';
 /// 1. 响应式布局：手机端几乎吃满屏幕宽度（极窄边距），平板/PC 桌面端限制最大宽度并水平居中；
 /// 2. 海报高清偏上裁切：采用 800px 高分辨率大图，锚点偏向上方 Alignment(0, -0.4) 聚焦人物面部；
 /// 3. 原生流畅体验：基于 PageView.builder 惰性加载，支持手势触摸感知与平滑自动轮播；
-/// 4. 视觉信息沉浸：覆盖微渐变暗色遮罩、金星评分、热播勋章与动态胶囊指示器。
+/// 4. 视觉信息沉浸：覆盖微渐变暗色遮罩、金星评分、热播勋章与动态胶囊指示器；
+/// 5. 智能算法赋能：支持注入 RecommendItem 渲染算法契合度胶囊与推荐理由气泡。
 class HomeBannerCarousel extends StatefulWidget {
-  final List<BangumiItem> items;
+  final List<BangumiItem>? items;
+  final List<RecommendItem>? recommendations;
   final int maxCount;
   final Duration autoPlayInterval;
   final double? height;
@@ -21,7 +24,8 @@ class HomeBannerCarousel extends StatefulWidget {
 
   const HomeBannerCarousel({
     super.key,
-    required this.items,
+    this.items,
+    this.recommendations,
     this.maxCount = 5,
     this.autoPlayInterval = const Duration(seconds: 4),
     this.height,
@@ -39,7 +43,12 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
   int _currentIndex = 0;
   bool _isInteracting = false;
 
-  List<BangumiItem> get _carouselItems => widget.items.take(widget.maxCount).toList();
+  List<BangumiItem> get _carouselItems {
+    if (widget.recommendations != null && widget.recommendations!.isNotEmpty) {
+      return widget.recommendations!.take(widget.maxCount).map((r) => r.item).toList();
+    }
+    return (widget.items ?? const []).take(widget.maxCount).toList();
+  }
 
   @override
   void initState() {
@@ -51,7 +60,8 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
   @override
   void didUpdateWidget(covariant HomeBannerCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.items.length != widget.items.length) {
+    if (oldWidget.items?.length != widget.items?.length ||
+        oldWidget.recommendations?.length != widget.recommendations?.length) {
       if (_currentIndex >= _carouselItems.length && _carouselItems.isNotEmpty) {
         _currentIndex = 0;
       }
@@ -139,9 +149,14 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                       },
                       itemBuilder: (context, index) {
                         final item = items[index];
+                        final recList = widget.recommendations;
+                        final currentRec = (recList != null && index < recList.length)
+                            ? recList[index]
+                            : null;
                         return _buildBannerCard(
                           context: context,
                           item: item,
+                          recommendItem: currentRec,
                           borderRadius: BorderRadius.circular(borderRadiusValue),
                         );
                       },
@@ -179,8 +194,11 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
   Widget _buildBannerCard({
     required BuildContext context,
     required BangumiItem item,
+    RecommendItem? recommendItem,
     required BorderRadius borderRadius,
   }) {
+    final hasRec = recommendItem != null;
+
     return BouncingScaleCard(
       onTap: () => showAnimeDetailSheet(context, item),
       child: ClipRRect(
@@ -193,7 +211,6 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
               imageUrl: item.coverUrl,
               fit: BoxFit.cover,
               alignment: const Alignment(0, -0.4),
-              resizeWidth: 800,
             ),
 
             // 全局微暗底色，增强层次感
@@ -208,7 +225,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
               left: 0,
               right: 0,
               bottom: 0,
-              height: 80,
+              height: hasRec ? 116 : 80,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -217,36 +234,92 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                     colors: [
                       Colors.transparent,
                       Colors.black.withAlpha(150),
-                      Colors.black.withAlpha(220),
+                      Colors.black.withAlpha(235),
                     ],
-                    stops: const [0.0, 0.5, 1.0],
+                    stops: const [0.0, 0.45, 1.0],
                   ),
                 ),
               ),
             ),
 
-            // 底部纯标题（简洁大气，无多余冗余参数遮挡画面）
+            // 底部标题与算法理由
             Positioned(
               left: 14,
               right: 76, // 右侧预留指示器避让空间
               bottom: 12,
-              child: Text(
-                item.preferredName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.3,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black87,
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (hasRec) ...[
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withAlpha(225),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.stars_rounded, size: 11, color: Colors.black),
+                              const SizedBox(width: 3),
+                              Text(
+                                '${recommendItem.matchRate}% 契合 · ${recommendItem.tag}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  Text(
+                    item.preferredName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.3,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black87,
+                          blurRadius: 4,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (hasRec) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '💡 ${recommendItem.reason}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(210),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        shadows: const [
+                          Shadow(
+                            color: Colors.black87,
+                            blurRadius: 3,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
           ],

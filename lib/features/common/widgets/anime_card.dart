@@ -57,7 +57,6 @@ class AnimeCard extends StatelessWidget {
                         ? item.thumbnailUrl
                         : item.coverUrl,
                     fit: BoxFit.cover,
-                    resizeWidth: compact ? 220 : 360,
                     loadDelayMs: loadDelayMs,
                   ),
                   // 封面底部暗色渐变遮罩
@@ -311,7 +310,6 @@ class _AnimeDetailContent extends StatelessWidget {
                       : item.coverUrl,
                   width: 100,
                   height: 140,
-                  resizeWidth: 300,
                 ),
               ),
             ),

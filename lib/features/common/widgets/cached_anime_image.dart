@@ -15,7 +15,7 @@ class CachedAnimeImage extends StatefulWidget {
   final double? height;
   final BoxFit fit;
   final Alignment alignment;
-  final int resizeWidth;
+  final int? resizeWidth;
   final BorderRadius? borderRadius;
   final int loadDelayMs;
 
@@ -26,7 +26,7 @@ class CachedAnimeImage extends StatefulWidget {
     this.height,
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
-    this.resizeWidth = 220,
+    this.resizeWidth,
     this.borderRadius,
     this.loadDelayMs = 0,
   });
@@ -84,7 +84,7 @@ class _CachedAnimeImageState extends State<CachedAnimeImage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final targetUrl = preferResizedCover(widget.imageUrl, maxEdge: widget.resizeWidth);
+    final targetUrl = bangumiImageUrl(widget.imageUrl);
     final cacheKey = getBangumiImageCacheKey(targetUrl);
 
     if (targetUrl.isEmpty || !_canLoad) {

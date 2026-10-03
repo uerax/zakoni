@@ -3,100 +3,74 @@ const String bangumiImageHostMirror = 'bgmimg.anibt.net';
 const String defaultBangumiImageHost = bangumiImageHostMirror;
 const String officialBangumiImageHost = bangumiImageHostBangumi;
 
-final Set<String> _rewritableImageHosts = {
-  bangumiImageHostBangumi,
-  bangumiImageHostMirror,
-  'bgm.tv',
-  'www.bgm.tv',
-  'bgmmi.anibt.net',
-};
-
 String currentBangumiImageHost = defaultBangumiImageHost;
 
 void setBangumiImageHost(String host) {
-  final h = host.trim().toLowerCase();
-  if (h.contains('lain') || h.contains('official') || h.contains('direct')) {
-    currentBangumiImageHost = bangumiImageHostBangumi;
-  } else if (h.contains('bgmimg') || h.contains('mirror') || h.contains('proxy')) {
-    currentBangumiImageHost = bangumiImageHostMirror;
-  } else {
-    currentBangumiImageHost = h
-        .replaceFirst(RegExp(r'^https?://', caseSensitive: false), '')
-        .split('/')
-        .first;
+  final cleanHost = host
+      .trim()
+      .replaceFirst(RegExp(r'^https?://', caseSensitive: false), '')
+      .split('/')
+      .first
+      .toLowerCase();
+  if (cleanHost.isNotEmpty) {
+    currentBangumiImageHost = cleanHost;
   }
 }
 
-/// 按照 animaku 标准实现：将已知 Bangumi 图片 Host 改写为当前源或指定源，并强制使用 HTTPS
+/// 纯粹的通用 Host 替换与 HTTPS 升级（方案 A：零硬编码域名白名单，零动态裁剪拼接）
+/// 1. 任何带有 /pic/ 的 Bangumi 图片资产，直接替换为其在目标镜像/官方图床上的对应 Host
+/// 2. 自动移除遗留的 /r/{size}/ 裁剪前缀，保证所有标准反代镜像均可 100% 直连原图
+/// 3. 非图片或外部第三方地址原样返回
 String bangumiImageUrl(String url, {String? overrideHost}) {
   final src = url.trim();
   if (src.isEmpty) return '';
 
-  final match = RegExp(r'^(?:https?:)?//([^/?#]+)(.*)$', caseSensitive: false).firstMatch(src);
-  if (match == null) return src;
+  final uri = Uri.tryParse(src);
+  if (uri == null) return src;
 
-  final host = match.group(1)!.toLowerCase();
-  final pathAndQuery = match.group(2) ?? '';
   final targetHost = overrideHost ?? currentBangumiImageHost;
 
-  if (host == targetHost || !_rewritableImageHosts.contains(host)) {
-    return _rewritableImageHosts.contains(host) ? 'https://$host$pathAndQuery' : src;
+  // 相对路径 (例如 /pic/cover/l/...)
+  if (!uri.hasScheme && !src.startsWith('//')) {
+    final cleanPath = src.startsWith('/') ? src : '/$src';
+    final normalized = cleanPath.replaceFirst(RegExp(r'^/r/\d+/'), '/');
+    return 'https://$targetHost$normalized';
   }
 
-  return 'https://$targetHost$pathAndQuery';
+  // 只要路径包含 /pic/，一律纯净换 Host 直连原图
+  if (uri.path.contains('/pic/')) {
+    final cleanPath = uri.path.replaceFirst(RegExp(r'^/r/\d+/'), '/');
+    return uri.replace(
+      scheme: 'https',
+      host: targetHost,
+      port: null,
+      path: cleanPath,
+    ).toString();
+  }
+
+  return src;
 }
 
-/// 优化 Bangumi 封面图（完全对齐 animaku 规范）：
-/// 1. 自动切换为指定的图床 Host（默认 Anycast 镜像，可选官方直连）
-/// 2. 对于原始超大封面 (/pic/cover/l/...)，自动挂接 /r/{maxEdge}/pic/ 动态裁剪，将体积从 2MB 降至 20KB 左右
-/// 3. 已经缩略的路径（如 /pic/cover/c/, /pic/cover/m/）不重复添加 /r/ 避免 400 错误
+/// 向后兼容：废除客户端拼装 /r/ 动态切片，直接统一委托给 bangumiImageUrl 原图直连
 String preferResizedCover(
   String url, {
-  int maxEdge = 400,
+  int? maxEdge,
   String? imageHost,
-}) {
-  final src = url.trim();
-  if (src.isEmpty) return '';
-
-  // 1. 如果已经带有 /r/{size}/ 路径，仅替换 host
-  if (RegExp(r'/r/\d+/').hasMatch(src)) {
-    return bangumiImageUrl(src, overrideHost: imageHost);
-  }
-
-  // 2. 如果已经是预缩略规格 (c=common, m=medium, s=small, g=grid)，仅替换 host
-  if (RegExp(r'/(?:cover|user|icon)/[cmsg]/', caseSensitive: false).hasMatch(src)) {
-    return bangumiImageUrl(src, overrideHost: imageHost);
-  }
-
-  // 3. 原始大图通过 /r/{maxEdge}/pic/ 动态裁剪
-  final resized = src.replaceFirstMapped(
-    RegExp(
-      r'^(https?://(?:lain\.)?bgm\.tv|https?://bgmimg\.anibt\.net|https?://bgmmi\.anibt\.net)/pic/',
-      caseSensitive: false,
-    ),
-    (m) => '${m.group(1)}/r/$maxEdge/pic/',
-  );
-
-  return bangumiImageUrl(resized, overrideHost: imageHost);
-}
+}) =>
+    bangumiImageUrl(url, overrideHost: imageHost);
 
 /// 为图片生成协议与域名无关的通用磁盘缓存 Key：
-/// 剥离不同图床 Host（lain.bgm.tv / bgmimg.anibt.net 等）与前缀协议差异，
+/// 剥离不同图床 Host 与协议差异，提取标准资产路径（如 bgm_img:/pic/cover/l/... 或 bgm_img:/r/400/pic/...），
 /// 使得用户在切换镜像源或官方源时，本地磁盘已下载的图片缓存能够 100% 复用命中。
 String getBangumiImageCacheKey(String url) {
   final src = url.trim();
   if (src.isEmpty) return '';
 
-  // 匹配已知 Bangumi 图床与镜像的相对路径
-  final match = RegExp(
-    r'^(?:https?:)?//[^/?#]+(/(?:r/\d+/)?pic/.*)$',
-    caseSensitive: false,
-  ).firstMatch(src);
-
-  if (match != null) {
-    return 'bgm_img:${match.group(1)}';
+  final uri = Uri.tryParse(src);
+  if (uri != null && uri.path.contains('/pic/')) {
+    final path = uri.path.startsWith('/') ? uri.path : '/${uri.path}';
+    return 'bgm_img:$path';
   }
 
-  // 非标准路径则降级使用去除协议的路径
   return src.replaceFirst(RegExp(r'^https?:', caseSensitive: false), '');
 }

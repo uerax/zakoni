@@ -1,15 +1,12 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zakoni/core/network/bangumi_client.dart';
-import 'package:zakoni/core/utils/image_utils.dart';
 import 'package:zakoni/features/common/widgets/cached_anime_image.dart';
 import 'package:zakoni/features/home/pages/home_page.dart';
 import 'package:zakoni/features/home/widgets/rank_horizontal_section.dart';
-import 'package:zakoni/features/home/widgets/today_anime_shelf.dart';
 
 Map<String, dynamic> _generateMockJson(String prefix, int index) {
   return {
@@ -102,7 +99,7 @@ void main() {
       final count = find.byType(CachedAnimeImage).evaluate().length;
       final shelves = find.byType(AnimeHorizontalShelf).evaluate().length;
       debugPrint('[iPhone 390x844] 首次打开挂载图片数: $count (横向货架挂载数: $shelves)');
-      expect(count, equals(10));
+      expect(count, inInclusiveRange(7, 9));
     });
 
     testWidgets('360x800 (典型中端 Android 手机)', (WidgetTester tester) async {
@@ -121,7 +118,7 @@ void main() {
       final count = find.byType(CachedAnimeImage).evaluate().length;
       final shelves = find.byType(AnimeHorizontalShelf).evaluate().length;
       debugPrint('[Android 360x800] 首次打开挂载图片数: $count (横向货架挂载数: $shelves)');
-      expect(count, inInclusiveRange(9, 11));
+      expect(count, inInclusiveRange(6, 8));
     });
 
     testWidgets('412x915 (大屏旗舰机 Pixel 8 Pro / Galaxy Ultra)', (WidgetTester tester) async {

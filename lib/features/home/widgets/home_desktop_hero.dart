@@ -1,25 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/models/bangumi/bangumi_calendar.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
+import '../../../core/models/home/recommend_item.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
 import 'home_banner_carousel.dart';
 
-/// 桌面/宽屏端 Hero 分栏黄金排版（类似 B站/流媒体桌面端模式）：
-/// 1. 左侧：高屏占比精选轮播图（Banner Carousel）；
-/// 2. 右侧：与左侧等高对齐的“今日放送” 2行 × 3列 6 宫格矩阵；
+/// 桌面/宽屏端 Hero 分栏黄金排版（智能推荐 + 全周新番）：
+/// 1. 左侧：智能个性化推荐轮播图（注入算法标签与推荐理由，大图呼吸动效）；
+/// 2. 右侧：与左侧等高对齐的“全周新番” 2行 × 3列 6 宫格矩阵，头部整合周一至周日胶囊快速切换；
 /// 3. 支持右上角“换一批 / 翻页”微交互与平滑动画；
 /// 4. 彻底解决大屏下单列轮播两边留白过宽与纯横向滑动割裂的问题。
 class HomeDesktopHero extends StatefulWidget {
-  final List<BangumiItem> bannerItems;
-  final List<BangumiItem> todayItems;
-  final String weekdayName;
+  final List<BangumiItem>? bannerItems;
+  final List<RecommendItem>? recommendations;
+  final List<BangumiCalendarDay>? calendarDays;
+  final List<BangumiItem>? todayItems;
+  final String? weekdayName;
 
   const HomeDesktopHero({
     super.key,
-    required this.bannerItems,
-    required this.todayItems,
-    required this.weekdayName,
+    this.bannerItems,
+    this.recommendations,
+    this.calendarDays,
+    this.todayItems,
+    this.weekdayName,
   });
 
   @override
@@ -29,22 +35,61 @@ class HomeDesktopHero extends StatefulWidget {
 class _HomeDesktopHeroState extends State<HomeDesktopHero> {
   late final PageController _gridPageController;
   int _gridPageIndex = 0;
+  late int _selectedDayIndex;
+  late final int _todayWeekdayIndex;
 
   static const double _heroHeight = 340.0;
   static const int _cardsPerPage = 6;
-
-  int get _totalPages => (widget.todayItems.length / _cardsPerPage).ceil().clamp(1, 99);
+  static const _weekLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
   @override
   void initState() {
     super.initState();
     _gridPageController = PageController();
+    final todayWeekday = DateTime.now().weekday; // 1=Mon .. 7=Sun
+    _todayWeekdayIndex = (todayWeekday - 1).clamp(0, 6);
+    _selectedDayIndex = _todayWeekdayIndex;
   }
 
   @override
   void dispose() {
     _gridPageController.dispose();
     super.dispose();
+  }
+
+  List<BangumiItem> get _currentDayItems {
+    final days = widget.calendarDays;
+    if (days != null && days.isNotEmpty) {
+      final targetDayId = _selectedDayIndex + 1;
+      final matchedDay = days.firstWhere(
+        (d) => d.weekday.id == targetDayId,
+        orElse: () => BangumiCalendarDay(
+          weekday: BangumiWeekday(
+            id: targetDayId,
+            en: '',
+            cn: _weekLabels[_selectedDayIndex],
+            ja: '',
+          ),
+          items: const [],
+        ),
+      );
+      return matchedDay.items;
+    }
+    return widget.todayItems ?? const [];
+  }
+
+  int get _totalPages => (_currentDayItems.length / _cardsPerPage).ceil().clamp(1, 99);
+
+  void _onSelectDay(int index) {
+    if (index == _selectedDayIndex) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _selectedDayIndex = index;
+      _gridPageIndex = 0;
+    });
+    if (_gridPageController.hasClients) {
+      _gridPageController.jumpToPage(0);
+    }
   }
 
   void _nextPage() {
@@ -79,7 +124,7 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. 左侧：精选轮播图（flex: 5，占比约 46%）
+          // 1. 左侧：智能推荐轮播图（flex: 5，占比约 46%）
           Expanded(
             flex: 5,
             child: Container(
@@ -97,6 +142,7 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
                 borderRadius: BorderRadius.circular(14),
                 child: HomeBannerCarousel(
                   items: widget.bannerItems,
+                  recommendations: widget.recommendations,
                   height: _heroHeight,
                   padding: EdgeInsets.zero,
                   borderRadius: 14,
@@ -106,15 +152,13 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
           ),
           const SizedBox(width: 14),
 
-          // 2. 右侧：今日放送 6 宫格矩阵（flex: 6，占比约 54%）
+          // 2. 右侧：全周新番 6 宫格矩阵（flex: 6，占比约 54%）
           Expanded(
             flex: 6,
             child: Container(
               height: _heroHeight,
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
               decoration: BoxDecoration(
-                // 实体质感卡片底色：深色模式使用深灰面板，浅色模式使用纯白面板，
-                // 清晰勾勒出 340px 容器顶边与底边，消除“右侧虚化镂空导致左侧视觉偏高”的视错觉
                 color: isDark
                     ? const Color(0xFF1E1E22).withAlpha(235)
                     : Colors.white.withAlpha(240),
@@ -138,22 +182,39 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
                 children: [
                   // 头部：标题与“换一批/翻页”控件
                   _buildHeader(theme, isDark),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 5),
+
+                  // 胶囊星期切换条
+                  if (widget.calendarDays != null && widget.calendarDays!.isNotEmpty) ...[
+                    _buildWeekdayCapsules(theme, isDark),
+                    const SizedBox(height: 5),
+                  ],
 
                   // 2行 × 3列 6宫格翻页视图
                   Expanded(
-                    child: PageView.builder(
-                      controller: _gridPageController,
-                      itemCount: _totalPages,
-                      onPageChanged: (index) {
-                        setState(() {
-                          _gridPageIndex = index;
-                        });
-                      },
-                      itemBuilder: (context, pageIndex) {
-                        return _buildSixGridPage(pageIndex);
-                      },
-                    ),
+                    child: _currentDayItems.isEmpty
+                        ? Center(
+                            child: Text(
+                              '当天暂无新番播出',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          )
+                        : PageView.builder(
+                            key: ValueKey('desktop_grid_$_selectedDayIndex'),
+                            controller: _gridPageController,
+                            itemCount: _totalPages,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _gridPageIndex = index;
+                              });
+                            },
+                            itemBuilder: (context, pageIndex) {
+                              return _buildSixGridPage(pageIndex);
+                            },
+                          ),
                   ),
                 ],
               ),
@@ -164,18 +225,21 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
     );
   }
 
-  /// 标题栏：轻量矢量图标 + 今日放送 + 翻页与换一批操作
+  /// 标题栏：轻量矢量图标 + 新番周历 + 翻页与换一批操作
   Widget _buildHeader(ThemeData theme, bool isDark) {
+    final currentDayItems = _currentDayItems;
+    final isToday = _selectedDayIndex == _todayWeekdayIndex;
+
     return Row(
       children: [
         Icon(
-          Icons.today_rounded,
+          Icons.calendar_month_rounded,
           size: 18,
           color: theme.colorScheme.primary,
         ),
         const SizedBox(width: 7),
         Text(
-          '今日放送',
+          '新番周历',
           style: TextStyle(
             fontSize: 16.5,
             fontWeight: FontWeight.w800,
@@ -185,7 +249,7 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
         ),
         const SizedBox(width: 8),
         Text(
-          '${widget.weekdayName} · ${widget.todayItems.length} 部更新',
+          '${_weekLabels[_selectedDayIndex]} · ${isToday ? '今日 ' : ''}${currentDayItems.length} 部更新',
           style: TextStyle(
             fontSize: 12,
             color: theme.colorScheme.onSurfaceVariant,
@@ -199,38 +263,34 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
           Text(
             '${_gridPageIndex + 1} / $_totalPages',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11.5,
               fontWeight: FontWeight.w600,
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           _buildActionIconButton(
             icon: Icons.chevron_left_rounded,
-            tooltip: '上一组',
+            tooltip: '上一页',
             onTap: _prevPage,
             isDark: isDark,
           ),
-          const SizedBox(width: 2),
           _buildActionIconButton(
             icon: Icons.chevron_right_rounded,
-            tooltip: '下一组',
+            tooltip: '下一页',
             onTap: _nextPage,
             isDark: isDark,
           ),
-          const SizedBox(width: 6),
-          // B站风格“换一批”按钮
+          const SizedBox(width: 4),
+          // 换一批快速翻页按钮
           Material(
-            color: Colors.transparent,
+            color: theme.colorScheme.primary.withAlpha(isDark ? 36 : 20),
+            borderRadius: BorderRadius.circular(6),
             child: InkWell(
               onTap: _nextPage,
-              borderRadius: BorderRadius.circular(100),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(100),
-                  color: isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(12),
-                ),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -255,6 +315,61 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
           ),
         ],
       ],
+    );
+  }
+
+  /// 周一至周日全周胶囊切换条
+  Widget _buildWeekdayCapsules(ThemeData theme, bool isDark) {
+    return SizedBox(
+      height: 24,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List.generate(7, (index) {
+          final isSelected = index == _selectedDayIndex;
+          final isCurrentDay = index == _todayWeekdayIndex;
+
+          return InkWell(
+            onTap: () => _onSelectDay(index),
+            borderRadius: BorderRadius.circular(12),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? theme.colorScheme.primary
+                    : (isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(8)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isCurrentDay && !isSelected) ...[
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                  ],
+                  Text(
+                    _weekLabels[index],
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected
+                          ? theme.colorScheme.onPrimary
+                          : (isDark ? Colors.white70 : Colors.black87),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
     );
   }
 
@@ -321,10 +436,11 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
   }
 
   Widget _buildGridCard(int index) {
-    if (index < widget.todayItems.length) {
+    final items = _currentDayItems;
+    if (index < items.length) {
       return Expanded(
         child: AnimeCard(
-          item: widget.todayItems[index],
+          item: items[index],
           compact: true,
         ),
       );
@@ -351,13 +467,16 @@ class ShimmerDesktopHero extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 左侧轮播图骨架
-          const Expanded(
+          // 左侧轮播骨架
+          Expanded(
             flex: 5,
-            child: ShimmerBannerCarousel(
-              height: _heroHeight,
-              padding: EdgeInsets.zero,
-              borderRadius: 14,
+            child: ShimmerLoading(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E22) : Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 14),
@@ -366,26 +485,36 @@ class ShimmerDesktopHero extends StatelessWidget {
           Expanded(
             flex: 6,
             child: Container(
-              height: _heroHeight,
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(8),
+                color: isDark
+                    ? const Color(0xFF1E1E22).withAlpha(235)
+                    : Colors.white.withAlpha(240),
                 borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withAlpha(28)
+                      : Colors.black.withAlpha(18),
+                  width: 1.0,
+                ),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ShimmerLoading(
-                    child: Container(
-                      height: 18,
-                      width: 140,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(4),
+                  Row(
+                    children: [
+                      ShimmerLoading(
+                        child: Container(
+                          height: 18,
+                          width: 140,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Expanded(
                     child: Column(
                       children: [
@@ -400,7 +529,7 @@ class ShimmerDesktopHero extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Expanded(
                           child: Row(
                             children: const [

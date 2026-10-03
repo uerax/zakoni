@@ -238,7 +238,6 @@ class _AnimeHorizontalShelfState extends State<AnimeHorizontalShelf> {
                               : item.coverUrl,
                           width: AnimeHorizontalShelf.cardWidth,
                           height: AnimeHorizontalShelf.cardHeight,
-                          resizeWidth: 400,
                         ),
                       ),
                     ),

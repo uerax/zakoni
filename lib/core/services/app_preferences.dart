@@ -23,6 +23,7 @@ class AppPreferences {
   static const _kWallpaperOpacity = 'pref_wallpaper_opacity';
   static const _kWallpaperBlur = 'pref_wallpaper_blur';
   static const _kSearchHistory = 'pref_search_history';
+  static const _kDeviceInstallId = 'pref_device_install_id';
 
   static SharedPreferences? _prefs;
 
@@ -174,5 +175,19 @@ class AppPreferences {
 
   static Future<void> saveSearchHistory(List<String> history) async {
     await _prefs?.setStringList(_kSearchHistory, history);
+  }
+
+  // --- 设备唯一标识持久化（用于每日推荐确定性种子生成） ---
+
+  static String getOrCreateDeviceInstallId() {
+    final prefs = _prefs;
+    if (prefs == null) return 'device_default_seed';
+    var id = prefs.getString(_kDeviceInstallId);
+    if (id == null || id.isEmpty) {
+      final now = DateTime.now();
+      id = 'dev_${now.millisecondsSinceEpoch}_${now.microsecondsSinceEpoch % 999999}';
+      prefs.setString(_kDeviceInstallId, id);
+    }
+    return id;
   }
 }

@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../../../core/models/bangumi/bangumi_calendar.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
+import '../../../core/models/home/recommend_item.dart';
 import '../../../core/network/bangumi_client.dart';
+import '../../../core/services/daily_recommend_service.dart';
 import '../../../core/utils/responsive.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
 import '../../search/pages/search_page.dart';
+import '../widgets/continue_watching_shelf.dart';
+import '../widgets/daily_spotlight_card.dart';
 import '../widgets/home_desktop_hero.dart';
 import '../widgets/home_top_bar.dart';
 import '../widgets/rank_horizontal_section.dart';
@@ -32,8 +36,10 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   static const bool _showExploreSection = false;
 
   late Future<({
+    List<BangumiCalendarDay> calendarDays,
     List<BangumiItem> today,
     String weekdayName,
+    List<RecommendItem> recommendations,
     List<BangumiItem> tv,
     List<BangumiItem> movies,
     List<BangumiItem> ova,
@@ -98,8 +104,10 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   }
 
   Future<({
+    List<BangumiCalendarDay> calendarDays,
     List<BangumiItem> today,
     String weekdayName,
+    List<RecommendItem> recommendations,
     List<BangumiItem> tv,
     List<BangumiItem> movies,
     List<BangumiItem> ova,
@@ -140,9 +148,18 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         )
         .items;
 
+    // 今日推荐算法抓取与调度：带天内幂等、L2 磁盘缓存与三级降级保护
+    final recommendations = await DailyRecommendService.getDailyRecommendations(
+      client: widget.client,
+      rawUserTagFreq: const {}, // 播放模块就绪后直接注入词频字典
+      forceRefresh: forceRefresh,
+    );
+
     return (
+      calendarDays: calendarDays,
       today: todayItems,
       weekdayName: weekdayName,
+      recommendations: recommendations,
       tv: tv,
       movies: movies,
       ova: ova,
@@ -260,8 +277,10 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
 
   Widget _buildAnimeContent(BuildContext context, ThemeData theme, double safeTop) {
     return FutureBuilder<({
+      List<BangumiCalendarDay> calendarDays,
       List<BangumiItem> today,
       String weekdayName,
+      List<RecommendItem> recommendations,
       List<BangumiItem> tv,
       List<BangumiItem> movies,
       List<BangumiItem> ova,
@@ -305,8 +324,10 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         }
 
         final data = snapshot.data;
+        final calendarDays = data?.calendarDays ?? [];
         final today = data?.today ?? [];
         final weekdayName = data?.weekdayName ?? '今日';
+        final recommendations = data?.recommendations ?? [];
         final tv = data?.tv ?? [];
         final movies = data?.movies ?? [];
         final ova = data?.ova ?? [];
@@ -336,7 +357,14 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                 child: SizedBox(height: safeTop + 42),
               ),
 
-              // 顶部轮播与今日放送：响应式双模式（宽屏模式下左右分栏，窄屏模式下纵向流）
+              // 继续追番模块（数据驱动，无记录时 0 像素折叠隐身）
+              SliverToBoxAdapter(
+                child: _buildResponsiveShelf(
+                  const ContinueWatchingShelf(records: []),
+                ),
+              ),
+
+              // 顶部新番周历与算法推荐：响应式双模式（宽屏模式下左右分栏，窄屏模式下纵向流）
               SliverToBoxAdapter(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -352,6 +380,8 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               child: HomeDesktopHero(
                                 bannerItems: tv,
+                                recommendations: recommendations,
+                                calendarDays: calendarDays,
                                 todayItems: today,
                                 weekdayName: weekdayName,
                               ),
@@ -361,14 +391,21 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                       );
                     }
 
-                    // 移动端/窄屏模式：去除冗余轮播图，首屏直达今日放送
+                    // 移动端/窄屏模式：周历全周胶囊切换 + 今日推荐算法卡片
                     return Column(
                       children: [
-                        if (today.isNotEmpty) ...[
+                        if (today.isNotEmpty || calendarDays.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           TodayAnimeShelf(
+                            calendarDays: calendarDays,
                             items: today,
                             weekdayName: weekdayName,
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        if (recommendations.isNotEmpty) ...[
+                          DailySpotlightCard(
+                            recommendations: recommendations,
                           ),
                           const SizedBox(height: 12),
                         ],

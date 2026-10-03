@@ -94,7 +94,7 @@ class BangumiItem {
   /// 获取优先展示的中文名称，若为空则降级为原名
   String get preferredName => nameCn.isNotEmpty ? nameCn : name;
 
-  /// 封面图快捷获取（优先 large，其次 common/medium/small）
+  /// 封面图快捷获取（优先 large 原图，其次 common/medium/small）
   String get coverUrl =>
       images['large'] ??
       images['common'] ??
@@ -103,16 +103,8 @@ class BangumiItem {
       images['grid'] ??
       '';
 
-  /// 列表缩略图（优先 large，并通过 preferResizedCover 动态挂接 400px 高清切片，杜绝使用 150px 模糊小图）
-  String get thumbnailUrl {
-    final raw = images['large'] ??
-        images['common'] ??
-        images['medium'] ??
-        images['small'] ??
-        images['grid'] ??
-        '';
-    return preferResizedCover(raw, maxEdge: 400);
-  }
+  /// 列表缩略图（方案 A：直接使用原图，通过 bangumiImageUrl 自动映射至当前镜像线路）
+  String get thumbnailUrl => bangumiImageUrl(coverUrl);
 
   factory BangumiItem.fromJson(Map<String, dynamic> json) {
     final rating = (json['rating'] as Map<String, dynamic>?) ?? {};
