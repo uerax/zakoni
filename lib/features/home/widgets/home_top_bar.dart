@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/utils/responsive.dart';
 
 /// 现代响应式顶部导航栏：
 /// 1. 桌面/宽屏端（≥840px）：常驻吸顶（Sticky Header，绝不收起隐藏），采用“左品牌 + 居中 440px 搜索台 (带快捷键提示) + 右侧头像”；
@@ -26,8 +27,7 @@ class HomeTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final isDesktop = screenWidth >= 840;
+    final isDesktop = context.isDesktop;
 
     // 桌面端无条件常驻吸顶 (Offset.zero)，移动端按滑动意图平滑收起 (-1.0) 或唤出 (0.0)
     final effectiveOffset = isDesktop
@@ -114,7 +114,7 @@ class HomeTopBar extends StatelessWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1200),
+        constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(

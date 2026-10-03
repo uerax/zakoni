@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
+import '../../../core/utils/responsive.dart';
 import 'bouncing_scale_card.dart';
 import 'cached_anime_image.dart';
 
@@ -216,8 +217,51 @@ class AnimeCard extends StatelessWidget {
   }
 }
 
-/// 底部弹出番剧详情抽屉
+/// 自适应弹出番剧详情：
+/// 1. 桌面/宽屏端（>= 840dp）：居中毛玻璃卡片模态弹窗（Dialog，最大宽度 560px），配备右上角关闭键；
+/// 2. 移动端/窄屏端（< 840dp）：保持标准抽屉底部弹窗（Modal Bottom Sheet + Draggable）。
 void showAnimeDetailSheet(BuildContext context, BangumiItem item) {
+  if (context.isDesktop) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Dialog(
+          backgroundColor: isDark ? const Color(0xFF1E1E22) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: AppBreakpoints.maxDialogWidth,
+              maxHeight: 650,
+            ),
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: _AnimeDetailContent(item: item),
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: '关闭',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    return;
+  }
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -234,97 +278,109 @@ void showAnimeDetailSheet(BuildContext context, BangumiItem item) {
           return SingleChildScrollView(
             controller: scrollController,
             padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: SizedBox(
-                        width: 100,
-                        height: 140,
-                        child: CachedAnimeImage(
-                          imageUrl: item.thumbnailUrl.isNotEmpty
-                              ? item.thumbnailUrl
-                              : item.coverUrl,
-                          width: 100,
-                          height: 140,
-                          resizeWidth: 300,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.preferredName,
-                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            item.name,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: [
-                              if (item.ratingScore > 0)
-                                Chip(
-                                  avatar: const Icon(Icons.star, size: 14, color: Colors.amber),
-                                  label: Text('${item.ratingScore}分 (${item.votes}人评)'),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                              if (item.rank > 0)
-                                Chip(
-                                  label: Text('Rank #${item.rank}'),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                              if (item.airDate.isNotEmpty)
-                                Chip(
-                                  label: Text('首播: ${item.airDate}'),
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const Text('剧情简介', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text(
-                  item.summary.isNotEmpty ? item.summary : '暂无剧情简介。',
-                  style: const TextStyle(height: 1.5, fontSize: 13),
-                ),
-                if (item.tags.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Text('标签', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: item.tags.take(12).map((tag) {
-                      return Chip(
-                        label: Text(tag.name, style: const TextStyle(fontSize: 11)),
-                        visualDensity: VisualDensity.compact,
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ],
-            ),
+            child: _AnimeDetailContent(item: item),
           );
         },
       );
     },
   );
+}
+
+class _AnimeDetailContent extends StatelessWidget {
+  final BangumiItem item;
+
+  const _AnimeDetailContent({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 100,
+                height: 140,
+                child: CachedAnimeImage(
+                  imageUrl: item.thumbnailUrl.isNotEmpty
+                      ? item.thumbnailUrl
+                      : item.coverUrl,
+                  width: 100,
+                  height: 140,
+                  resizeWidth: 300,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.preferredName,
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.name,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      if (item.ratingScore > 0)
+                        Chip(
+                          avatar: const Icon(Icons.star, size: 14, color: Colors.amber),
+                          label: Text('${item.ratingScore}分 (${item.votes}人评)'),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      if (item.rank > 0)
+                        Chip(
+                          label: Text('Rank #${item.rank}'),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      if (item.airDate.isNotEmpty)
+                        Chip(
+                          label: Text('首播: ${item.airDate}'),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Divider(),
+        const Text('剧情简介', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Text(
+          item.summary.isNotEmpty ? item.summary : '暂无剧情简介。',
+          style: const TextStyle(height: 1.5, fontSize: 13),
+        ),
+        if (item.tags.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Text('标签', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: item.tags.take(12).map((tag) {
+              return Chip(
+                label: Text(tag.name, style: const TextStyle(fontSize: 11)),
+                visualDensity: VisualDensity.compact,
+              );
+            }).toList(),
+          ),
+        ],
+      ],
+    );
+  }
 }

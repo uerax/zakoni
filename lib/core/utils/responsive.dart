@@ -1,0 +1,57 @@
+import 'package:flutter/material.dart';
+
+/// 全局多端响应式断点与布局工具：
+/// 1. 严格参照 Flutter 与 Material 3 Adaptive 规范体系；
+/// 2. compact: < 600（手机竖屏，紧凑单栏流）；
+/// 3. medium: 600 ~ 839（大折叠屏、平板竖屏，过渡形态）；
+/// 4. expanded: >= 840（平板横屏、PC/桌面端、大屏显示器，宽屏分栏/矩阵形态）；
+/// 5. 统一网格跨轴阶梯列数计算（<500: 3, <750: 4, <1000: 5, >=1000: 6）。
+class AppBreakpoints {
+  AppBreakpoints._();
+
+  /// 紧凑与中等屏幕分界（手机 vs 平板竖屏/折叠屏）
+  static const double compact = 600.0;
+
+  /// 宽屏与桌面端分界（平板横屏 / 桌面端）
+  static const double medium = 840.0;
+
+  /// 全局大屏主要内容流最大限制宽度
+  static const double maxContentWidth = 1200.0;
+
+  /// 设置页等列表型页面在大屏上的收拢宽度
+  static const double maxSettingsWidth = 800.0;
+
+  /// 居中详情模态弹窗的最大宽度
+  static const double maxDialogWidth = 560.0;
+
+  /// 统一计算动漫卡片网格阶梯列数：
+  /// - width < 500: 3 列（移动端标准）
+  /// - width < 750: 4 列（小平板/折叠屏）
+  /// - width < 1000: 5 列（平板横屏/中等窗口）
+  /// - width >= 1000: 6 列（桌面大屏）
+  static int gridColumns(double width) {
+    if (width < 500) return 3;
+    if (width < 750) return 4;
+    if (width < 1000) return 5;
+    return 6;
+  }
+}
+
+/// 响应式 Context 扩展，方便在 Widget 中快速获取断点状态
+extension ResponsiveContext on BuildContext {
+  /// 屏幕宽度
+  double get screenWidth => MediaQuery.sizeOf(this).width;
+
+  /// 屏幕高度
+  double get screenHeight => MediaQuery.sizeOf(this).height;
+
+  /// 是否为宽屏/桌面端布局（>= 840dp）
+  bool get isDesktop => screenWidth >= AppBreakpoints.medium;
+
+  /// 是否为小屏紧凑模式（< 600dp）
+  bool get isCompact => screenWidth < AppBreakpoints.compact;
+
+  /// 是否为中等平板模式（600dp ~ 839dp）
+  bool get isMedium =>
+      screenWidth >= AppBreakpoints.compact && screenWidth < AppBreakpoints.medium;
+}

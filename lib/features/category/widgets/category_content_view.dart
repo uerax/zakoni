@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/utils/responsive.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
 import '../controllers/category_controller.dart';
@@ -34,7 +35,7 @@ class CategoryContentView extends ConsumerWidget {
         sliver: SliverLayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.crossAxisExtent;
-            final count = width < 500 ? 3 : (width < 750 ? 4 : (width < 1000 ? 5 : 6));
+            final count = AppBreakpoints.gridColumns(width);
             final skeletonCount = count * 2;
             return SliverGrid(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -142,7 +143,7 @@ class CategoryContentView extends ConsumerWidget {
         sliver: SliverLayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.crossAxisExtent;
-            final count = width < 500 ? 3 : (width < 750 ? 4 : (width < 1000 ? 5 : 6));
+            final count = AppBreakpoints.gridColumns(width);
 
             return SliverGrid(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

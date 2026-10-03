@@ -4,6 +4,7 @@ import 'package:flutter/rendering.dart';
 import '../../../core/models/bangumi/bangumi_calendar.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/network/bangumi_client.dart';
+import '../../../core/utils/responsive.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
 import '../../search/pages/search_page.dart';
@@ -79,6 +80,22 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         builder: (context) => SearchPage(initialQuery: query),
       ),
     );
+  }
+
+  /// 货架响应式对齐容器：
+  /// 特殊处理说明：
+  /// 1. 桌面/宽屏端（>= 840dp）：通过 Center + ConstrainedBox(maxWidth: 1200) 与顶栏和 Hero 区域基线严格垂直对齐，两边优雅留白；
+  /// 2. 手机与平板竖屏（< 840dp）：直接返回原货架组件，保持 100% 贴边无阻碍全宽滑动流与边缘露头（Peek）手势引导，零视觉副作用。
+  Widget _buildResponsiveShelf(Widget shelf) {
+    if (context.isDesktop) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+          child: shelf,
+        ),
+      );
+    }
+    return shelf;
   }
 
   Future<({
@@ -175,7 +192,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                 if (notification.metrics.axis == Axis.vertical) {
                   _scrollOffsetNotifier.value = notification.metrics.pixels;
 
-                  final isDesktop = MediaQuery.sizeOf(context).width >= 840;
+                  final isDesktop = context.isDesktop;
 
                   if (isDesktop) {
                     // 桌面端无条件常驻吸顶显示，绝不执行上下收起动画
@@ -324,14 +341,14 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               SliverToBoxAdapter(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isDesktop = constraints.maxWidth >= 840;
+                    final isDesktop = constraints.maxWidth >= AppBreakpoints.medium;
 
                     if (isDesktop && (tv.isNotEmpty || today.isNotEmpty)) {
                       return Padding(
                         padding: const EdgeInsets.only(top: 8, bottom: 12),
                         child: Center(
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 1200),
+                            constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               child: HomeDesktopHero(
@@ -368,39 +385,45 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
 
               // 货架 1：热门 TV 番剧独立货架
               SliverToBoxAdapter(
-                child: AnimeHorizontalShelf(
-                  icon: Icons.tv_rounded,
-                  title: '热门 TV 番剧',
-                  items: tv,
-                  defaultStatType: 'heat',
-                  viewAllSubtitle: '浏览全部 TV',
-                  onViewAllTap: () => _onShelfViewAllTap('TV'),
+                child: _buildResponsiveShelf(
+                  AnimeHorizontalShelf(
+                    icon: Icons.tv_rounded,
+                    title: '热门 TV 番剧',
+                    items: tv,
+                    defaultStatType: 'heat',
+                    viewAllSubtitle: '浏览全部 TV',
+                    onViewAllTap: () => _onShelfViewAllTap('TV'),
+                  ),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
               // 货架 2：热门剧场版独立货架
               SliverToBoxAdapter(
-                child: AnimeHorizontalShelf(
-                  icon: Icons.movie_filter_rounded,
-                  title: '热门剧场版',
-                  items: movies,
-                  defaultStatType: 'collect',
-                  viewAllSubtitle: '浏览全部剧场版',
-                  onViewAllTap: () => _onShelfViewAllTap('剧场版'),
+                child: _buildResponsiveShelf(
+                  AnimeHorizontalShelf(
+                    icon: Icons.movie_filter_rounded,
+                    title: '热门剧场版',
+                    items: movies,
+                    defaultStatType: 'collect',
+                    viewAllSubtitle: '浏览全部剧场版',
+                    onViewAllTap: () => _onShelfViewAllTap('剧场版'),
+                  ),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
               // 货架 3：热门 OVA / 特别篇独立货架
               SliverToBoxAdapter(
-                child: AnimeHorizontalShelf(
-                  icon: Icons.album_rounded,
-                  title: '热门 OVA / 特别篇',
-                  items: ova,
-                  defaultStatType: 'collect',
-                  viewAllSubtitle: '浏览全部 OVA',
-                  onViewAllTap: () => _onShelfViewAllTap('OVA'),
+                child: _buildResponsiveShelf(
+                  AnimeHorizontalShelf(
+                    icon: Icons.album_rounded,
+                    title: '热门 OVA / 特别篇',
+                    items: ova,
+                    defaultStatType: 'collect',
+                    viewAllSubtitle: '浏览全部 OVA',
+                    onViewAllTap: () => _onShelfViewAllTap('OVA'),
+                  ),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 12)),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_calendar.dart';
 import '../../../core/network/bangumi_client.dart';
+import '../../../core/utils/responsive.dart';
 import '../../common/widgets/anime_card.dart';
 
 class TimelinePage extends StatefulWidget {
@@ -327,16 +328,7 @@ class _KeepAliveDayViewState extends State<_KeepAliveDayView>
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final int crossAxisCount;
-        if (width < 500) {
-          crossAxisCount = 3;
-        } else if (width < 750) {
-          crossAxisCount = 4;
-        } else if (width < 1000) {
-          crossAxisCount = 5;
-        } else {
-          crossAxisCount = 6;
-        }
+        final int crossAxisCount = AppBreakpoints.gridColumns(width);
 
         return GridView.builder(
           key: PageStorageKey<String>(

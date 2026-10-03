@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/utils/appearance_manager.dart';
 import '../../../core/utils/font_manager.dart';
+import '../../../core/utils/responsive.dart';
 import '../widgets/about_settings_card.dart';
 import '../widgets/appearance_settings_card.dart';
 import '../widgets/cache_settings_card.dart';
@@ -57,29 +58,34 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             centerTitle: true,
           ),
-          body: ListView(
-            // 底部预留 96px 间距，适配悬浮毛玻璃底栏穿透
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-            children: [
-              // 1. 网络线路
-              NetworkSettingsCard(
-                client: widget.client,
-                currentPreset: _currentPreset,
-                onPresetChanged: _onPresetChanged,
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxSettingsWidth),
+              child: ListView(
+                // 底部预留 96px 间距，适配悬浮毛玻璃底栏穿透
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                children: [
+                  // 1. 网络线路
+                  NetworkSettingsCard(
+                    client: widget.client,
+                    currentPreset: _currentPreset,
+                    onPresetChanged: _onPresetChanged,
+                  ),
+
+                  // 2. 缓存管理
+                  CacheSettingsCard(client: widget.client),
+
+                  // 3. 字体设置
+                  const FontSettingsCard(),
+
+                  // 4. 个性化外观 (图标与壁纸)
+                  const AppearanceSettingsCard(),
+
+                  // 5. 关于应用
+                  const AboutSettingsCard(),
+                ],
               ),
-
-              // 2. 缓存管理
-              CacheSettingsCard(client: widget.client),
-
-              // 3. 字体设置
-              const FontSettingsCard(),
-
-              // 4. 个性化外观 (图标与壁纸)
-              const AppearanceSettingsCard(),
-
-              // 5. 关于应用
-              const AboutSettingsCard(),
-            ],
+            ),
           ),
         );
       },

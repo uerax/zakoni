@@ -82,11 +82,26 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
           // 1. 左侧：精选轮播图（flex: 5，占比约 46%）
           Expanded(
             flex: 5,
-            child: HomeBannerCarousel(
-              items: widget.bannerItems,
-              height: _heroHeight,
-              padding: EdgeInsets.zero,
-              borderRadius: 14,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(isDark ? 55 : 18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: HomeBannerCarousel(
+                  items: widget.bannerItems,
+                  height: _heroHeight,
+                  padding: EdgeInsets.zero,
+                  borderRadius: 14,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 14),
@@ -96,25 +111,34 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
             flex: 6,
             child: Container(
               height: _heroHeight,
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
               decoration: BoxDecoration(
+                // 实体质感卡片底色：深色模式使用深灰面板，浅色模式使用纯白面板，
+                // 清晰勾勒出 340px 容器顶边与底边，消除“右侧虚化镂空导致左侧视觉偏高”的视错觉
                 color: isDark
-                    ? Colors.white.withAlpha(12)
-                    : Colors.black.withAlpha(8),
+                    ? const Color(0xFF1E1E22).withAlpha(235)
+                    : Colors.white.withAlpha(240),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: isDark
-                      ? Colors.white.withAlpha(22)
-                      : Colors.black.withAlpha(14),
+                      ? Colors.white.withAlpha(28)
+                      : Colors.black.withAlpha(18),
                   width: 1.0,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(isDark ? 55 : 18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 头部：标题与“换一批/翻页”控件
                   _buildHeader(theme, isDark),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
                   // 2行 × 3列 6宫格翻页视图
                   Expanded(
@@ -278,7 +302,7 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
 
         // 第 2 排（3 部）
         Expanded(
