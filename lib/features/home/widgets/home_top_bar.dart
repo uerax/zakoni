@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/utils/appearance_manager.dart';
 import '../../../core/utils/responsive.dart';
 
 /// 现代响应式顶部导航栏：
@@ -119,16 +120,27 @@ class HomeTopBar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              // 左侧：品牌纯粹优雅排印
-              Text(
-                'zakoni',
-                style: TextStyle(
-                  fontFamily: theme.textTheme.titleLarge?.fontFamily ?? 'MiSans',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                  color: theme.colorScheme.onSurface,
-                ),
+              // 左侧：精致应用品牌 Logo（自适应圆角微光投影与个性化图标即时联动）
+              ListenableBuilder(
+                listenable: AppearanceManager.instance,
+                builder: (context, _) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(isDark ? 50 : 16),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: AppearanceManager.instance.buildAppLogoWidget(
+                      size: 32,
+                      borderRadius: 8,
+                    ),
+                  );
+                },
               ),
               const Spacer(),
 

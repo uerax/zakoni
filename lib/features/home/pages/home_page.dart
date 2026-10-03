@@ -8,7 +8,6 @@ import '../../../core/utils/responsive.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
 import '../../search/pages/search_page.dart';
-import '../widgets/home_banner_carousel.dart';
 import '../widgets/home_desktop_hero.dart';
 import '../widgets/home_top_bar.dart';
 import '../widgets/rank_horizontal_section.dart';
@@ -362,15 +361,11 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                       );
                     }
 
-                    // 移动端/窄屏模式（原布局保持不变）
+                    // 移动端/窄屏模式：去除冗余轮播图，首屏直达今日放送
                     return Column(
                       children: [
-                        if (tv.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          HomeBannerCarousel(items: tv),
-                          const SizedBox(height: 10),
-                        ],
                         if (today.isNotEmpty) ...[
+                          const SizedBox(height: 8),
                           TodayAnimeShelf(
                             items: today,
                             weekdayName: weekdayName,
@@ -565,8 +560,6 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                 return const Column(
                   children: [
                     SizedBox(height: 8),
-                    ShimmerBannerCarousel(),
-                    SizedBox(height: 10),
                     ShimmerTodayShelf(),
                     SizedBox(height: 12),
                   ],
