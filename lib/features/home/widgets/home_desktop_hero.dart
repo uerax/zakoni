@@ -225,7 +225,7 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
     );
   }
 
-  /// 标题栏：轻量矢量图标 + 新番周历 + 翻页与换一批操作
+  /// 标题栏：轻量矢量图标 + 新番每日放送 + 翻页与换一批操作
   Widget _buildHeader(ThemeData theme, bool isDark) {
     final currentDayItems = _currentDayItems;
     final isToday = _selectedDayIndex == _todayWeekdayIndex;
@@ -239,7 +239,7 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
         ),
         const SizedBox(width: 7),
         Text(
-          '新番周历',
+          '新番每日放送',
           style: TextStyle(
             fontSize: 16.5,
             fontWeight: FontWeight.w800,

@@ -7,7 +7,7 @@ import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
 
-/// 首页“新番周历 / 今日放送”专属模块：
+/// 首页“新番每日放送”专属模块：
 /// 1. 支持传入全周 7 天数据 (calendarDays)，提供周一至周日胶囊切换条，0 额外网络开销；
 /// 2. 向后兼容单天 items 注入；
 /// 3. 采用紧凑小卡片 (compact: true)，尺寸收敛至 108×188px，视觉轻盈；
@@ -110,7 +110,7 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
               ),
               const SizedBox(width: 7),
               Text(
-                '新番周历',
+                '新番每日放送',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,

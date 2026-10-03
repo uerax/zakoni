@@ -158,129 +158,134 @@ class _DailySpotlightCardState extends State<DailySpotlightCard> {
                     ),
                     const SizedBox(width: 12),
 
-                    // 右侧：标题、标签、推荐理由与评分
+                    // 右侧：标题、标签、推荐理由与评分（锁定 126px 高度并通过 Spacer 让理由气泡稳固置底）
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 契合度与特色标签
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withAlpha(isDark ? 40 : 25),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.stars_rounded,
-                                      size: 11,
-                                      color: Colors.amber,
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      '${current.matchRate}% 契合',
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.amber,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.onSurfaceVariant.withAlpha(20),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  current.tag,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-
-                          // 作品名
-                          Text(
-                            item.preferredName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: theme.textTheme.titleMedium?.color,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-
-                          // 评分
-                          if (item.ratingScore > 0)
+                      child: SizedBox(
+                        height: 126,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 契合度与特色标签
                             Row(
                               children: [
-                                const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
-                                const SizedBox(width: 3),
-                                Text(
-                                  item.ratingScore.toStringAsFixed(1),
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.amber,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withAlpha(isDark ? 40 : 25),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.stars_rounded,
+                                        size: 11,
+                                        color: Colors.amber,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        '${current.matchRate}% 契合',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.amber,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '(${item.votes}人评)',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    color: theme.colorScheme.onSurfaceVariant,
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.onSurfaceVariant.withAlpha(20),
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
-                                ),
-                              ],
-                            ),
-                          const SizedBox(height: 8),
-
-                          // 显式推荐理由气泡
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withAlpha(isDark ? 22 : 12),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '💡 ',
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                                Expanded(
                                   child: Text(
-                                    current.reason,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
+                                    current.tag,
                                     style: TextStyle(
-                                      fontSize: 11,
-                                      height: 1.35,
-                                      color: theme.colorScheme.primary,
-                                      fontWeight: FontWeight.w500,
+                                      fontSize: 10,
+                                      color: theme.colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 6),
+
+                            // 作品名
+                            Text(
+                              item.preferredName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: theme.textTheme.titleMedium?.color,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+
+                            // 评分
+                            if (item.ratingScore > 0)
+                              Row(
+                                children: [
+                                  const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    item.ratingScore.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.amber,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '(${item.votes}人评)',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                            // 核心：弹性填充间隙，将推荐理由气泡推至最底部与左侧海报底沿平齐
+                            const Spacer(),
+
+                            // 显式推荐理由气泡
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary.withAlpha(isDark ? 22 : 12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '💡 ',
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      current.reason,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        height: 1.35,
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

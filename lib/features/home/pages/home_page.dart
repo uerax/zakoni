@@ -96,7 +96,10 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
       return Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
-          child: shelf,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: shelf,
+          ),
         ),
       );
     }
@@ -364,7 +367,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                 ),
               ),
 
-              // 顶部新番周历与算法推荐：响应式双模式（宽屏模式下左右分栏，窄屏模式下纵向流）
+              // 顶部新番每日放送与算法推荐：响应式双模式（宽屏模式下左右分栏，窄屏模式下纵向流）
               SliverToBoxAdapter(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -606,15 +609,15 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
           ),
           // 3 行独立货架骨架流光
           SliverToBoxAdapter(
-            child: buildShelfSkeletonRow('TV 番剧'),
+            child: _buildResponsiveShelf(buildShelfSkeletonRow('TV 番剧')),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 12)),
           SliverToBoxAdapter(
-            child: buildShelfSkeletonRow('剧场版'),
+            child: _buildResponsiveShelf(buildShelfSkeletonRow('剧场版')),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 12)),
           SliverToBoxAdapter(
-            child: buildShelfSkeletonRow('OVA 特别篇'),
+            child: _buildResponsiveShelf(buildShelfSkeletonRow('OVA 特别篇')),
           ),
 
           if (_showExploreSection) ...[
