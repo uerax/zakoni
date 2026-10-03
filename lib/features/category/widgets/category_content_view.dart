@@ -156,9 +156,19 @@ class CategoryContentView extends ConsumerWidget {
                 (context, index) {
                   final item = items[index];
                   final row = index ~/ count;
-                  // 对齐 Animaku 梯形资源调度：首排 0ms 直出，后续排次阶梯错峰 35ms 递增，
-                  // 避免同屏 15+ 张图片瞬间同时调用磁盘 I/O 与 CPU 解码导致丢帧
-                  final delayMs = row == 0 ? 0 : (row * 35).clamp(0, 140);
+                  // 对齐 Animaku 资源调度策略：
+                  // 1. 前 2 个核心卡片 (index < 2) 0ms 独占带宽极速直出，让首屏顶部瞬时点亮；
+                  // 2. 其余卡片先保持干净置白骨架占位，避免全屏 10+ 张封面同时并发请求争抢网络带宽导致整体卡顿；
+                  // 3. 随后按排次梯度错峰加载（首排剩余 100ms，后续每排递增 130ms，上限 600ms），逐排平滑淡入刷出。
+                  final int delayMs;
+                  if (index < 2) {
+                    delayMs = 0;
+                  } else if (row == 0) {
+                    delayMs = 100;
+                  } else {
+                    delayMs = (100 + row * 130).clamp(0, 600);
+                  }
+
                   return AnimeCard(
                     key: ValueKey('anime_cat_${item.id}'),
                     item: item,

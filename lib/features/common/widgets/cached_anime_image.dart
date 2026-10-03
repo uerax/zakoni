@@ -107,8 +107,8 @@ class _CachedAnimeImageState extends State<CachedAnimeImage> {
       alignment: widget.alignment,
       memCacheWidth: widget.resizeWidth,
       filterQuality: FilterQuality.medium,
-      fadeInDuration: const Duration(milliseconds: 100),
-      fadeOutDuration: const Duration(milliseconds: 100),
+      fadeInDuration: const Duration(milliseconds: 180),
+      fadeOutDuration: const Duration(milliseconds: 180),
       useOldImageOnUrlChange: true,
       placeholder: (context, url) => _buildPlaceholder(context, theme),
       errorWidget: (context, url, error) => _buildPlaceholder(
