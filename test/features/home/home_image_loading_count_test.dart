@@ -99,7 +99,7 @@ void main() {
       final count = find.byType(CachedAnimeImage).evaluate().length;
       final shelves = find.byType(AnimeHorizontalShelf).evaluate().length;
       debugPrint('[iPhone 390x844] 首次打开挂载图片数: $count (横向货架挂载数: $shelves)');
-      expect(count, inInclusiveRange(7, 9));
+      expect(count, inInclusiveRange(8, 11));
     });
 
     testWidgets('360x800 (典型中端 Android 手机)', (WidgetTester tester) async {
@@ -118,7 +118,7 @@ void main() {
       final count = find.byType(CachedAnimeImage).evaluate().length;
       final shelves = find.byType(AnimeHorizontalShelf).evaluate().length;
       debugPrint('[Android 360x800] 首次打开挂载图片数: $count (横向货架挂载数: $shelves)');
-      expect(count, inInclusiveRange(6, 8));
+      expect(count, inInclusiveRange(7, 10));
     });
 
     testWidgets('412x915 (大屏旗舰机 Pixel 8 Pro / Galaxy Ultra)', (WidgetTester tester) async {

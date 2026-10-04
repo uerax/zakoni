@@ -87,7 +87,8 @@ void main() {
 
       expect(find.text('继续追番'), findsOneWidget);
       expect(find.text('Frieren 中文'), findsOneWidget);
-      expect(find.textContaining('第 8 话 · 18:23 / 24:00'), findsOneWidget);
+      expect(find.textContaining('第 8 话'), findsOneWidget);
+      expect(find.textContaining('72%'), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
     });
   });

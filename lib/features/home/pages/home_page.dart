@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../../../core/models/bangumi/bangumi_calendar.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
+import '../../../core/models/history/watch_history_item.dart';
 import '../../../core/models/home/recommend_item.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/services/daily_recommend_service.dart';
+import '../../../core/services/watch_history_service.dart';
 import '../../../core/utils/responsive.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
+import '../../history/pages/history_page.dart';
 import '../../search/pages/search_page.dart';
 import '../widgets/continue_watching_shelf.dart';
 import '../widgets/daily_spotlight_card.dart';
@@ -16,6 +19,17 @@ import '../widgets/home_desktop_hero.dart';
 import '../widgets/home_top_bar.dart';
 import '../widgets/rank_horizontal_section.dart';
 import '../widgets/today_anime_shelf.dart';
+
+typedef _HomeData = ({
+  List<BangumiCalendarDay> calendarDays,
+  List<BangumiItem> today,
+  String weekdayName,
+  List<RecommendItem> recommendations,
+  List<WatchHistoryItem> watchHistory,
+  List<BangumiItem> tv,
+  List<BangumiItem> movies,
+  List<BangumiItem> ova,
+});
 
 class HomePage extends StatefulWidget {
   final BangumiClient client;
@@ -35,15 +49,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   // 业务配置：精选探索模块预留开关（后续完善后可直接切为 true 开启）
   static const bool _showExploreSection = false;
 
-  late Future<({
-    List<BangumiCalendarDay> calendarDays,
-    List<BangumiItem> today,
-    String weekdayName,
-    List<RecommendItem> recommendations,
-    List<BangumiItem> tv,
-    List<BangumiItem> movies,
-    List<BangumiItem> ova,
-  })> _dataFuture;
+  late Future<_HomeData> _dataFuture;
 
   final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier<double>(0.0);
   bool _isTopBarVisible = true;
@@ -106,17 +112,11 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
     return shelf;
   }
 
-  Future<({
-    List<BangumiCalendarDay> calendarDays,
-    List<BangumiItem> today,
-    String weekdayName,
-    List<RecommendItem> recommendations,
-    List<BangumiItem> tv,
-    List<BangumiItem> movies,
-    List<BangumiItem> ova,
-  })> _fetchHomeData({
+  Future<_HomeData> _fetchHomeData({
     bool forceRefresh = false,
   }) async {
+    final watchHistoryFuture = WatchHistoryService.getHistory();
+
     final results = await Future.wait([
       widget.client.getCalendar(forceRefresh: forceRefresh),
       widget.client.getTrending(limit: 18, forceRefresh: forceRefresh),
@@ -158,11 +158,14 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
       forceRefresh: forceRefresh,
     );
 
+    final watchHistory = await watchHistoryFuture;
+
     return (
       calendarDays: calendarDays,
       today: todayItems,
       weekdayName: weekdayName,
       recommendations: recommendations,
+      watchHistory: watchHistory,
       tv: tv,
       movies: movies,
       ova: ova,
@@ -279,15 +282,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _buildAnimeContent(BuildContext context, ThemeData theme, double safeTop) {
-    return FutureBuilder<({
-      List<BangumiCalendarDay> calendarDays,
-      List<BangumiItem> today,
-      String weekdayName,
-      List<RecommendItem> recommendations,
-      List<BangumiItem> tv,
-      List<BangumiItem> movies,
-      List<BangumiItem> ova,
-    })>(
+    return FutureBuilder<_HomeData>(
       future: _dataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -331,6 +326,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         final today = data?.today ?? [];
         final weekdayName = data?.weekdayName ?? '今日';
         final recommendations = data?.recommendations ?? [];
+        final watchHistory = data?.watchHistory ?? [];
         final tv = data?.tv ?? [];
         final movies = data?.movies ?? [];
         final ova = data?.ova ?? [];
@@ -363,7 +359,19 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
               // 继续追番模块（数据驱动，无记录时 0 像素折叠隐身）
               SliverToBoxAdapter(
                 child: _buildResponsiveShelf(
-                  const ContinueWatchingShelf(records: []),
+                  ContinueWatchingShelf(
+                    records: watchHistory,
+                    onResumeWatch: (record) {
+                      showAnimeDetailSheet(context, record.toBangumiItem());
+                    },
+                    onViewAllHistory: () {
+                      Navigator.of(context).push(
+                        CupertinoPageRoute(
+                          builder: (context) => const HistoryPage(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
 

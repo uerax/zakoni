@@ -23,6 +23,7 @@ class AppPreferences {
   static const _kWallpaperOpacity = 'pref_wallpaper_opacity';
   static const _kWallpaperBlur = 'pref_wallpaper_blur';
   static const _kSearchHistory = 'pref_search_history';
+  static const _kWatchHistory = 'pref_watch_history';
   static const _kDeviceInstallId = 'pref_device_install_id';
 
   static SharedPreferences? _prefs;
@@ -175,6 +176,20 @@ class AppPreferences {
 
   static Future<void> saveSearchHistory(List<String> history) async {
     await _prefs?.setStringList(_kSearchHistory, history);
+  }
+
+  // --- 播放历史持久化 ---
+
+  static String? getWatchHistoryJson() {
+    return _prefs?.getString(_kWatchHistory);
+  }
+
+  static Future<void> saveWatchHistoryJson(String jsonStr) async {
+    await _prefs?.setString(_kWatchHistory, jsonStr);
+  }
+
+  static Future<void> clearWatchHistory() async {
+    await _prefs?.remove(_kWatchHistory);
   }
 
   // --- 设备唯一标识持久化（用于每日推荐确定性种子生成） ---

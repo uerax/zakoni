@@ -1,33 +1,48 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
+import '../../../core/models/history/watch_history_item.dart';
+import '../../../core/utils/responsive.dart';
 import '../../common/widgets/bouncing_scale_card.dart';
 import '../../common/widgets/cached_anime_image.dart';
 
-/// 播放进度记录实体：
-/// 用于表达用户最近观看的集数进度与时间，供“继续追番”模块消费。
-class WatchProgressItem {
-  final BangumiItem item;
-  final int episodeNumber;
-  final double progress; // 0.0 ~ 1.0
-  final String positionText; // "18:24 / 24:00"
-  final DateTime lastWatchTime;
+/// 播放进度记录实体（向后兼容封装，底层统一使用 core 层 WatchHistoryItem）：
+class WatchProgressItem extends WatchHistoryItem {
+  final String? _customPositionText;
 
-  const WatchProgressItem({
-    required this.item,
-    required this.episodeNumber,
-    required this.progress,
-    required this.positionText,
-    required this.lastWatchTime,
-  });
+  WatchProgressItem({
+    required BangumiItem item,
+    required int episodeNumber,
+    required double progress,
+    required String positionText,
+    required DateTime lastWatchTime,
+    super.pluginName = '默认源',
+    super.road = 0,
+    super.pageUrl = '',
+  })  : _customPositionText = positionText,
+        super(
+          id: WatchHistoryItem.buildId(item.id, episodeNumber),
+          bangumiId: item.id,
+          title: item.preferredName,
+          cover: item.thumbnailUrl.isNotEmpty ? item.thumbnailUrl : item.coverUrl,
+          episode: episodeNumber,
+          position: progress * 1440,
+          duration: 1440,
+          updatedAt: lastWatchTime.millisecondsSinceEpoch,
+        );
+
+  @override
+  String get positionText => _customPositionText ?? super.positionText;
 }
 
-/// 首页“继续追番”模块：
+/// 首页“继续追番”模块（现代响应式静态平铺设计）：
 /// 1. 数据驱动：当 records 为空时直接返回 SizedBox.shrink()，0 像素占位，零视觉副作用；
-/// 2. 紧凑横卡：单张卡片控制在 74px 高度，左侧缩略封面 + 右侧剧集名称/进度条，紧凑且信息明确；
-/// 3. 支持点击直达播放，桌面端支持鼠标 Hover 播放光标动效。
+/// 2. 彻底消除横滑手势竞争：移除水平 ListView，采用响应式静态平铺 Row，杜绝移动端（特别是 iOS）垂直滚动误触；
+/// 3. 多端阶梯列数：手机端展示前 2 部平铺一屏，平板端展示 3 部，PC 桌面大屏展示 4 部；
+/// 4. 轻量化卡片设计：单张控制在 68px 高度，左侧 2:3 缩略微海报 + 右侧剧集名称/高亮视频源/纤细进度条；
+/// 5. 支持点击直达播放/详情，右上角统一挂载「历史记录 >」入口引导。
 class ContinueWatchingShelf extends StatelessWidget {
-  final List<WatchProgressItem> records;
-  final ValueChanged<WatchProgressItem>? onResumeWatch;
+  final List<WatchHistoryItem> records;
+  final ValueChanged<WatchHistoryItem>? onResumeWatch;
   final VoidCallback? onViewAllHistory;
 
   const ContinueWatchingShelf({
@@ -46,78 +61,108 @@ class ContinueWatchingShelf extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 标题行
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.play_circle_outline_rounded,
-                  size: 18,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 7),
-                Text(
-                  '继续追番',
-                  style: TextStyle(
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
-                    color: theme.textTheme.titleMedium?.color,
-                  ),
-                ),
-                const Spacer(),
-                if (onViewAllHistory != null)
-                  InkWell(
-                    onTap: onViewAllHistory,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '历史记录',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            size: 16,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        // 依据屏幕宽度响应式决定展示卡片数量与列宽：
+        // 手机端 (< 600px)：平铺展示最新 2 部
+        // 平板端 (600 ~ 840px)：平铺展示最新 3 部
+        // 桌面大屏 (>= 840px)：平铺展示最新 4 部
+        final int maxColumns = screenWidth >= AppBreakpoints.medium
+            ? 4
+            : (screenWidth >= AppBreakpoints.compact ? 3 : 2);
+
+        final displayItems = records.take(maxColumns).toList();
+        if (displayItems.isEmpty) return const SizedBox.shrink();
+
+        const double gap = 8.0;
+        final double availableWidth = screenWidth - 32.0;
+        final double cardWidth = ((availableWidth - gap * (maxColumns - 1)) / maxColumns)
+            .floorToDouble()
+            .clamp(140.0, 320.0);
+        const double cardHeight = 68.0;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 标题行
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.play_circle_outline_rounded,
+                      size: 16.5,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '继续追番',
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
+                        color: theme.textTheme.titleMedium?.color,
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
+                    const Spacer(),
+                    if (onViewAllHistory != null)
+                      InkWell(
+                        onTap: onViewAllHistory,
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '历史记录',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 16,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
 
-          // 卡片横向滑动列表
-          SizedBox(
-            height: 76,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: records.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final record = records[index];
-                return _buildWatchCard(context, theme, isDark, record);
-              },
-            ),
+              // 响应式静态平铺行（零横向滚动，彻底杜绝手势竞争与误触）
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < displayItems.length; i++) ...[
+                      if (i > 0) const SizedBox(width: gap),
+                      SizedBox(
+                        width: cardWidth,
+                        height: cardHeight,
+                        child: _buildWatchCard(
+                          context,
+                          theme,
+                          isDark,
+                          displayItems[i],
+                          cardHeight: cardHeight,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -125,107 +170,146 @@ class ContinueWatchingShelf extends StatelessWidget {
     BuildContext context,
     ThemeData theme,
     bool isDark,
-    WatchProgressItem record,
-  ) {
-    final item = record.item;
+    WatchHistoryItem record, {
+    required double cardHeight,
+  }) {
+    final coverUrl = (record.cover != null && record.cover!.isNotEmpty)
+        ? record.cover!
+        : (record.item.thumbnailUrl.isNotEmpty ? record.item.thumbnailUrl : record.item.coverUrl);
+    final displayTitle = record.title.isNotEmpty ? record.title : record.item.preferredName;
 
     return BouncingScaleCard(
       onTap: () => onResumeWatch?.call(record),
       child: Container(
-        width: 220,
-        height: 76,
-        padding: const EdgeInsets.all(7),
+        height: cardHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
         decoration: BoxDecoration(
           color: isDark
-              ? const Color(0xFF1E1E22).withAlpha(220)
-              : Colors.white.withAlpha(240),
-          borderRadius: BorderRadius.circular(10),
+              ? const Color(0xFF1E1E22).withAlpha(190)
+              : Colors.white.withAlpha(225),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isDark
-                ? Colors.white.withAlpha(20)
-                : Colors.black.withAlpha(14),
-            width: 1,
+                ? Colors.white.withAlpha(16)
+                : Colors.black.withAlpha(12),
+            width: 0.8,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(isDark ? 40 : 10),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+              color: Colors.black.withAlpha(isDark ? 28 : 8),
+              blurRadius: 4,
+              offset: const Offset(0, 1.5),
             ),
           ],
         ),
         child: Row(
           children: [
-            // 封面与播放微胶囊
+            // 封面与播放微胶囊（紧凑 38x54 尺寸）
             ClipRRect(
-              borderRadius: BorderRadius.circular(7),
+              borderRadius: BorderRadius.circular(5),
               child: SizedBox(
-                width: 48,
-                height: 62,
+                width: 38,
+                height: 54,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
                     CachedAnimeImage(
-                      imageUrl: item.thumbnailUrl.isNotEmpty
-                          ? item.thumbnailUrl
-                          : item.coverUrl,
+                      imageUrl: coverUrl,
                       fit: BoxFit.cover,
                     ),
-                    ColoredBox(color: Colors.black.withAlpha(35)),
+                    ColoredBox(color: Colors.black.withAlpha(28)),
                     const Center(
                       child: Icon(
                         Icons.play_arrow_rounded,
                         color: Colors.white,
-                        size: 22,
+                        size: 18,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
 
-            // 信息与进度条
+            // 信息、高亮视频源与轻量进度条
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.preferredName,
+                    displayTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: theme.textTheme.titleSmall?.color,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '看到第 ${record.episodeNumber} 话 · ${record.positionText}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-
-                  // 紧凑播放进度条
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(2),
-                    child: LinearProgressIndicator(
-                      value: record.progress.clamp(0.0, 1.0),
-                      minHeight: 3.5,
-                      backgroundColor: isDark
-                          ? Colors.white.withAlpha(30)
-                          : Colors.black.withAlpha(20),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        theme.colorScheme.primary,
+                  const SizedBox(height: 2.5),
+                  Row(
+                    children: [
+                      Text(
+                        '第 ${record.episode} 话',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
+                      if (record.pluginName.isNotEmpty && record.pluginName != '默认源') ...[
+                        Text(
+                          ' · ',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSurfaceVariant.withAlpha(120),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            record.pluginName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+
+                  // 纤细进度条与百分比
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(1.5),
+                          child: LinearProgressIndicator(
+                            value: record.progress.clamp(0.0, 1.0),
+                            minHeight: 2.5,
+                            backgroundColor: isDark
+                                ? Colors.white.withAlpha(24)
+                                : Colors.black.withAlpha(16),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        '${(record.progress * 100).toInt()}%',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
