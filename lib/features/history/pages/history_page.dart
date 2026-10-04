@@ -309,7 +309,12 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
       onDismissed: (_) => _deleteItem(item),
       child: BouncingScaleCard(
-        onTap: () => showAnimeDetailSheet(context, item.toBangumiItem()),
+        onTap: () => navigateToVideoPlayer(
+          context,
+          item.toBangumiItem(),
+          initialPosition: Duration(seconds: item.position.toInt()),
+          currentEpisode: item.episode,
+        ),
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(

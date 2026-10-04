@@ -1,8 +1,30 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/utils/responsive.dart';
+import '../../player/player.dart';
 import 'bouncing_scale_card.dart';
 import 'cached_anime_image.dart';
+
+/// 跳转至视频播放页面
+void navigateToVideoPlayer(
+  BuildContext context,
+  BangumiItem item, {
+  Duration? initialPosition,
+  int? currentEpisode,
+}) {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (context) => VideoPlayPage(
+        title: item.preferredName,
+        bangumiItem: item,
+        coverUrl: item.coverUrl,
+        episodeCount: item.eps > 0 ? item.eps : 12,
+        currentEpisode: currentEpisode,
+        initialPosition: initialPosition,
+      ),
+    ),
+  );
+}
 
 class AnimeCard extends StatelessWidget {
   final BangumiItem item;
@@ -25,7 +47,7 @@ class AnimeCard extends StatelessWidget {
     final bottomStat = _resolveBottomStat();
 
     return BouncingScaleCard(
-      onTap: onTap ?? () => showAnimeDetailSheet(context, item),
+      onTap: onTap ?? () => navigateToVideoPlayer(context, item),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(compact ? 8 : 12),
@@ -378,6 +400,19 @@ class _AnimeDetailContent extends StatelessWidget {
             }).toList(),
           ),
         ],
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: FilledButton.icon(
+            icon: const Icon(Icons.play_arrow_rounded, size: 22),
+            label: const Text('立即播放', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            onPressed: () {
+              Navigator.of(context).pop();
+              navigateToVideoPlayer(context, item);
+            },
+          ),
+        ),
       ],
     );
   }

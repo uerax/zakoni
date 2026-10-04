@@ -1,0 +1,599 @@
+import 'dart:async';
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:zakoni/features/player/danmaku/core/danmaku_controller.dart';
+import 'package:zakoni/features/player/danmaku/core/danmaku_entry.dart';
+import 'package:zakoni/features/player/danmaku/core/danmaku_scroll_track.dart';
+import 'package:zakoni/features/player/danmaku/models/danmaku_item.dart';
+import 'package:zakoni/features/player/danmaku/utils/danmaku_text_normalizer.dart';
+import 'package:zakoni/features/player/danmaku/view/danmaku_text_layout.dart';
+
+const double _kBaseDanmakuPx = 20.0;
+const double _kTrackSpacing = 1.15;
+const double _kTopDurationMs = 5000.0;
+const double _kBottomDurationMs = 5000.0;
+const double _kScrollBaseDurationMs = 8500.0;
+const double _kSeekThresholdMs = 1200.0;
+
+/// 高性能纯 Flutter Canvas 弹幕渲染组件
+/// 支持飞行中动态吸收合流 (xN)、微秒级时钟插值、防追尾轨道算法与智能休眠节电
+class DanmakuView extends StatefulWidget {
+  const DanmakuView({
+    super.key,
+    required this.controller,
+    this.fontFamily,
+  });
+
+  final DanmakuController controller;
+  final String? fontFamily;
+
+  @override
+  State<DanmakuView> createState() => _DanmakuViewState();
+}
+
+class _DanmakuViewState extends State<DanmakuView>
+    with SingleTickerProviderStateMixin
+    implements DanmakuListener {
+  late final Ticker _ticker;
+  final ValueNotifier<int> _repaintNotifier = ValueNotifier<int>(0);
+
+  final List<DanmakuEntry> _activeEntries = <DanmakuEntry>[];
+  List<DanmakuScrollTrack> _scrollTracks = const [];
+  List<double> _topBusyUntil = const [];
+  List<double> _bottomBusyUntil = const [];
+
+  Timer? _wakeTimer;
+  int _cursor = 0;
+  double _clockMs = 0.0;
+  Duration _lastElapsed = Duration.zero;
+
+  double _viewWidth = 0.0;
+  double _viewHeight = 0.0;
+  double _lineHeight = 24.0;
+  double _nextExpiryMs = double.infinity;
+  int _scrollingCount = 0;
+
+  DanmakuController get _controller => widget.controller;
+  bool get _hasViewport => _viewWidth > 0 && _viewHeight > 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker(_onTick);
+    _controller.attach(this);
+    if (_controller.playing) {
+      _scheduleWork();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant DanmakuView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller.detach(this);
+      _clearActive();
+      widget.controller.attach(this);
+      _cursor = _lowerBound(_controller.items, _clockMs);
+      _scheduleWork();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.detach(this);
+    _stopWork();
+    _clearActive();
+    _ticker.dispose();
+    _repaintNotifier.dispose();
+    super.dispose();
+  }
+
+  // ==========================
+  // 时钟驱动与低功耗状态机
+  // ==========================
+
+  void _onTick(Duration elapsed) {
+    final delta = elapsed - _lastElapsed;
+    _lastElapsed = elapsed;
+    if (delta <= Duration.zero) return;
+
+    // 1. 微秒级连续平滑时间插值推进
+    _clockMs += (delta.inMicroseconds / 1000.0) * _controller.playbackRate;
+
+    // 2. 发射到期弹幕（带动态合流与入场调度）
+    _emitDue();
+
+    // 3. 淘汰出界弹幕
+    _expire();
+
+    // 4. 重绘通知
+    if (_scrollingCount > 0) {
+      _repaintNotifier.value++;
+    } else {
+      // 5. 无滚动弹幕时立刻挂起 Ticker，进入休眠省电状态
+      _scheduleWork();
+    }
+  }
+
+  void _scheduleWork({bool forceWake = false}) {
+    if (!_controller.playing || !_hasViewport || !mounted) {
+      _stopWork();
+      return;
+    }
+
+    // 若屏幕上有正在移动的滚动弹幕，必须保持 Ticker 60/120fps 运转
+    if (_scrollingCount > 0) {
+      _wakeTimer?.cancel();
+      _wakeTimer = null;
+      if (!_ticker.isActive) {
+        _lastElapsed = Duration.zero;
+        _ticker.start();
+      }
+      return;
+    }
+
+    // 无活动滚动弹幕：停止 Ticker
+    _ticker.stop();
+
+    // 计算下一个需要唤醒的时刻（下一条待发射的时刻，或当前固定弹幕的最早消失时刻）
+    final items = _controller.items;
+    final nextItemMs = _cursor < items.length
+        ? items[_cursor].timeMs.toDouble()
+        : double.infinity;
+    final nextWakeMs = math.min(nextItemMs, _nextExpiryMs);
+
+    if (!nextWakeMs.isFinite) {
+      _wakeTimer?.cancel();
+      _wakeTimer = null;
+      return;
+    }
+
+    final rate = _controller.playbackRate;
+    final delayMs = math.max(0.0, (nextWakeMs - _clockMs) / rate);
+
+    _wakeTimer?.cancel();
+    _wakeTimer = Timer(
+      Duration(milliseconds: math.max(1, delayMs.ceil())),
+      () {
+        _wakeTimer = null;
+        if (!_controller.playing || !mounted) return;
+        _clockMs = math.max(_clockMs, nextWakeMs);
+        _emitDue();
+        _expire();
+        _scheduleWork();
+      },
+    );
+  }
+
+  void _stopWork() {
+    _wakeTimer?.cancel();
+    _wakeTimer = null;
+    if (_ticker.isActive) {
+      _ticker.stop();
+    }
+  }
+
+  // ==========================
+  // 弹幕发射与动态合流逻辑
+  // ==========================
+
+  void _emitDue() {
+    if (!_hasViewport || !_controller.settings.enabled) return;
+    final items = _controller.items;
+    final initialCount = _activeEntries.length;
+
+    while (_cursor < items.length && items[_cursor].timeMs <= _clockMs) {
+      _tryEmit(items[_cursor]);
+      _cursor++;
+    }
+
+    if (_activeEntries.length != initialCount) {
+      _repaintNotifier.value++;
+    }
+  }
+
+  void _tryEmit(DanmakuItem item, {bool checkFilter = true}) {
+    if (!_hasViewport) return;
+    final settings = _controller.settings;
+
+    if (checkFilter) {
+      if (!settings.enabled) return;
+      if (_controller.isBlocked(item.text)) return;
+      if (item.mode == DanmakuMode.scroll && settings.hideScroll) return;
+      if (item.mode == DanmakuMode.top && settings.hideTop) return;
+      if (item.mode == DanmakuMode.bottom && settings.hideBottom) return;
+    }
+
+    // === 核心算法：In-Flight 飞行中动态合流 (animaku 经典算法) ===
+    if (tryMergeInFlight(item, _clockMs, _viewWidth)) {
+      // 成功被屏幕上飞行的同类弹幕吸收，不再分配新轨道
+      return;
+    }
+
+    // 无法合流，进入轨道分配流程
+    switch (item.mode) {
+      case DanmakuMode.scroll:
+        _emitScroll(item);
+      case DanmakuMode.top:
+        _emitFixed(item, isTop: true);
+      case DanmakuMode.bottom:
+        _emitFixed(item, isTop: false);
+    }
+  }
+
+  /// 飞行中动态合流判定
+  bool tryMergeInFlight(DanmakuItem incoming, double nowMs, double viewWidth) {
+    final normKey = DanmakuTextNormalizer.normalize(incoming.text);
+    if (normKey.isEmpty) return false;
+
+    for (var i = 0; i < _activeEntries.length; i++) {
+      final active = _activeEntries[i];
+      if (active.mode != incoming.mode) continue;
+      if (DanmakuTextNormalizer.normalize(active.baseText) != normKey) continue;
+
+      final ageMs = nowMs - active.startMs;
+      if (ageMs < 0 || ageMs >= active.durationMs) continue;
+
+      // 滚动弹幕：必须确保其尾部还没有越过屏幕左侧边缘
+      if (active.mode == DanmakuMode.scroll) {
+        final currentX = viewWidth - (ageMs / active.durationMs) * (viewWidth + active.layout.size.width);
+        if (currentX + active.layout.size.width < 20.0) continue;
+      }
+
+      // === 原地吸收 ===
+      active.count++;
+      final oldWidth = active.layout.size.width;
+      active.layout.updateText('${active.baseText} ×${active.count}');
+      final newWidth = active.layout.size.width;
+
+      // === 头部 X 坐标 0 像素跳动补偿 ===
+      if (active.mode == DanmakuMode.scroll) {
+        final pathOld = viewWidth + oldWidth;
+        final pathNew = viewWidth + newWidth;
+        if (pathOld > 0 && pathNew > 0) {
+          final adjustedAge = ageMs * (pathOld / pathNew);
+          active.startMs = nowMs - adjustedAge;
+          active.speed = pathNew / active.durationMs;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  void _emitScroll(DanmakuItem item) {
+    if (_scrollTracks.isEmpty) return;
+    final settings = _controller.settings;
+    final durationMs = math.max(1000.0, _kScrollBaseDurationMs / settings.speed);
+    final fontPx = _calculateCalculatedFontSize();
+
+    DanmakuTextLayout? layout;
+
+    // 尝试在所有可用轨道中找到不发生追尾的轨道
+    for (var i = 0; i < _scrollTracks.length; i++) {
+      final track = _scrollTracks[i];
+      layout ??= DanmakuTextLayout(
+        text: item.text,
+        color: settings.hideColor ? Colors.white : item.color,
+        fontSize: fontPx,
+        strokeWidth: settings.strokeWidth,
+        fontFamily: widget.fontFamily,
+      );
+
+      final speed = (_viewWidth + layout.size.width) / durationMs;
+      if (!track.canAccept(_clockMs, speed, _viewWidth)) {
+        continue;
+      }
+
+      final entry = DanmakuEntry(
+        item: item,
+        track: i,
+        startMs: _clockMs,
+        durationMs: durationMs,
+        speed: speed,
+        x: _viewWidth,
+        y: i * _lineHeight * _kTrackSpacing,
+        baseText: item.text,
+        layout: layout,
+      );
+
+      _activeEntries.add(entry);
+      _scrollingCount++;
+      _nextExpiryMs = math.min(_nextExpiryMs, entry.endMs);
+      track.register(
+        startMs: entry.startMs,
+        width: layout.size.width,
+        speed: speed,
+        viewWidth: _viewWidth,
+      );
+      return;
+    }
+
+    // 所有轨道均饱和，释放未发射的排版对象
+    layout?.dispose();
+  }
+
+  void _emitFixed(DanmakuItem item, {required bool isTop}) {
+    final busyList = isTop ? _topBusyUntil : _bottomBusyUntil;
+    if (busyList.isEmpty) return;
+
+    var targetTrack = -1;
+    for (var i = 0; i < busyList.length; i++) {
+      if (_clockMs >= busyList[i]) {
+        targetTrack = i;
+        break;
+      }
+    }
+    if (targetTrack < 0) return; // 对应固定轨道已满
+
+    final settings = _controller.settings;
+    final durationMs = isTop ? _kTopDurationMs : _kBottomDurationMs;
+    final fontPx = _calculateCalculatedFontSize();
+
+    final layout = DanmakuTextLayout(
+      text: item.text,
+      color: settings.hideColor ? Colors.white : item.color,
+      fontSize: fontPx,
+      strokeWidth: settings.strokeWidth,
+      fontFamily: widget.fontFamily,
+    );
+
+    busyList[targetTrack] = _clockMs + durationMs;
+
+    final entry = DanmakuEntry(
+      item: item,
+      track: targetTrack,
+      startMs: _clockMs,
+      durationMs: durationMs,
+      speed: 0.0,
+      x: math.max(0.0, (_viewWidth - layout.size.width) / 2.0),
+      y: isTop
+          ? targetTrack * _lineHeight * _kTrackSpacing
+          : _viewHeight - (targetTrack + 1) * _lineHeight * _kTrackSpacing,
+      baseText: item.text,
+      layout: layout,
+    );
+
+    _activeEntries.add(entry);
+    _nextExpiryMs = math.min(_nextExpiryMs, entry.endMs);
+  }
+
+  void _expire() {
+    if (_clockMs < _nextExpiryMs) return;
+    var next = double.infinity;
+    _activeEntries.removeWhere((entry) {
+      if (_clockMs < entry.endMs) {
+        next = math.min(next, entry.endMs);
+        return false;
+      }
+      if (entry.mode == DanmakuMode.scroll) {
+        _scrollingCount--;
+      }
+      entry.dispose();
+      return true;
+    });
+    _nextExpiryMs = next;
+    _repaintNotifier.value++;
+  }
+
+  // ==========================
+  // 视口响应与字号计算
+  // ==========================
+
+  void _updateViewport(BoxConstraints constraints) {
+    final w = constraints.maxWidth;
+    final h = constraints.maxHeight;
+    if (w == _viewWidth && h == _viewHeight) return;
+
+    _viewWidth = w;
+    _viewHeight = h;
+    if (!_hasViewport) return;
+
+    _rebuildTracks();
+    _scheduleWork();
+  }
+
+  /// 核心细节：移动端横屏基于“短边高度”限高，彻底杜绝全屏大字糊屏
+  double _calculateCalculatedFontSize() {
+    final settings = _controller.settings;
+    final baseScale = settings.fontSizeScale;
+
+    // 当处于横屏（宽大于高）且高度小于 600px 时（典型手机横屏全屏模式）
+    if (_viewWidth > _viewHeight && _viewHeight < 600.0) {
+      // animaku 黄金法则：targetPx 在 [11.0, 14.5] 之间，由物理高度严格约束
+      final targetBase = math.min(14.5, math.max(11.0, _viewHeight * 0.032));
+      return targetBase * baseScale;
+    }
+
+    // 桌面端或竖屏模式：基于 20px 基准做平滑比例缩放
+    final scale = math.min(1.2, math.max(0.65, _viewWidth / 720.0));
+    return _kBaseDanmakuPx * scale * baseScale;
+  }
+
+  void _rebuildTracks() {
+    final fontPx = _calculateCalculatedFontSize();
+    _lineHeight = fontPx * 1.35;
+    final availableH = math.max(0.0, _viewHeight * _controller.settings.area);
+    final rowCount = _lineHeight > 0
+        ? (availableH / (_lineHeight * _kTrackSpacing)).floor()
+        : 0;
+
+    _scrollTracks = List.generate(rowCount, (_) => DanmakuScrollTrack());
+    final fixedCount = math.max(1, rowCount ~/ 2);
+    _topBusyUntil = List.filled(fixedCount, -double.infinity);
+    _bottomBusyUntil = List.filled(fixedCount, -double.infinity);
+  }
+
+  void _clearActive() {
+    for (final track in _scrollTracks) {
+      track.reset();
+    }
+    _topBusyUntil.fillRange(0, _topBusyUntil.length, -double.infinity);
+    _bottomBusyUntil.fillRange(0, _bottomBusyUntil.length, -double.infinity);
+
+    for (final entry in _activeEntries) {
+      entry.dispose();
+    }
+    _activeEntries.clear();
+    _scrollingCount = 0;
+    _nextExpiryMs = double.infinity;
+  }
+
+  // ==========================
+  // DanmakuListener 实现
+  // ==========================
+
+  @override
+  void onDanmakuTimeSync(Duration position) {
+    final positionMs = position.inMilliseconds.toDouble();
+    final drift = positionMs - _clockMs;
+
+    // Seek 阈值超过 1.2 秒：认定为用户拖动进度条，执行重置与二分查找重定位
+    if (drift.abs() > _kSeekThresholdMs) {
+      _clockMs = positionMs;
+      _clearActive();
+      _cursor = _lowerBound(_controller.items, positionMs);
+      _repaintNotifier.value++;
+      _emitDue();
+      _scheduleWork(forceWake: true);
+    } else if (_ticker.isActive) {
+      // 微小漂移在每一帧中温和纠偏
+      _clockMs += drift.clamp(-16.0, 16.0);
+    } else {
+      _clockMs = positionMs;
+    }
+  }
+
+  @override
+  void onDanmakuPlaybackRateChanged(double rate) {
+    _scheduleWork(forceWake: true);
+  }
+
+  @override
+  void onDanmakuItemsChanged() {
+    _clearActive();
+    _cursor = _lowerBound(_controller.items, _clockMs);
+    _repaintNotifier.value++;
+    _scheduleWork(forceWake: true);
+  }
+
+  @override
+  void onDanmakuInject(DanmakuItem item) {
+    if (!_hasViewport) return;
+    _tryEmit(item, checkFilter: false);
+    _scheduleWork();
+  }
+
+  @override
+  void onDanmakuSettingsChanged(DanmakuSettings next, DanmakuSettings previous) {
+    if (_hasViewport) {
+      _rebuildTracks();
+    }
+    _repaintNotifier.value++;
+    _scheduleWork(forceWake: true);
+  }
+
+  @override
+  void onDanmakuPause() {
+    _stopWork();
+  }
+
+  @override
+  void onDanmakuResume() {
+    _scheduleWork();
+  }
+
+  @override
+  void onDanmakuReset() {
+    _stopWork();
+    _clearActive();
+    _cursor = 0;
+    _clockMs = 0.0;
+    _repaintNotifier.value++;
+  }
+
+  int _lowerBound(List<DanmakuItem> list, double targetMs) {
+    var min = 0;
+    var max = list.length;
+    while (min < max) {
+      final mid = min + ((max - min) >> 1);
+      if (list[mid].timeMs < targetMs) {
+        min = mid + 1;
+      } else {
+        max = mid;
+      }
+    }
+    return min;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _updateViewport(constraints);
+        return IgnorePointer(
+          child: RepaintBoundary(
+            child: CustomPaint(
+              isComplex: true,
+              willChange: true,
+              painter: _DanmakuPainter(
+                repaint: _repaintNotifier,
+                state: this,
+              ),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 弹幕画布最终绘制器
+class _DanmakuPainter extends CustomPainter {
+  _DanmakuPainter({
+    required Listenable repaint,
+    required this.state,
+  }) : super(repaint: repaint);
+
+  final _DanmakuViewState state;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final now = state._clockMs;
+    final opacity = state._controller.settings.opacity;
+
+    // 当不透明度为 1 时无需 saveLayer，提升绘制效率
+    final needsOpacityLayer = opacity < 0.99;
+    if (needsOpacityLayer) {
+      canvas.saveLayer(
+        Offset.zero & size,
+        Paint()..color = Color.fromRGBO(0, 0, 0, opacity.clamp(0.0, 1.0)),
+      );
+    }
+
+    for (final entry in state._activeEntries) {
+      final double x;
+      if (entry.mode == DanmakuMode.scroll) {
+        x = size.width - (now - entry.startMs) * entry.speed;
+      } else {
+        x = entry.x;
+      }
+
+      final textSize = entry.layout.size;
+      // 视口外剔除，节省 GPU 负担
+      if (x >= size.width || x + textSize.width <= 0) continue;
+      if (entry.y >= size.height || entry.y + textSize.height <= 0) continue;
+
+      entry.layout.paint(canvas, Offset(x, entry.y));
+    }
+
+    if (needsOpacityLayer) {
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DanmakuPainter oldDelegate) => true;
+}

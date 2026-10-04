@@ -217,7 +217,7 @@ class _AnimeHorizontalShelfState extends State<AnimeHorizontalShelf> {
     return Padding(
       padding: const EdgeInsets.only(right: 12),
       child: BouncingScaleCard(
-        onTap: () => showAnimeDetailSheet(context, item),
+        onTap: () => navigateToVideoPlayer(context, item),
         child: SizedBox(
           width: AnimeHorizontalShelf.cardWidth,
           child: Column(

@@ -159,7 +159,12 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
           return ContinueWatchingShelf(
             records: watchHistory,
             onResumeWatch: (record) {
-              showAnimeDetailSheet(context, record.toBangumiItem());
+              navigateToVideoPlayer(
+                context,
+                record.toBangumiItem(),
+                initialPosition: Duration(seconds: record.position.toInt()),
+                currentEpisode: record.episode,
+              );
             },
             onViewAllHistory: () {
               Navigator.of(context).push(

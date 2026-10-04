@@ -1,0 +1,116 @@
+import 'package:flutter/material.dart';
+
+/// 播放器低频核心状态（仅在宏观状态变化时触发更新）
+@immutable
+class PlaybackCoreState {
+  const PlaybackCoreState({
+    this.playing = false,
+    this.loading = true,
+    this.buffering = false,
+    this.completed = false,
+    this.playbackRate = 1.0,
+    this.volume = 1.0,
+    this.muted = false,
+    this.videoFit = BoxFit.contain,
+    this.errorMessage,
+  });
+
+  /// 是否正在播放
+  final bool playing;
+
+  /// 是否处于首次加载或切集加载状态
+  final bool loading;
+
+  /// 是否正在缓冲卡顿
+  final bool buffering;
+
+  /// 视频是否已播放完毕
+  final bool completed;
+
+  /// 播放倍速 (0.5 ~ 3.0)
+  final double playbackRate;
+
+  /// 音量大小 (0.0 ~ 1.0)
+  final double volume;
+
+  /// 是否静音
+  final bool muted;
+
+  /// 画面缩放模式
+  final BoxFit videoFit;
+
+  /// 错误提示信息
+  final String? errorMessage;
+
+  bool get hasError => errorMessage != null && errorMessage!.isNotEmpty;
+
+  PlaybackCoreState copyWith({
+    bool? playing,
+    bool? loading,
+    bool? buffering,
+    bool? completed,
+    double? playbackRate,
+    double? volume,
+    bool? muted,
+    BoxFit? videoFit,
+    String? errorMessage,
+    bool clearError = false,
+  }) {
+    return PlaybackCoreState(
+      playing: playing ?? this.playing,
+      loading: loading ?? this.loading,
+      buffering: buffering ?? this.buffering,
+      completed: completed ?? this.completed,
+      playbackRate: playbackRate ?? this.playbackRate,
+      volume: volume ?? this.volume,
+      muted: muted ?? this.muted,
+      videoFit: videoFit ?? this.videoFit,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+    );
+  }
+}
+
+/// 播放器高频时间线状态（250ms 节流触发，专供进度条、时间文字与弹幕时间轴监听）
+@immutable
+class PlaybackTimelineState {
+  const PlaybackTimelineState({
+    this.position = Duration.zero,
+    this.duration = Duration.zero,
+    this.buffer = Duration.zero,
+    this.previewPosition,
+  });
+
+  /// 当前实际播放位置
+  final Duration position;
+
+  /// 视频总时长
+  final Duration duration;
+
+  /// 已缓冲位置
+  final Duration buffer;
+
+  /// 用户拖拽进度条时的预览目标位置（松手前不直接 seek 底层）
+  final Duration? previewPosition;
+
+  /// 是否正在拖拽 Seek 预览
+  bool get isSeekingPreview => previewPosition != null;
+
+  /// 进度条应该显示的最终位置（若在拖拽中优先展示 previewPosition）
+  Duration get displayPosition => previewPosition ?? position;
+
+  PlaybackTimelineState copyWith({
+    Duration? position,
+    Duration? duration,
+    Duration? buffer,
+    Duration? previewPosition,
+    bool clearPreview = false,
+  }) {
+    return PlaybackTimelineState(
+      position: position ?? this.position,
+      duration: duration ?? this.duration,
+      buffer: buffer ?? this.buffer,
+      previewPosition:
+          clearPreview ? null : (previewPosition ?? this.previewPosition),
+    );
+  }
+}

@@ -8,6 +8,7 @@ import '../widgets/appearance_settings_card.dart';
 import '../widgets/cache_settings_card.dart';
 import '../widgets/font_settings_card.dart';
 import '../widgets/network_settings_card.dart';
+import '../widgets/source_settings_card.dart';
 
 class SettingsPage extends StatefulWidget {
   final BangumiClient client;
@@ -76,7 +77,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   // 2. 缓存管理
                   CacheSettingsCard(client: widget.client),
 
-                  // 3. 字体设置
+                  // 3. 视频源与解析器
+                  const SourceSettingsCard(),
+
+                  // 4. 字体设置
                   const FontSettingsCard(),
 
                   // 4. 个性化外观 (图标与壁纸)
