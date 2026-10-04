@@ -265,6 +265,18 @@ class BangumiClient {
       return days;
     } on DioException catch (e) {
       if (_calendarCache.staleValue != null) return _calendarCache.staleValue!;
+      // 特殊处理说明：网络异常（如断网或 TLS 握手失败）时，若内存已无陈旧缓存，优先回退到磁盘缓存，避免主页抛错崩溃
+      final diskData = await _diskCache?.getJson('bangumi_calendar');
+      if (diskData is List) {
+        final days = diskData
+            .whereType<Map<String, dynamic>>()
+            .map((d) => BangumiCalendarDay.fromJson(d))
+            .toList();
+        if (days.isNotEmpty) {
+          _calendarCache.set(days, days.length * 1500);
+          return days;
+        }
+      }
       throw _handleDioError('获取每日放送失败', e);
     }
   }
@@ -354,10 +366,23 @@ class BangumiClient {
     return _trendingCache.staleValue ?? const [];
   }
 
-  /// 获取热门剧场版列表 (带内存缓存)
+  /// 获取热门剧场版列表 (带 12 小时磁盘与内存多级持久化缓存)
   Future<List<BangumiItem>> getHotMovies({int limit = 18, bool forceRefresh = false}) async {
-    if (!forceRefresh && _moviesCache.value != null) {
-      return _moviesCache.value!;
+    if (!forceRefresh) {
+      if (_moviesCache.value != null) {
+        return _moviesCache.value!;
+      }
+      final diskData = await _diskCache?.getJson('bangumi_hot_movies_$limit');
+      if (diskData is List) {
+        final items = diskData
+            .whereType<Map<String, dynamic>>()
+            .map((item) => BangumiItem.fromJson(item))
+            .toList();
+        if (items.isNotEmpty) {
+          _moviesCache.set(items, items.length * 1500);
+          return items;
+        }
+      }
     }
 
     try {
@@ -370,18 +395,51 @@ class BangumiClient {
       );
       if (items.isNotEmpty) {
         _moviesCache.set(items, items.length * 1500);
+        unawaited(_diskCache?.putJson(
+          'bangumi_hot_movies_$limit',
+          items.map((i) => i.toJson()).toList(),
+          maxAge: const Duration(hours: 12),
+        ) ?? Future.value());
         return items;
       }
     } catch (e) {
       developer.log('获取热门剧场版失败: $e');
     }
-    return _moviesCache.staleValue ?? const [];
+
+    if (_moviesCache.staleValue != null) return _moviesCache.staleValue!;
+
+    // 特殊处理说明：网络异常（如 HandshakeException）时，尝试从磁盘缓存兜底，坚决避免返回空列表导致页面货架空白
+    final diskFallback = await _diskCache?.getJson('bangumi_hot_movies_$limit');
+    if (diskFallback is List) {
+      final items = diskFallback
+          .whereType<Map<String, dynamic>>()
+          .map((item) => BangumiItem.fromJson(item))
+          .toList();
+      if (items.isNotEmpty) {
+        return items;
+      }
+    }
+
+    return const [];
   }
 
-  /// 获取热门 OVA 列表 (带 30 分钟内存持久化缓存)
+  /// 获取热门 OVA 列表 (带 12 小时磁盘与内存多级持久化缓存)
   Future<List<BangumiItem>> getHotOva({int limit = 18, bool forceRefresh = false}) async {
-    if (!forceRefresh && _ovaCache.value != null) {
-      return _ovaCache.value!;
+    if (!forceRefresh) {
+      if (_ovaCache.value != null) {
+        return _ovaCache.value!;
+      }
+      final diskData = await _diskCache?.getJson('bangumi_hot_ova_$limit');
+      if (diskData is List) {
+        final items = diskData
+            .whereType<Map<String, dynamic>>()
+            .map((item) => BangumiItem.fromJson(item))
+            .toList();
+        if (items.isNotEmpty) {
+          _ovaCache.set(items, items.length * 1500);
+          return items;
+        }
+      }
     }
 
     try {
@@ -394,12 +452,32 @@ class BangumiClient {
       );
       if (items.isNotEmpty) {
         _ovaCache.set(items, items.length * 1500);
+        unawaited(_diskCache?.putJson(
+          'bangumi_hot_ova_$limit',
+          items.map((i) => i.toJson()).toList(),
+          maxAge: const Duration(hours: 12),
+        ) ?? Future.value());
         return items;
       }
     } catch (e) {
       developer.log('获取热门 OVA 失败: $e');
     }
-    return _ovaCache.staleValue ?? const [];
+
+    if (_ovaCache.staleValue != null) return _ovaCache.staleValue!;
+
+    // 特殊处理说明：网络异常时从磁盘缓存兜底，坚决避免返回空列表导致页面货架空白
+    final diskFallback = await _diskCache?.getJson('bangumi_hot_ova_$limit');
+    if (diskFallback is List) {
+      final items = diskFallback
+          .whereType<Map<String, dynamic>>()
+          .map((item) => BangumiItem.fromJson(item))
+          .toList();
+      if (items.isNotEmpty) {
+        return items;
+      }
+    }
+
+    return const [];
   }
 
   /// 获取番剧条目详情 (带 6 小时内存缓存与 Single-Flight 并发合并)

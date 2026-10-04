@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -47,7 +48,11 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   // 业务配置：精选探索模块预留开关（后续完善后可直接切为 true 开启）
   static const bool _showExploreSection = false;
 
-  late Future<_HomeData> _dataFuture;
+  // Stale-While-Revalidate 机制：保存当前已成功加载的首页数据，
+  // 刷新中或网络失败时保留旧数据平滑呈现，杜绝骨架屏闪烁与清空白屏
+  _HomeData? _homeData;
+  bool _isLoading = false;
+  Object? _error;
 
   final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier<double>(0.0);
   bool _isTopBarVisible = true;
@@ -71,10 +76,42 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
     super.dispose();
   }
 
-  void _loadData({bool forceRefresh = false}) {
+  Future<void> _loadData({bool forceRefresh = false}) async {
+    if (_isLoading) return;
     setState(() {
-      _dataFuture = _fetchHomeData(forceRefresh: forceRefresh);
+      _isLoading = true;
+      if (_homeData == null) {
+        _error = null;
+      }
     });
+
+    try {
+      final data = await _fetchHomeData(forceRefresh: forceRefresh);
+      if (!mounted) return;
+      setState(() {
+        _homeData = data;
+        _isLoading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = e;
+      });
+
+      // 特殊处理说明：当屏幕上已有旧数据时，刷新失败绝不清空列表，仅弹出轻量提醒告知用户
+      if (_homeData != null) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('刷新失败: 网络连接异常，已为您保留当前数据'),
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _onShelfViewAllTap(String category) {
@@ -140,17 +177,58 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   Future<_HomeData> _fetchHomeData({
     bool forceRefresh = false,
   }) async {
+    // 容灾设计：并发子请求相互隔离降级，避免单个接口异常击垮整页
+    final calendarFuture = widget.client
+        .getCalendar(forceRefresh: forceRefresh)
+        .catchError((e) {
+          developer.log('首页获取每日放送失败: $e');
+          return <BangumiCalendarDay>[];
+        });
+    final tvFuture = widget.client
+        .getTrending(limit: 18, forceRefresh: forceRefresh)
+        .catchError((e) {
+          developer.log('首页获取热门 TV 失败: $e');
+          return <BangumiItem>[];
+        });
+    final moviesFuture = widget.client
+        .getHotMovies(limit: 18, forceRefresh: forceRefresh)
+        .catchError((e) {
+          developer.log('首页获取热门剧场版失败: $e');
+          return <BangumiItem>[];
+        });
+    final ovaFuture = widget.client
+        .getHotOva(limit: 18, forceRefresh: forceRefresh)
+        .catchError((e) {
+          developer.log('首页获取热门 OVA 失败: $e');
+          return <BangumiItem>[];
+        });
+
     final results = await Future.wait([
-      widget.client.getCalendar(forceRefresh: forceRefresh),
-      widget.client.getTrending(limit: 18, forceRefresh: forceRefresh),
-      widget.client.getHotMovies(limit: 18, forceRefresh: forceRefresh),
-      widget.client.getHotOva(limit: 18, forceRefresh: forceRefresh),
+      calendarFuture,
+      tvFuture,
+      moviesFuture,
+      ovaFuture,
     ]);
 
-    final calendarDays = results[0] as List<BangumiCalendarDay>;
-    final tv = results[1] as List<BangumiItem>;
-    final movies = results[2] as List<BangumiItem>;
-    final ova = results[3] as List<BangumiItem>;
+    final fetchedCalendar = results[0] as List<BangumiCalendarDay>;
+    final fetchedTv = results[1] as List<BangumiItem>;
+    final fetchedMovies = results[2] as List<BangumiItem>;
+    final fetchedOva = results[3] as List<BangumiItem>;
+
+    // 特殊处理说明：优先使用新拉取的数据；若新请求因网络异常返回空列表，
+    // 优先回退复用当前内存中已有数据（Stale-While-Revalidate），绝不开天窗
+    final calendarDays = fetchedCalendar.isNotEmpty
+        ? fetchedCalendar
+        : (_homeData?.calendarDays ?? const <BangumiCalendarDay>[]);
+    final tv = fetchedTv.isNotEmpty
+        ? fetchedTv
+        : (_homeData?.tv ?? const <BangumiItem>[]);
+    final movies = fetchedMovies.isNotEmpty
+        ? fetchedMovies
+        : (_homeData?.movies ?? const <BangumiItem>[]);
+    final ova = fetchedOva.isNotEmpty
+        ? fetchedOva
+        : (_homeData?.ova ?? const <BangumiItem>[]);
 
     final now = DateTime.now();
     final todayWeekday = now.weekday; // 1=Mon .. 7=Sun
@@ -175,11 +253,26 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         .items;
 
     // 今日推荐算法抓取与调度：带天内幂等、L2 磁盘缓存与三级降级保护
-    final recommendations = await DailyRecommendService.getDailyRecommendations(
-      client: widget.client,
-      rawUserTagFreq: const {}, // 播放模块就绪后直接注入词频字典
-      forceRefresh: forceRefresh,
-    );
+    List<RecommendItem> recommendations = const [];
+    try {
+      recommendations = await DailyRecommendService.getDailyRecommendations(
+        client: widget.client,
+        rawUserTagFreq: const {}, // 播放模块就绪后直接注入词频字典
+        forceRefresh: forceRefresh,
+      );
+    } catch (e) {
+      developer.log('首页获取今日推荐失败: $e');
+      recommendations = _homeData?.recommendations ?? const [];
+    }
+
+    // 若所有数据源均彻底为空（冷启动首开且网络完全断开），则抛出异常以便展示全屏错误重试视图
+    if (calendarDays.isEmpty &&
+        tv.isEmpty &&
+        movies.isEmpty &&
+        ova.isEmpty &&
+        recommendations.isEmpty) {
+      throw const BangumiApiException('无法连接到服务器，且本地无有效缓存');
+    }
 
     return (
       calendarDays: calendarDays,
@@ -302,84 +395,79 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _buildAnimeContent(BuildContext context, ThemeData theme, double safeTop) {
-    return FutureBuilder<_HomeData>(
-      future: _dataFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          // 1:1 动态流光骨架屏无缝垫底，呈现即时响应感
-          return _buildShimmerSkeleton(context, theme, safeTop);
-        }
+    // 1. 首次冷启动且完全无任何数据：呈现 1:1 流光骨架屏
+    // 特殊处理说明：当已有数据时（_homeData != null），重新加载或下拉刷新绝不退回骨架屏，平滑保留当前界面
+    if (_isLoading && _homeData == null) {
+      return _buildShimmerSkeleton(context, theme, safeTop);
+    }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.cloud_off_rounded, size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  Text(
-                    '加载失败',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${snapshot.error}',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.redAccent),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: () => _loadData(forceRefresh: true),
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('重试'),
-                  ),
-                ],
+    // 2. 首次加载失败且完全无任何数据：呈现居中错误重试视图
+    if (_homeData == null && _error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_rounded, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              Text(
+                '加载失败',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
+              const SizedBox(height: 8),
+              Text(
+                '$_error',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.redAccent),
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () => _loadData(forceRefresh: true),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('重试'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final data = _homeData;
+    if (data == null) {
+      return const SizedBox.shrink();
+    }
+
+    // 精选探索流预留数据（开关开启时使用）
+    final exploreItems = <BangumiItem>[
+      ...data.today,
+      ...data.tv,
+      ...data.movies,
+      ...data.ova,
+    ];
+    final seenIds = <int>{};
+    final uniqueExploreItems = exploreItems.where((item) => seenIds.add(item.id)).toList();
+
+    final isDesktop = context.isDesktop;
+
+    // 3. 正常呈现内容：下拉刷新直接触发 _loadData，即使网络失败也会保留 _homeData 绝不清空
+    return RefreshIndicator(
+      onRefresh: () => _loadData(forceRefresh: true),
+      child: isDesktop
+          ? _buildDesktopLayout(
+              context: context,
+              theme: theme,
+              safeTop: safeTop,
+              data: data,
+              uniqueExploreItems: uniqueExploreItems,
+            )
+          : _buildMobileLayout(
+              context: context,
+              theme: theme,
+              safeTop: safeTop,
+              data: data,
+              uniqueExploreItems: uniqueExploreItems,
             ),
-          );
-        }
-
-        final data = snapshot.data;
-        if (data == null) {
-          return const SizedBox.shrink();
-        }
-
-        // 精选探索流预留数据（开关开启时使用）
-        final exploreItems = <BangumiItem>[
-          ...data.today,
-          ...data.tv,
-          ...data.movies,
-          ...data.ova,
-        ];
-        final seenIds = <int>{};
-        final uniqueExploreItems = exploreItems.where((item) => seenIds.add(item.id)).toList();
-
-        final isDesktop = context.isDesktop;
-
-        return RefreshIndicator(
-          onRefresh: () async {
-            _loadData(forceRefresh: true);
-            await _dataFuture;
-          },
-          child: isDesktop
-              ? _buildDesktopLayout(
-                  context: context,
-                  theme: theme,
-                  safeTop: safeTop,
-                  data: data,
-                  uniqueExploreItems: uniqueExploreItems,
-                )
-              : _buildMobileLayout(
-                  context: context,
-                  theme: theme,
-                  safeTop: safeTop,
-                  data: data,
-                  uniqueExploreItems: uniqueExploreItems,
-                ),
-        );
-      },
     );
   }
 
