@@ -268,5 +268,110 @@ void main() {
       expect(requestCount, 2);
       expect(forced.items.first.id, 2001);
     });
+
+    test('getCalendar single-flight deduplicates concurrent requests', () async {
+      int requestCount = 0;
+      dio = Dio(BaseOptions(baseUrl: 'https://api.bgm.tv'));
+      dio.httpClientAdapter = MockAdapter((options) {
+        requestCount++;
+        return {
+          'statusCode': 200,
+          'data': [
+            {
+              'weekday': {'id': 1, 'en': 'Mon', 'cn': '星期一', 'ja': '月曜日'},
+              'items': [
+                {'id': 101, 'name': 'Anime Mon', 'type': 2}
+              ]
+            }
+          ]
+        };
+      });
+      client = BangumiClient(dio: dio);
+
+      // 并发触发 3 次请求
+      final results = await Future.wait([
+        client.getCalendar(forceRefresh: true),
+        client.getCalendar(forceRefresh: true),
+        client.getCalendar(forceRefresh: true),
+      ]);
+
+      // Single-Flight 机制确保仅发生 1 次网络 I/O
+      expect(requestCount, 1);
+      expect(results.length, 3);
+      expect(results[0].first.items.first.id, 101);
+      expect(results[1].first.items.first.id, 101);
+      expect(results[2].first.items.first.id, 101);
+    });
+
+    test('getTrending single-flight deduplicates concurrent requests', () async {
+      int requestCount = 0;
+      dio = Dio(BaseOptions(baseUrl: 'https://api.bgm.tv'));
+      dio.httpClientAdapter = MockAdapter((options) {
+        requestCount++;
+        return {
+          'statusCode': 200,
+          'data': {
+            'data': [
+              {
+                'id': 3001,
+                'type': 2,
+                'name': 'Trending 1',
+                'name_cn': '热门 1',
+              }
+            ]
+          }
+        };
+      });
+      client = BangumiClient(dio: dio);
+
+      final results = await Future.wait([
+        client.getTrending(limit: 18, forceRefresh: true),
+        client.getTrending(limit: 18, forceRefresh: true),
+        client.getTrending(limit: 18, forceRefresh: true),
+      ]);
+
+      expect(requestCount, 1);
+      expect(results.length, 3);
+      expect(results[0].first.id, 3001);
+    });
+
+    test('getHotMovies and getHotOva reuse search cache seamlessly', () async {
+      int requestCount = 0;
+      dio = Dio(BaseOptions(baseUrl: 'https://api.bgm.tv'));
+      dio.httpClientAdapter = MockAdapter((options) {
+        requestCount++;
+        return {
+          'statusCode': 200,
+          'data': {
+            'total': 1,
+            'limit': 18,
+            'offset': 0,
+            'data': [
+              {
+                'id': 4001,
+                'type': 2,
+                'name': 'Movie Anime',
+                'name_cn': '剧场版动画',
+              }
+            ]
+          }
+        };
+      });
+      client = BangumiClient(dio: dio);
+
+      // 1. 首页请求热门剧场版
+      final movies = await client.getHotMovies(limit: 18);
+      expect(requestCount, 1);
+      expect(movies.first.nameCn, '剧场版动画');
+
+      // 2. 分类页面以相同筛选查询剧场版，应 0ms 命中同一份 search 缓存，不发网络请求
+      final categoryPeek = client.peekSearchCache('', tags: ['剧场版'], sort: 'heat', limit: 18, offset: 0);
+      expect(categoryPeek, isNotNull);
+      expect(categoryPeek!.items.first.id, 4001);
+
+      final categoryResult = await client.searchWithTotal('', tags: ['剧场版'], sort: 'heat', limit: 18, offset: 0);
+      expect(requestCount, 1);
+      expect(categoryResult.items.first.id, 4001);
+    });
   });
 }

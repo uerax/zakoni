@@ -27,6 +27,12 @@ class DailyRecommendService {
   static List<RecommendItem>? _memoryCachedItems;
   static String? _cachedDateKey;
 
+  /// 清空今日推荐的内存与时间戳缓存（在用户手动清理数据缓存或切换线路时调用）
+  static void clearCache() {
+    _memoryCachedItems = null;
+    _cachedDateKey = null;
+  }
+
   /// 计算当天的 32 位确定性正整数天命种子
   static int computeSeed(String deviceId, DateTime date) {
     final dateStr =
