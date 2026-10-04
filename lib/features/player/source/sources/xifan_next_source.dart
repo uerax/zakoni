@@ -373,10 +373,9 @@ class XifanNextSource extends VideoSource {
 
           final episodes = rawEps.map((e) {
             final epNum = e['episode_number'] ?? 1;
-            final epTitle = e['title']?.toString().trim();
             final epId = e['id'];
             return SourceEpisode(
-              name: (epTitle != null && epTitle.isNotEmpty) ? epTitle : '第$epNum集',
+              name: '第$epNum集',
               url: 'https://next.xifanacg.com/anime/$animeId/play/$epId?source=${Uri.encodeComponent(code)}',
             );
           }).toList();
@@ -400,15 +399,13 @@ class XifanNextSource extends VideoSource {
         for (final item in res.whereType<Map<String, dynamic>>()) {
           final epId = item['id'];
           final epNum = item['episode_number'] ?? 1;
-          final title = item['title']?.toString().trim();
           final kind = item['kind']?.toString();
-          final displayName = (title != null && title.isNotEmpty) ? title : '第$epNum集';
           final epUrl = 'https://next.xifanacg.com/anime/$animeId/play/$epId';
 
           if (kind == null || kind == 'main') {
-            mainEps.add(SourceEpisode(name: displayName, url: epUrl));
+            mainEps.add(SourceEpisode(name: '第$epNum集', url: epUrl));
           } else {
-            spEps.add(SourceEpisode(name: displayName, url: epUrl));
+            spEps.add(SourceEpisode(name: 'SP $epNum', url: epUrl));
           }
         }
 
