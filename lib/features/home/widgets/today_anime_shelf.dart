@@ -34,6 +34,7 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
   late final int _todayWeekdayIndex;
 
   static const _weekLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  static const _singleWeekLabels = ['一', '二', '三', '四', '五', '六', '日'];
 
   @override
   void initState() {
@@ -131,66 +132,13 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
           ),
         ),
 
-        // 周一至周日全周胶囊切换条（当提供 calendarDays 时展示）
+        // 周一至周日全周单字分段周期条（当提供 calendarDays 时展示）：
+        // 1. 采用单字展示（一~日）彻底去除“周”字冗余信息，彻底消除小屏横滑与系统字体放大导致的 RenderFlex 溢出；
+        // 2. 移动端 7 等分铺满整行（保证触控热区达标且 0 误触），平板与宽屏下限制最大宽度居中收拢，防止过度拉伸失真。
         if (hasDays) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-            child: SizedBox(
-              height: 32,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: 7,
-                separatorBuilder: (context, index) => const SizedBox(width: 6),
-                itemBuilder: (context, index) {
-                  final isSelected = index == _selectedDayIndex;
-                  final isCurrentDay = index == _todayWeekdayIndex;
-
-                  return InkWell(
-                    onTap: () => _onSelectDay(index),
-                    borderRadius: BorderRadius.circular(16),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? theme.colorScheme.primary
-                            : (isDark
-                                ? Colors.white.withAlpha(14)
-                                : Colors.black.withAlpha(8)),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isCurrentDay && !isSelected) ...[
-                            Container(
-                              width: 5,
-                              height: 5,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          Text(
-                            _weekLabels[index],
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected
-                                  ? theme.colorScheme.onPrimary
-                                  : (isDark ? Colors.white70 : Colors.black87),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+            child: _buildWeekStrip(theme, isDark),
           ),
         ],
         const SizedBox(height: 4),
@@ -249,6 +197,83 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
                 ),
         ),
       ],
+    );
+  }
+
+  /// 构建自适应周一至周日单字分段条：
+  /// - 手机端（宽 <= 500dp）：Row + 7 个 Expanded 撑满内容流，高度 36dp，触控热区饱满，杜绝任何滑动或溢出；
+  /// - 平板/宽屏端（宽 > 500dp）：限制最大宽度 420dp 居中收拢，防止元素被拉伸过扁或过度分散。
+  Widget _buildWeekStrip(ThemeData theme, bool isDark) {
+    final strip = Container(
+      height: 36,
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(6),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        children: List.generate(7, (index) {
+          final isSelected = index == _selectedDayIndex;
+          final isCurrentDay = index == _todayWeekdayIndex;
+
+          return Expanded(
+            child: Semantics(
+              button: true,
+              selected: isSelected,
+              label: '${_weekLabels[index]}${isCurrentDay ? " (今日)" : ""}',
+              child: Tooltip(
+                message: '${_weekLabels[index]}${isCurrentDay ? " · 今日" : ""}',
+                waitDuration: const Duration(milliseconds: 400),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(15),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => _onSelectDay(index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      decoration: BoxDecoration(
+                        color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _singleWeekLabels[index],
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : (isCurrentDay ? FontWeight.w600 : FontWeight.w500),
+                          color: isSelected
+                              ? theme.colorScheme.onPrimary
+                              : (isCurrentDay
+                                  ? theme.colorScheme.primary
+                                  : (isDark ? Colors.white70 : Colors.black87)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth > 500) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: strip,
+            ),
+          );
+        }
+        return strip;
+      },
     );
   }
 }

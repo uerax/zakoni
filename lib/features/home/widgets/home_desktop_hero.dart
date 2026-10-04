@@ -41,6 +41,7 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
   static const double _heroHeight = 340.0;
   static const int _cardsPerPage = 6;
   static const _weekLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  static const _singleWeekLabels = ['一', '二', '三', '四', '五', '六', '日'];
 
   @override
   void initState() {
@@ -318,57 +319,67 @@ class _HomeDesktopHeroState extends State<HomeDesktopHero> {
     );
   }
 
-  /// 周一至周日全周胶囊切换条
+  /// 桌面端周一至周日单字分段条（独立跑道居中排布）：
+  /// 1. 采用精致紧凑的跑道凹槽背景（高 28dp、宽 294dp），均分 7 等分，节省垂直空间给下方番剧卡片；
+  /// 2. 融入桌面专属体验：hover 背景反馈、click 鼠标手型、长按或悬停 Tooltip 完整星期提示。
   Widget _buildWeekdayCapsules(ThemeData theme, bool isDark) {
-    return SizedBox(
-      height: 24,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(7, (index) {
-          final isSelected = index == _selectedDayIndex;
-          final isCurrentDay = index == _todayWeekdayIndex;
+    return Center(
+      child: Container(
+        height: 29,
+        constraints: const BoxConstraints(maxWidth: 294),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(6),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        padding: const EdgeInsets.all(2.5),
+        child: Row(
+          children: List.generate(7, (index) {
+            final isSelected = index == _selectedDayIndex;
+            final isCurrentDay = index == _todayWeekdayIndex;
 
-          return InkWell(
-            onTap: () => _onSelectDay(index),
-            borderRadius: BorderRadius.circular(12),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? theme.colorScheme.primary
-                    : (isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(8)),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isCurrentDay && !isSelected) ...[
-                    Container(
-                      width: 4,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: theme.colorScheme.primary,
+            return Expanded(
+              child: Tooltip(
+                message: '${_weekLabels[index]}${isCurrentDay ? " · 今日" : ""}',
+                waitDuration: const Duration(milliseconds: 300),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => _onSelectDay(index),
+                      hoverColor: theme.colorScheme.primary.withAlpha(isDark ? 28 : 16),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutCubic,
+                        decoration: BoxDecoration(
+                          color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          _singleWeekLabels[index],
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : (isCurrentDay ? FontWeight.w600 : FontWeight.w500),
+                            color: isSelected
+                                ? theme.colorScheme.onPrimary
+                                : (isCurrentDay
+                                    ? theme.colorScheme.primary
+                                    : (isDark ? Colors.white70 : Colors.black87)),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 3),
-                  ],
-                  Text(
-                    _weekLabels[index],
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                      color: isSelected
-                          ? theme.colorScheme.onPrimary
-                          : (isDark ? Colors.white70 : Colors.black87),
-                    ),
                   ),
-                ],
+                ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }

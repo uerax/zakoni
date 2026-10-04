@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zakoni/core/models/bangumi/bangumi_calendar.dart';
 import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
 import 'package:zakoni/core/models/home/recommend_item.dart';
 import 'package:zakoni/features/home/widgets/continue_watching_shelf.dart';
 import 'package:zakoni/features/home/widgets/daily_spotlight_card.dart';
+import 'package:zakoni/features/home/widgets/home_desktop_hero.dart';
+import 'package:zakoni/features/home/widgets/today_anime_shelf.dart';
 
 BangumiItem _createMockItem(int id, String name, double score) {
   return BangumiItem(
@@ -134,6 +137,82 @@ void main() {
       expect(find.text('当季精选'), findsOneWidget);
       expect(find.text('Dungeon Meshi 中文'), findsOneWidget);
       expect(find.textContaining('极高水准奇幻生态冒险剧'), findsOneWidget);
+    });
+  });
+
+  group('TodayAnimeShelf single-character week strip tests', () {
+    testWidgets('Renders all 7 single characters without overflow on compact 360dp screen', (tester) async {
+      // 设置为极窄 360dp 手机屏幕
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final mockCalendarDays = List.generate(7, (i) {
+        final dayId = i + 1;
+        return BangumiCalendarDay(
+          weekday: BangumiWeekday(id: dayId, en: '', cn: '周$dayId', ja: ''),
+          items: [_createMockItem(200 + dayId, 'Anime $dayId', 8.0)],
+        );
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: TodayAnimeShelf(
+                calendarDays: mockCalendarDays,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 验证 7 个单字均在屏幕中正常呈现
+      for (final char in ['一', '二', '三', '四', '五', '六', '日']) {
+        expect(find.text(char), findsOneWidget);
+      }
+
+      // 验证点击“五”能正常响应并触发选中
+      await tester.tap(find.text('五'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('周五'), findsOneWidget);
+    });
+  });
+
+  group('HomeDesktopHero desktop week strip tests', () {
+    testWidgets('Renders segmented week strip and switches days on desktop width', (tester) async {
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final mockCalendarDays = List.generate(7, (i) {
+        final dayId = i + 1;
+        return BangumiCalendarDay(
+          weekday: BangumiWeekday(id: dayId, en: '', cn: '周$dayId', ja: ''),
+          items: [_createMockItem(300 + dayId, 'Desktop Anime $dayId', 8.5)],
+        );
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: HomeDesktopHero(
+              calendarDays: mockCalendarDays,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final char in ['一', '二', '三', '四', '五', '六', '日']) {
+        expect(find.text(char), findsOneWidget);
+      }
+
+      // 点击“六”能正常响应并切换标题显示
+      await tester.tap(find.text('六'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('周六'), findsOneWidget);
     });
   });
 }
