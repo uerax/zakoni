@@ -2,14 +2,41 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+typedef NavItemWidgetBuilder = Widget Function(
+  BuildContext context,
+  Color color,
+  bool isSelected,
+);
+
 class AppFloatingNavItem {
-  final IconData unselectedIcon;
-  final IconData selectedIcon;
+  final IconData? unselectedIcon;
+  final IconData? selectedIcon;
+  final NavItemWidgetBuilder? builder;
 
   const AppFloatingNavItem({
-    required this.unselectedIcon,
-    required this.selectedIcon,
-  });
+    this.unselectedIcon,
+    this.selectedIcon,
+    this.builder,
+  }) : assert(
+          builder != null || (unselectedIcon != null && selectedIcon != null),
+          'Either builder or both unselectedIcon and selectedIcon must be provided',
+        );
+
+  const AppFloatingNavItem.builder({
+    required NavItemWidgetBuilder this.builder,
+  })  : unselectedIcon = null,
+        selectedIcon = null;
+
+  Widget buildIcon(BuildContext context, Color color, bool isSelected) {
+    if (builder != null) {
+      return builder!(context, color, isSelected);
+    }
+    return Icon(
+      isSelected ? selectedIcon : unselectedIcon,
+      color: color,
+      size: 24,
+    );
+  }
 }
 
 /// 苹果悬浮极简纯图标毛玻璃胶囊底栏（Apple Floating Frosted Dock）：
@@ -128,8 +155,7 @@ class AppFloatingBottomBar extends StatelessWidget {
                             return Expanded(
                               child: _BouncingNavItem(
                                 isSelected: isSelected,
-                                selectedIcon: item.selectedIcon,
-                                unselectedIcon: item.unselectedIcon,
+                                item: item,
                                 color: itemColor,
                                 onTap: () {
                                   if (currentIndex == i) return;
@@ -158,15 +184,13 @@ class AppFloatingBottomBar extends StatelessWidget {
 /// 带来如同真实物理按钮一般的 Q 弹触感。
 class _BouncingNavItem extends StatefulWidget {
   final bool isSelected;
-  final IconData selectedIcon;
-  final IconData unselectedIcon;
+  final AppFloatingNavItem item;
   final Color color;
   final VoidCallback onTap;
 
   const _BouncingNavItem({
     required this.isSelected,
-    required this.selectedIcon,
-    required this.unselectedIcon,
+    required this.item,
     required this.color,
     required this.onTap,
   });
@@ -231,10 +255,10 @@ class _BouncingNavItemState extends State<_BouncingNavItem>
       child: Center(
         child: ScaleTransition(
           scale: _scaleAnimation,
-          child: Icon(
-            widget.isSelected ? widget.selectedIcon : widget.unselectedIcon,
-            color: widget.color,
-            size: 24,
+          child: widget.item.buildIcon(
+            context,
+            widget.color,
+            widget.isSelected,
           ),
         ),
       ),

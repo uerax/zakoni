@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zakoni/core/network/bangumi_client.dart';
 import 'package:zakoni/features/category/pages/category_page.dart';
+import 'package:zakoni/features/common/widgets/nav_custom_icons.dart';
 import 'package:zakoni/main.dart';
 
 class ImmediateMockAdapter implements HttpClientAdapter {
@@ -50,8 +51,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('热门 OVA / 特别篇'), findsOneWidget);
 
-    // 切换到底部“分类”（四宫格图标）
-    await tester.tap(find.byIcon(Icons.grid_view_outlined));
+    // 切换到底部“分类”（企鹅手绘图标）
+    await tester.tap(find.byType(PenguinNavIcon));
     await tester.pumpAndSettle();
     expect(find.byType(CategoryPage), findsOneWidget);
     expect(find.text('全部'), findsNWidgets(2));
@@ -82,7 +83,7 @@ void main() {
     expect(find.text('网络线路'), findsNothing);
 
     // 首次点击分类 Tab：激活挂载分类页
-    await tester.tap(find.byIcon(Icons.grid_view_outlined));
+    await tester.tap(find.byType(PenguinNavIcon));
     await tester.pumpAndSettle();
     expect(find.byType(CategoryPage), findsOneWidget);
 
@@ -92,7 +93,7 @@ void main() {
     expect(find.text('网络线路'), findsOneWidget);
 
     // 切回首页后，已激活的分类页保持常驻保活
-    await tester.tap(find.byIcon(Icons.home_outlined));
+    await tester.tap(find.byType(JellyNavIcon));
     await tester.pumpAndSettle();
     expect(find.byType(CategoryPage, skipOffstage: false), findsOneWidget);
   });

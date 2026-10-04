@@ -5,6 +5,7 @@ import '../core/providers/bangumi_providers.dart';
 import '../core/utils/appearance_manager.dart';
 import 'category/pages/category_page.dart';
 import 'common/widgets/app_floating_bottom_bar.dart';
+import 'common/widgets/nav_custom_icons.dart';
 import 'home/pages/home_page.dart';
 import 'settings/pages/settings_page.dart';
 
@@ -105,19 +106,23 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
                 _currentIndex = index;
               });
             },
-            items: const [
-              // Tab 0: 首页 (番剧大厅 + 连载周历)
+            items: [
+              // Tab 0: 首页 (专属吉祥物：Q 弹果冻)
               AppFloatingNavItem(
-                unselectedIcon: Icons.home_outlined,
-                selectedIcon: Icons.home_rounded,
+                builder: (context, color, isSelected) => JellyNavIcon(
+                  color: color,
+                  isSelected: isSelected,
+                ),
               ),
-              // Tab 1: 分类索引 (四宫格矩阵，苹果/现代流媒体官方规范)
+              // Tab 1: 分类索引 (萌系企鹅剪影)
               AppFloatingNavItem(
-                unselectedIcon: Icons.grid_view_outlined,
-                selectedIcon: Icons.grid_view_rounded,
+                builder: (context, color, isSelected) => PenguinNavIcon(
+                  color: color,
+                  isSelected: isSelected,
+                ),
               ),
-              // Tab 2: 系统设置
-              AppFloatingNavItem(
+              // Tab 2: 系统设置 (保持原状)
+              const AppFloatingNavItem(
                 unselectedIcon: Icons.settings_outlined,
                 selectedIcon: Icons.settings_rounded,
               ),
