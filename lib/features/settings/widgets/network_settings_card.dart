@@ -277,7 +277,6 @@ class _NetworkSettingsCardState extends State<NetworkSettingsCard> {
                   child: Text('取消', style: baseStyle),
                 ),
                 CupertinoDialogAction(
-                  isDefaultAction: true,
                   onPressed: () async {
                     var rawUrl = urlController.text.trim();
                     if (rawUrl.isEmpty) {
@@ -420,7 +419,7 @@ class _NetworkSettingsCardState extends State<NetworkSettingsCard> {
                   },
                   child: Text(
                     '确认添加',
-                    style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+                    style: baseStyle.copyWith(fontWeight: FontWeight.normal),
                   ),
                 ),
               ],
