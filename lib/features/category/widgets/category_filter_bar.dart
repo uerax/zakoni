@@ -25,26 +25,20 @@ class CategoryFilterBar extends ConsumerWidget {
     );
     final controller = ref.read(categoryControllerProvider(initialCategory).notifier);
 
-    // 采用 Row + Expanded 均分 3 列布局：
-    // 在所有手机屏幕宽度（360dp~430dp）上整齐自适应排满整行，彻底消除横向滚动与溢出
+    // 左侧紧凑放置【年份】+【季度】，右侧放置【排序】，中间弹性留白
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
         children: [
           // 1. 年份下拉菜单
-          Expanded(
-            child: _buildYearDropdownMenu(context, ref, controller, selectedYear, theme, isDark),
-          ),
+          _buildYearDropdownMenu(context, ref, controller, selectedYear, theme, isDark),
           const SizedBox(width: 8),
           // 2. 季度下拉菜单（全部、春、夏、秋、冬）
-          Expanded(
-            child: _buildSeasonDropdownMenu(context, ref, controller, selectedMonth, theme, isDark),
-          ),
-          const SizedBox(width: 8),
-          // 3. 排序下拉菜单（热度、评分、时间）
-          Expanded(
-            child: _buildSortDropdownMenu(context, ref, controller, selectedSort, theme, isDark),
-          ),
+          _buildSeasonDropdownMenu(context, ref, controller, selectedMonth, theme, isDark),
+          // 3. 中间弹性留白
+          const Spacer(),
+          // 4. 排序下拉菜单（热度、评分、时间）
+          _buildSortDropdownMenu(context, ref, controller, selectedSort, theme, isDark),
         ],
       ),
     );
@@ -69,13 +63,13 @@ class CategoryFilterBar extends ConsumerWidget {
     return InstantDropdownButton<int?>(
       items: years,
       selectedValue: selectedYear,
-      menuWidth: 120,
+      menuWidth: 110,
       maxMenuHeight: 280,
       alignRight: false,
       onSelected: controller.setYear,
       itemBuilder: (context, y, isSelected) {
         return Container(
-          height: 38,
+          height: 36,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           color: isSelected
               ? theme.colorScheme.primary.withAlpha(isDark ? 35 : 18)
@@ -85,7 +79,7 @@ class CategoryFilterBar extends ConsumerWidget {
               Text(
                 y == null ? '全部年份' : '$y年',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? theme.colorScheme.primary
@@ -96,7 +90,7 @@ class CategoryFilterBar extends ConsumerWidget {
               if (isSelected)
                 Icon(
                   Icons.check_rounded,
-                  size: 16,
+                  size: 15,
                   color: theme.colorScheme.primary,
                 ),
             ],
@@ -104,45 +98,41 @@ class CategoryFilterBar extends ConsumerWidget {
         );
       },
       child: Container(
-        height: 32,
+        height: 28,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: isHighlight
-              ? theme.colorScheme.primary.withAlpha(isDark ? 45 : 22)
-              : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
+              ? theme.colorScheme.primary.withAlpha(isDark ? 40 : 20)
+              : (isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8)),
           borderRadius: BorderRadius.circular(100),
           border: Border.all(
             color: isHighlight
-                ? theme.colorScheme.primary.withAlpha(160)
-                : (isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(12)),
-            width: isHighlight ? 1.0 : 0.8,
+                ? theme.colorScheme.primary.withAlpha(120)
+                : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
+            width: 0.8,
           ),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
-                  color: isHighlight
-                      ? theme.colorScheme.primary
-                      : (isDark ? Colors.white70 : Colors.black87),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isHighlight ? FontWeight.w600 : FontWeight.w500,
+                color: isHighlight
+                    ? theme.colorScheme.primary
+                    : (isDark ? Colors.white70 : Colors.black87),
               ),
             ),
             const SizedBox(width: 2),
             Icon(
-              Icons.arrow_drop_down_rounded,
-              size: 16,
+              Icons.keyboard_arrow_down_rounded,
+              size: 14,
               color: isHighlight
                   ? theme.colorScheme.primary
-                  : (isDark ? Colors.white54 : Colors.black54),
+                  : (isDark ? Colors.white38 : Colors.black38),
             ),
           ],
         ),
@@ -190,14 +180,14 @@ class CategoryFilterBar extends ConsumerWidget {
     return InstantDropdownButton<int>(
       items: seasonOptions.map((s) => s.month).toList(),
       selectedValue: effectiveMonth,
-      menuWidth: 140,
+      menuWidth: 125,
       maxMenuHeight: 240,
       alignRight: false,
       onSelected: controller.setMonth,
       itemBuilder: (context, m, isSelected) {
         final opt = seasonOptions.firstWhere((s) => s.month == m);
         return Container(
-          height: 38,
+          height: 36,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           color: isSelected
               ? theme.colorScheme.primary.withAlpha(isDark ? 35 : 18)
@@ -207,7 +197,7 @@ class CategoryFilterBar extends ConsumerWidget {
               Text(
                 opt.name,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? theme.colorScheme.primary
@@ -218,7 +208,7 @@ class CategoryFilterBar extends ConsumerWidget {
               if (isSelected)
                 Icon(
                   Icons.check_rounded,
-                  size: 16,
+                  size: 15,
                   color: theme.colorScheme.primary,
                 ),
             ],
@@ -226,45 +216,41 @@ class CategoryFilterBar extends ConsumerWidget {
         );
       },
       child: Container(
-        height: 32,
+        height: 28,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: isHighlight
-              ? theme.colorScheme.primary.withAlpha(isDark ? 45 : 22)
-              : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
+              ? theme.colorScheme.primary.withAlpha(isDark ? 40 : 20)
+              : (isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8)),
           borderRadius: BorderRadius.circular(100),
           border: Border.all(
             color: isHighlight
-                ? theme.colorScheme.primary.withAlpha(160)
-                : (isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(12)),
-            width: isHighlight ? 1.0 : 0.8,
+                ? theme.colorScheme.primary.withAlpha(120)
+                : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
+            width: 0.8,
           ),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
-                  color: isHighlight
-                      ? theme.colorScheme.primary
-                      : (isDark ? Colors.white70 : Colors.black87),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isHighlight ? FontWeight.w600 : FontWeight.w500,
+                color: isHighlight
+                    ? theme.colorScheme.primary
+                    : (isDark ? Colors.white70 : Colors.black87),
               ),
             ),
             const SizedBox(width: 2),
             Icon(
-              Icons.arrow_drop_down_rounded,
-              size: 16,
+              Icons.keyboard_arrow_down_rounded,
+              size: 14,
               color: isHighlight
                   ? theme.colorScheme.primary
-                  : (isDark ? Colors.white54 : Colors.black54),
+                  : (isDark ? Colors.white38 : Colors.black38),
             ),
           ],
         ),
@@ -288,14 +274,14 @@ class CategoryFilterBar extends ConsumerWidget {
     return InstantDropdownButton<String>(
       items: CategoryConstants.sortOptions.map((s) => s.key).toList(),
       selectedValue: selectedSort,
-      menuWidth: 110,
+      menuWidth: 100,
       maxMenuHeight: 180,
       alignRight: true,
       onSelected: controller.setSort,
       itemBuilder: (context, key, isSelected) {
         final opt = CategoryConstants.sortOptions.firstWhere((s) => s.key == key);
         return Container(
-          height: 38,
+          height: 36,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           color: isSelected
               ? theme.colorScheme.primary.withAlpha(isDark ? 35 : 18)
@@ -305,7 +291,7 @@ class CategoryFilterBar extends ConsumerWidget {
               Text(
                 opt.label,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? theme.colorScheme.primary
@@ -316,7 +302,7 @@ class CategoryFilterBar extends ConsumerWidget {
               if (isSelected)
                 Icon(
                   Icons.check_rounded,
-                  size: 16,
+                  size: 15,
                   color: theme.colorScheme.primary,
                 ),
             ],
@@ -324,37 +310,39 @@ class CategoryFilterBar extends ConsumerWidget {
         );
       },
       child: Container(
-        height: 32,
+        height: 28,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10),
+          color: isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8),
           borderRadius: BorderRadius.circular(100),
           border: Border.all(
-            color: isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(12),
+            color: isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10),
             width: 0.8,
           ),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(
-              child: Text(
-                '排序: ${curSort.label}',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.black87,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Icon(
+              Icons.sort_rounded,
+              size: 14,
+              color: isDark ? Colors.white60 : Colors.black54,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              curSort.label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black87,
               ),
             ),
             const SizedBox(width: 2),
             Icon(
-              Icons.arrow_drop_down_rounded,
-              size: 16,
-              color: isDark ? Colors.white54 : Colors.black54,
+              Icons.keyboard_arrow_down_rounded,
+              size: 14,
+              color: isDark ? Colors.white38 : Colors.black38,
             ),
           ],
         ),

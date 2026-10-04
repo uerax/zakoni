@@ -6,7 +6,6 @@ import '../controllers/category_controller.dart';
 import '../widgets/category_content_view.dart';
 import '../widgets/category_filter_bar.dart';
 import '../widgets/category_genre_chips.dart';
-import '../widgets/category_header_bar.dart';
 
 class CategoryPage extends ConsumerStatefulWidget {
   final BangumiClient? client;
@@ -129,19 +128,19 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
                   parent: BouncingScrollPhysics(),
                 ),
                 slivers: [
-                  // 1. 顶部主标题与“🎯 当季”快捷复位按钮
-                  SliverToBoxAdapter(
-                    child: CategoryHeaderBar(initialCategory: widget.initialCategory),
+                  // 1. 顶部呼吸留白
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 10),
                   ),
 
-                  // 2. 第一行：题材分类栏（支持横向滑动 + 右侧【展开全览网格】）
+                  // 2. 形式分类（单选）与题材分类（多选）
                   SliverToBoxAdapter(
                     child: CategoryGenreChips(initialCategory: widget.initialCategory),
                   ),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-                  // 3. 第二行：年份、季度与排序下拉菜单栏（使用极速轻量原地 Dropdown 菜单）
+                  // 3. 年份、季度与排序下拉菜单栏（左侧年份季度，右侧排序）
                   SliverToBoxAdapter(
                     child: CategoryFilterBar(initialCategory: widget.initialCategory),
                   ),
@@ -200,7 +199,9 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
                         padding: const EdgeInsets.symmetric(vertical: 24),
                         child: Center(
                           child: Text(
-                            '已经翻到底啦 · 共 ${state.total} 部',
+                            state.total < 1000
+                                ? '已经翻到底啦 · 共 ${state.total} 部'
+                                : '已经翻到底啦',
                             style: TextStyle(
                               fontSize: 12,
                               color: theme.colorScheme.onSurfaceVariant.withAlpha(160),

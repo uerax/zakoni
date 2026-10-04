@@ -35,6 +35,16 @@ class AppBreakpoints {
     if (width < 1000) return 5;
     return 6;
   }
+
+  /// 计算分类/搜索等网格瀑布流在不同端型下的最优单次分页拉取数量：
+  /// - 手机端 (<600): 12 部 (3列 x 4行整除，轻量省流响应快)
+  /// - 平板端 (600 ~ 839): 20 部 (4列 x 5行 或 5列 x 4行，公倍数整除不破排)
+  /// - 桌面端 (>=840): 24 部 (6列 x 4行整除，铺满大屏视口)
+  static int responsivePageSize(double width) {
+    if (width < compact) return 12;
+    if (width < medium) return 20;
+    return 24;
+  }
 }
 
 /// 响应式 Context 扩展，方便在 Widget 中快速获取断点状态

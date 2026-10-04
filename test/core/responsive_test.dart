@@ -15,6 +15,23 @@ void main() {
       expect(AppBreakpoints.gridColumns(1920), 6);
     });
 
+    test('responsivePageSize calculates correct page limits for 3 platforms', () {
+      // 手机端 (<600): 12 部
+      expect(AppBreakpoints.responsivePageSize(360), 12);
+      expect(AppBreakpoints.responsivePageSize(390), 12);
+      expect(AppBreakpoints.responsivePageSize(599), 12);
+
+      // 平板端 (600 ~ 839): 20 部
+      expect(AppBreakpoints.responsivePageSize(600), 20);
+      expect(AppBreakpoints.responsivePageSize(768), 20);
+      expect(AppBreakpoints.responsivePageSize(839), 20);
+
+      // 桌面端 (>=840): 24 部
+      expect(AppBreakpoints.responsivePageSize(840), 24);
+      expect(AppBreakpoints.responsivePageSize(1280), 24);
+      expect(AppBreakpoints.responsivePageSize(1920), 24);
+    });
+
     testWidgets('ResponsiveContext extension returns correct values', (tester) async {
       late bool isDesktop;
       late bool isCompact;

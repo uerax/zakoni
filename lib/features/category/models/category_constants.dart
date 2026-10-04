@@ -2,6 +2,35 @@
 class CategoryConstants {
   CategoryConstants._();
 
+  static const mediaTypes = [
+    'TV',
+    '剧场版',
+    'OVA',
+  ];
+
+  static const genres = [
+    '热血',
+    '奇幻',
+    '战斗',
+    '校园',
+    '日常',
+    '治愈',
+    '科幻',
+    '悬疑',
+    '恋爱',
+    '搞笑',
+    '异世界',
+    '机战',
+    '音乐',
+    '运动',
+    '偶像',
+    '冒险',
+    '百合',
+    '后宫',
+    '致郁',
+    '催泪',
+  ];
+
   static const popularTags = [
     '全部',
     'TV',
@@ -44,7 +73,13 @@ class CategoryConstants {
     (month: 10, label: '🍁 10月'),
   ];
 
-  static const int pageSize = 24;
+  /// 分页拉取基准尺寸：
+  static const int defaultMobilePageSize = 12;
+  static const int defaultTabletPageSize = 20;
+  static const int defaultDesktopPageSize = 24;
+
+  /// 基础回退分页尺寸（手机端 12 部）
+  static const int pageSize = defaultMobilePageSize;
 
   static int get currentYear => DateTime.now().year;
 

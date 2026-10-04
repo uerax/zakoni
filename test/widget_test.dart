@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zakoni/core/network/bangumi_client.dart';
+import 'package:zakoni/features/category/pages/category_page.dart';
 import 'package:zakoni/main.dart';
 
 class ImmediateMockAdapter implements HttpClientAdapter {
@@ -52,7 +53,8 @@ void main() {
     // 切换到底部“分类”（四宫格图标）
     await tester.tap(find.byIcon(Icons.grid_view_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('⊞ 分类索引'), findsOneWidget);
+    expect(find.byType(CategoryPage), findsOneWidget);
+    expect(find.text('全部'), findsNWidgets(2));
 
     // 切换到底部设置
     await tester.tap(find.byIcon(Icons.settings_outlined));
@@ -76,13 +78,13 @@ void main() {
     await tester.pump();
 
     // 刚打开应用时（仅激活 Tab 0 首页）：分类页与设置页未挂载，杜绝后台偷跑网络
-    expect(find.text('⊞ 分类索引'), findsNothing);
+    expect(find.byType(CategoryPage), findsNothing);
     expect(find.text('网络线路'), findsNothing);
 
     // 首次点击分类 Tab：激活挂载分类页
     await tester.tap(find.byIcon(Icons.grid_view_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('⊞ 分类索引'), findsOneWidget);
+    expect(find.byType(CategoryPage), findsOneWidget);
 
     // 首次点击设置 Tab：激活挂载设置页
     await tester.tap(find.byIcon(Icons.settings_outlined));
@@ -92,7 +94,7 @@ void main() {
     // 切回首页后，已激活的分类页保持常驻保活
     await tester.tap(find.byIcon(Icons.home_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('⊞ 分类索引', skipOffstage: false), findsOneWidget);
+    expect(find.byType(CategoryPage, skipOffstage: false), findsOneWidget);
   });
 
   testWidgets('HomePage adapts to desktop mode with HomeDesktopHero when width >= 840', (WidgetTester tester) async {

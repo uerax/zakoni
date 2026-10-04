@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/bangumi_providers.dart';
+import '../../../core/utils/responsive.dart';
 import '../models/category_constants.dart';
 import 'category_state.dart';
 
@@ -34,6 +37,18 @@ class CategoryController extends Notifier<CategoryState> {
     return CategoryState(filter: filter, isLoading: true);
   }
 
+  /// 根据当前运行端型（手机 12 / 平板 20 / 桌面 24）动态计算单页最优请求量
+  int get _effectivePageSize {
+    try {
+      final view = WidgetsBinding.instance.platformDispatcher.views.firstOrNull;
+      if (view != null) {
+        final logicalWidth = view.physicalSize.width / view.devicePixelRatio;
+        return AppBreakpoints.responsivePageSize(logicalWidth);
+      }
+    } catch (_) {}
+    return CategoryConstants.pageSize;
+  }
+
   /// 构建当前筛选条件的日期与参数，向 Bangumi 发起第一页请求
   /// 若本地已有缓存，则 0ms 同步秒出，彻底消除骨架屏闪烁
   Future<void> fetchFirstPage({bool forceRefresh = false}) async {
@@ -46,9 +61,8 @@ class CategoryController extends Notifier<CategoryState> {
     _cancelToken = cancelToken;
 
     final filter = state.filter;
-    final tagList = (filter.selectedTag != null && filter.selectedTag != '全部')
-        ? [filter.selectedTag!]
-        : null;
+    final tagList = filter.allTags;
+    final limit = _effectivePageSize;
 
     List<String>? airDate;
     int? yearParam;
@@ -71,7 +85,7 @@ class CategoryController extends Notifier<CategoryState> {
         year: yearParam,
         airDate: airDate,
         sort: filter.selectedSort,
-        limit: CategoryConstants.pageSize,
+        limit: limit,
         offset: 0,
       );
       if (cached != null) {
@@ -100,7 +114,7 @@ class CategoryController extends Notifier<CategoryState> {
         year: yearParam,
         airDate: airDate,
         sort: filter.selectedSort,
-        limit: CategoryConstants.pageSize,
+        limit: limit,
         offset: 0,
         forceRefresh: forceRefresh,
         cancelToken: cancelToken,
@@ -130,9 +144,7 @@ class CategoryController extends Notifier<CategoryState> {
     _debounceTimer?.cancel();
 
     final filter = state.filter;
-    final tagList = (filter.selectedTag != null && filter.selectedTag != '全部')
-        ? [filter.selectedTag!]
-        : null;
+    final tagList = filter.allTags;
 
     List<String>? airDate;
     int? yearParam;
@@ -146,13 +158,14 @@ class CategoryController extends Notifier<CategoryState> {
     }
 
     final client = ref.read(bangumiClientProvider);
+    final limit = _effectivePageSize;
     final cached = client.peekSearchCache(
       '',
       tags: tagList,
       year: yearParam,
       airDate: airDate,
       sort: filter.selectedSort,
-      limit: CategoryConstants.pageSize,
+      limit: limit,
       offset: 0,
     );
 
@@ -192,9 +205,7 @@ class CategoryController extends Notifier<CategoryState> {
 
     try {
       final filter = state.filter;
-      final tagList = (filter.selectedTag != null && filter.selectedTag != '全部')
-          ? [filter.selectedTag!]
-          : null;
+      final tagList = filter.allTags;
 
       List<String>? airDate;
       int? yearParam;
@@ -208,13 +219,14 @@ class CategoryController extends Notifier<CategoryState> {
       }
 
       final client = ref.read(bangumiClientProvider);
+      final limit = _effectivePageSize;
       final result = await client.searchWithTotal(
         '',
         tags: tagList,
         year: yearParam,
         airDate: airDate,
         sort: filter.selectedSort,
-        limit: CategoryConstants.pageSize,
+        limit: limit,
         offset: state.items.length,
       );
 
@@ -232,14 +244,66 @@ class CategoryController extends Notifier<CategoryState> {
     }
   }
 
-  void setTag(String? tag) {
-    final effectiveTag = (tag == '全部') ? null : tag;
-    if (state.filter.selectedTag == effectiveTag) return;
+  /// 批量更新已选标签集合（包含类型与题材，弹窗关闭或点击完成时统一调用一次，杜绝多选过程中的频繁请求）
+  void setTags(Set<String> tags) {
+    if (setEquals(state.filter.selectedTags, tags)) return;
     state = state.copyWith(
-      filter: state.filter.copyWith(selectedTag: effectiveTag),
+      filter: state.filter.copyWith(selectedTags: Set<String>.from(tags)),
       isTagExpanded: false,
     );
-    _triggerFetchWithDebounce();
+    _triggerFetchWithDebounce(delay: Duration.zero);
+  }
+
+  /// 切换单个标签勾选状态（无单选限制）
+  void toggleTag(String tag) {
+    final cur = Set<String>.from(state.filter.selectedTags);
+    if (cur.contains(tag)) {
+      cur.remove(tag);
+    } else {
+      cur.add(tag);
+    }
+    setTags(cur);
+  }
+
+  /// 清空所有标签
+  void clearTags() {
+    if (state.filter.selectedTags.isEmpty) return;
+    setTags(const {});
+  }
+
+  /// 切换形式分类（支持多选，传 '全部' 时仅清空当前形式类型）
+  void setType(String? type) {
+    if (type == null || type == '全部') {
+      final cur = Set<String>.from(state.filter.selectedTags)
+        ..removeWhere((t) => CategoryConstants.mediaTypes.contains(t));
+      setTags(cur);
+    } else {
+      toggleTag(type);
+    }
+  }
+
+  /// 批量更新题材多选集合
+  void setGenres(Set<String> genres) {
+    final mediaTypes = state.filter.selectedTags.where((t) => CategoryConstants.mediaTypes.contains(t));
+    setTags({...mediaTypes, ...genres});
+  }
+
+  /// 切换单个题材分类
+  void toggleGenre(String genre) => toggleTag(genre);
+
+  /// 清空所有已选题材（保留已选的形式类型）
+  void clearGenres() {
+    final mediaTypes = state.filter.selectedTags.where((t) => CategoryConstants.mediaTypes.contains(t)).toSet();
+    setTags(mediaTypes);
+  }
+
+  /// 兼容旧版单一 tag 访问
+  void setTag(String? tag) {
+    if (tag == null || tag == '全部') {
+      clearTags();
+    } else {
+      setTags({tag});
+    }
   }
 
   void setYear(int? year) {
@@ -288,7 +352,7 @@ class CategoryController extends Notifier<CategoryState> {
     if (state.filter.isCurrentSeason) return;
     state = state.copyWith(
       filter: state.filter.copyWith(
-        selectedTag: null,
+        selectedTags: const {},
         selectedYear: CategoryConstants.currentYear,
         selectedMonth: CategoryConstants.currentSeasonMonth,
         selectedSort: 'heat',
