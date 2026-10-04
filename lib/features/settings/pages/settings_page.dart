@@ -70,6 +70,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     client: widget.client,
                     currentPreset: _currentPreset,
                     onPresetChanged: _onPresetChanged,
+                    onRouteChanged: () => widget.onSettingsChanged?.call(),
                   ),
 
                   // 2. 缓存管理

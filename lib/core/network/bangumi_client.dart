@@ -9,6 +9,7 @@ import '../models/bangumi/bangumi_episode.dart';
 import '../models/bangumi/bangumi_item.dart';
 import '../models/bangumi/bangumi_search_result.dart';
 import '../models/bangumi/bangumi_user.dart';
+import '../models/network/custom_network_route.dart';
 import '../services/app_preferences.dart';
 import '../utils/image_utils.dart';
 import '../utils/timed_cache.dart';
@@ -19,6 +20,7 @@ import 'bangumi_source_preset.dart';
 import 'bangumi_user_agent.dart';
 
 export '../models/bangumi/bangumi_search_result.dart';
+export '../models/network/custom_network_route.dart';
 export 'bangumi_api_exception.dart';
 export 'bangumi_source_preset.dart';
 export 'bangumi_user_agent.dart';
@@ -35,8 +37,10 @@ class BangumiClient {
       BangumiUserAgent.build(version: version, platform: platform);
 
   final Dio _dio;
-  String _baseUrl;
+  late String _baseUrl;
   BangumiSourcePreset _sourcePreset = BangumiSourcePreset.mirror;
+  String _activeRouteId = BangumiSourcePreset.mirror.name;
+  String? _customRouteName;
 
   // 按照 Animaku 规范对齐 TTL 的内存缓存池
   // 1. 每日放送：按季更替，24 小时缓存
@@ -82,11 +86,9 @@ class BangumiClient {
   BangumiClient({
     String? baseUrl,
     Dio? dio,
-  })  : _baseUrl = baseUrl ?? AppPreferences.getInitialSourcePreset().apiBase,
-        _dio = dio ??
+  }) : _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: baseUrl ?? AppPreferences.getInitialSourcePreset().apiBase,
                 connectTimeout: const Duration(seconds: 15),
                 receiveTimeout: const Duration(seconds: 15),
                 headers: {
@@ -96,28 +98,84 @@ class BangumiClient {
               ),
             ) {
     if (baseUrl != null) {
+      _baseUrl = baseUrl;
       if (baseUrl == BangumiSourcePreset.official.apiBase) {
+        _activeRouteId = BangumiSourcePreset.official.name;
         _sourcePreset = BangumiSourcePreset.official;
         setBangumiImageHost(BangumiSourcePreset.official.imageHost);
-      } else {
+      } else if (baseUrl == BangumiSourcePreset.mirror.apiBase) {
+        _activeRouteId = BangumiSourcePreset.mirror.name;
         _sourcePreset = BangumiSourcePreset.mirror;
         setBangumiImageHost(BangumiSourcePreset.mirror.imageHost);
+      } else {
+        _activeRouteId = 'custom';
+        _sourcePreset = BangumiSourcePreset.mirror;
+        final host = Uri.tryParse(baseUrl)?.host;
+        if (host != null && host.isNotEmpty) {
+          setBangumiImageHost(host);
+        }
       }
     } else {
-      final initial = AppPreferences.getInitialSourcePreset();
-      _sourcePreset = initial;
-      setBangumiImageHost(initial.imageHost);
+      final activeId = AppPreferences.getActiveRouteId();
+      _activeRouteId = activeId;
+      if (activeId == BangumiSourcePreset.official.name) {
+        _sourcePreset = BangumiSourcePreset.official;
+        _baseUrl = BangumiSourcePreset.official.apiBase;
+        setBangumiImageHost(BangumiSourcePreset.official.imageHost);
+      } else if (activeId == BangumiSourcePreset.mirror.name) {
+        _sourcePreset = BangumiSourcePreset.mirror;
+        _baseUrl = BangumiSourcePreset.mirror.apiBase;
+        setBangumiImageHost(BangumiSourcePreset.mirror.imageHost);
+      } else {
+        // 自定义线路
+        final customRoutes = AppPreferences.getCustomNetworkRoutes();
+        final matched = customRoutes.where((r) => r.id == activeId).firstOrNull;
+        if (matched != null) {
+          _sourcePreset = BangumiSourcePreset.mirror;
+          _baseUrl = matched.url;
+          _customRouteName = matched.name;
+          final host = Uri.tryParse(matched.url)?.host;
+          if (host != null && host.isNotEmpty) {
+            setBangumiImageHost(host);
+          }
+        } else {
+          _activeRouteId = BangumiSourcePreset.mirror.name;
+          _sourcePreset = BangumiSourcePreset.mirror;
+          _baseUrl = BangumiSourcePreset.mirror.apiBase;
+          setBangumiImageHost(BangumiSourcePreset.mirror.imageHost);
+        }
+      }
     }
+    _dio.options.baseUrl = _baseUrl;
   }
 
   String get baseUrl => _baseUrl;
   BangumiSourcePreset get sourcePreset => _sourcePreset;
+  String get activeRouteId => _activeRouteId;
+  String? get customRouteName => _customRouteName;
 
+  /// 切换到内置预设线路（镜像加速 / 官方直连）
   void setSourcePreset(BangumiSourcePreset preset) {
+    _activeRouteId = preset.name;
+    _customRouteName = null;
     _sourcePreset = preset;
     updateBaseUrl(preset.apiBase);
     setBangumiImageHost(preset.imageHost);
-    AppPreferences.saveSourcePreset(preset);
+    AppPreferences.saveActiveRouteId(preset.name);
+    clearCache();
+  }
+
+  /// 切换到用户自定义网络线路
+  void setCustomRoute(CustomNetworkRoute route) {
+    _activeRouteId = route.id;
+    _customRouteName = route.name;
+    _sourcePreset = BangumiSourcePreset.mirror; // 兼容现有检查
+    updateBaseUrl(route.url);
+    final host = Uri.tryParse(route.url)?.host;
+    if (host != null && host.isNotEmpty) {
+      setBangumiImageHost(host);
+    }
+    AppPreferences.saveActiveRouteId(route.id);
     clearCache();
   }
 

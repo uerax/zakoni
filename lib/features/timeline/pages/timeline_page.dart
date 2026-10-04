@@ -87,7 +87,9 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
   @override
   void didUpdateWidget(TimelinePage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.client.sourcePreset != widget.client.sourcePreset) {
+    if (oldWidget.client.baseUrl != widget.client.baseUrl ||
+        oldWidget.client.activeRouteId != widget.client.activeRouteId ||
+        oldWidget.client.sourcePreset != widget.client.sourcePreset) {
       _loadCalendar(forceRefresh: true);
     }
   }

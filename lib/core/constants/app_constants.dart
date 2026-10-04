@@ -21,4 +21,8 @@ class AppConstants {
   /// 格式: <开发者ID>/<应用名>/<版本号> (<项目主页URL>)
   static const String bangumiUserAgent =
       '$developerId/$appName/$appVersion ($projectUrl)';
+
+  /// 内置默认网络线路仓库链接（用于从远程或内置源导入社区反代节点）
+  static const String defaultRoutesRepoUrl =
+      'https://raw.githubusercontent.com/uerax/zakoni/master/routes.json';
 }

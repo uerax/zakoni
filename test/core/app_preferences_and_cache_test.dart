@@ -54,6 +54,40 @@ void main() {
       expect(AppPreferences.getInitialSourcePreset(), equals(BangumiSourcePreset.official));
     });
 
+    test('saves and restores custom network routes and active route ID', () async {
+      await AppPreferences.init();
+      expect(AppPreferences.getActiveRouteId(), equals(BangumiSourcePreset.mirror.name));
+      expect(AppPreferences.getCustomNetworkRoutes(), isEmpty);
+
+      const customRoute = CustomNetworkRoute(
+        id: 'custom_123',
+        name: '自建香港',
+        url: 'https://hk.proxy.test',
+      );
+
+      await AppPreferences.saveCustomNetworkRoutes([customRoute]);
+      await AppPreferences.saveActiveRouteId(customRoute.id);
+
+      expect(AppPreferences.getActiveRouteId(), equals('custom_123'));
+      final routes = AppPreferences.getCustomNetworkRoutes();
+      expect(routes.length, equals(1));
+      expect(routes.first.id, equals('custom_123'));
+      expect(routes.first.name, equals('自建香港'));
+      expect(routes.first.url, equals('https://hk.proxy.test'));
+
+      // 验证 BangumiClient 启动与切换
+      final client = BangumiClient();
+      expect(client.activeRouteId, equals('custom_123'));
+      expect(client.baseUrl, equals('https://hk.proxy.test'));
+      expect(client.customRouteName, equals('自建香港'));
+
+      // 切换回内置预设
+      client.setSourcePreset(BangumiSourcePreset.official);
+      expect(client.activeRouteId, equals(BangumiSourcePreset.official.name));
+      expect(client.baseUrl, equals(BangumiSourcePreset.official.apiBase));
+      expect(AppPreferences.getActiveRouteId(), equals(BangumiSourcePreset.official.name));
+    });
+
     test('saves and restores font type', () async {
       await AppPreferences.init();
       final fontMgr = FontManager.instance;

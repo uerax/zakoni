@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/network/custom_network_route.dart';
 import '../network/bangumi_source_preset.dart';
 import '../utils/appearance_manager.dart';
 import '../utils/font_manager.dart';
@@ -11,6 +12,7 @@ class AppPreferences {
   AppPreferences._();
 
   static const _kSourcePreset = 'pref_network_source_preset';
+  static const _kCustomNetworkRoutes = 'pref_custom_network_routes';
   static const _kFontType = 'pref_font_type';
   static const _kCustomFontPath = 'pref_custom_font_path';
   static const _kCustomFontName = 'pref_custom_font_name';
@@ -104,6 +106,35 @@ class AppPreferences {
   }
 
   // --- 网络线路持久化 ---
+
+  static String getActiveRouteId() {
+    return _prefs?.getString(_kSourcePreset) ?? BangumiSourcePreset.mirror.name;
+  }
+
+  static Future<void> saveActiveRouteId(String routeId) async {
+    await _prefs?.setString(_kSourcePreset, routeId);
+  }
+
+  static List<CustomNetworkRoute> getCustomNetworkRoutes() {
+    final raw = _prefs?.getString(_kCustomNetworkRoutes);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final list = jsonDecode(raw);
+      if (list is List) {
+        return list
+            .whereType<Map<String, dynamic>>()
+            .map((e) => CustomNetworkRoute.fromJson(e))
+            .where((e) => e.id.isNotEmpty && e.url.isNotEmpty)
+            .toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<void> saveCustomNetworkRoutes(List<CustomNetworkRoute> routes) async {
+    final raw = jsonEncode(routes.map((e) => e.toJson()).toList());
+    await _prefs?.setString(_kCustomNetworkRoutes, raw);
+  }
 
   static BangumiSourcePreset getInitialSourcePreset() {
     final presetName = _prefs?.getString(_kSourcePreset);
