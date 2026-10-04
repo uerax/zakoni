@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../network/bangumi_source_preset.dart';
 import '../utils/appearance_manager.dart';
@@ -14,6 +15,8 @@ class AppPreferences {
   static const _kCustomFontPath = 'pref_custom_font_path';
   static const _kCustomFontName = 'pref_custom_font_name';
 
+  static const _kThemePreset = 'pref_theme_preset';
+  static const _kCustomThemeColor = 'pref_custom_theme_color';
   static const _kCustomIconPath = 'pref_custom_icon_path';
   static const _kGlobalWallpaperPath = 'pref_global_wallpaper_path';
   static const _kPageWallpapers = 'pref_page_wallpapers';
@@ -58,8 +61,16 @@ class AppPreferences {
       }
     }
 
-    // 2. 恢复外观偏好（图标、壁纸、参数）
+    // 2. 恢复外观偏好（主题色、图标、壁纸、参数）
     final appMgr = AppearanceManager.instance;
+
+    final themePresetId = prefs.getString(_kThemePreset);
+    final customColorVal = prefs.getInt(_kCustomThemeColor);
+    final customColor = customColorVal != null ? Color(customColorVal) : null;
+    if (themePresetId != null) {
+      appMgr.restoreThemePreset(themePresetId, customColor: customColor);
+    }
+
     final customIcon = prefs.getString(_kCustomIconPath);
     if (customIcon != null) {
       appMgr.restoreCustomIcon(customIcon);
@@ -124,6 +135,14 @@ class AppPreferences {
   }
 
   // --- 外观持久化 ---
+
+  static Future<void> saveThemePreset(String presetId) async {
+    await _prefs?.setString(_kThemePreset, presetId);
+  }
+
+  static Future<void> saveCustomThemeColor(int colorValue) async {
+    await _prefs?.setInt(_kCustomThemeColor, colorValue);
+  }
 
   static Future<void> saveCustomIcon(String? iconPath) async {
     if (iconPath != null) {

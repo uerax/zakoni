@@ -129,7 +129,7 @@ class _WallpaperCropDialogState extends State<WallpaperCropDialog> {
               // 顶部标题行与居中重置按钮
               Row(
                 children: [
-                  const Icon(Icons.crop_rounded, color: Color(0xFF0077B6), size: 20),
+                  Icon(Icons.crop_rounded, color: theme.colorScheme.primary, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     '调整壁纸视窗取景',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'app_icon_tile.dart';
 import 'ios_settings_card.dart';
+import 'theme_color_tile.dart';
 import 'wallpaper_settings_tile.dart';
 
 class AppearanceSettingsCard extends StatelessWidget {
@@ -15,6 +16,7 @@ class AppearanceSettingsCard extends StatelessWidget {
         IosSettingsSectionHeader(title: '个性化外观'),
         IosSettingsCard(
           children: [
+            ThemeColorTile(),
             AppIconTile(),
             WallpaperSettingsTile(),
           ],

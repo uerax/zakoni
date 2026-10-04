@@ -1,7 +1,9 @@
+import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zakoni/core/network/bangumi_client.dart';
 import 'package:zakoni/core/services/app_preferences.dart';
+import 'package:zakoni/core/theme/app_theme_color.dart';
 import 'package:zakoni/core/utils/appearance_manager.dart';
 import 'package:zakoni/core/utils/font_manager.dart';
 import 'package:zakoni/core/utils/image_utils.dart';
@@ -62,6 +64,37 @@ void main() {
       // 再次初始化模拟冷启动恢复
       await AppPreferences.init();
       expect(FontManager.instance.currentType, equals(AppFontType.system));
+    });
+
+    test('saves and restores theme preset and custom color', () async {
+      await AppPreferences.init();
+      final appMgr = AppearanceManager.instance;
+
+      // 默认颜色应为薄荷绿
+      expect(AppThemePreset.presets.first.id, equals('mint'));
+      expect(AppThemePreset.defaultColor, equals(const Color(0xFF2A9D8F)));
+
+      // 切换为樱花粉主题
+      final sakura = AppThemePreset.findById('sakura');
+      appMgr.setThemePreset(sakura);
+      expect(appMgr.currentThemePreset.id, equals('sakura'));
+      expect(appMgr.primaryColor, equals(sakura.color));
+
+      // 再次初始化模拟冷启动恢复
+      await AppPreferences.init();
+      expect(AppearanceManager.instance.currentThemePreset.id, equals('sakura'));
+      expect(AppearanceManager.instance.primaryColor, equals(sakura.color));
+
+      // 测试自定义颜色保存与恢复
+      const customCol = Color(0xFF9C27B0); // 紫色
+      appMgr.setCustomColor(customCol);
+      expect(appMgr.currentThemePreset.id, equals(AppThemePreset.customId));
+      expect(appMgr.primaryColor, equals(customCol));
+
+      // 再次初始化模拟冷启动恢复自定义颜色
+      await AppPreferences.init();
+      expect(AppearanceManager.instance.currentThemePreset.id, equals(AppThemePreset.customId));
+      expect(AppearanceManager.instance.primaryColor, equals(customCol));
     });
 
     test('saves and restores wallpaper transform & opacity & blur', () async {

@@ -41,6 +41,10 @@ class _DailySpotlightCardState extends State<DailySpotlightCard> {
     final current = widget.recommendations[_currentIndex.clamp(0, widget.recommendations.length - 1)];
     final item = current.item;
 
+    // 视觉舒适的琥珀金色阶：浅色模式采用深琥珀金 (amber-600) 避免白底刺眼，深色模式采用明朗金 (amber-400)
+    final amberColor = isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
+    final amberBgColor = isDark ? const Color(0xFFFBBF24).withAlpha(35) : const Color(0xFFD97706).withAlpha(24);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Column(
@@ -171,24 +175,24 @@ class _DailySpotlightCardState extends State<DailySpotlightCard> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                   decoration: BoxDecoration(
-                                    color: Colors.amber.withAlpha(isDark ? 40 : 25),
+                                    color: amberBgColor,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(
+                                      Icon(
                                         Icons.stars_rounded,
                                         size: 11,
-                                        color: Colors.amber,
+                                        color: amberColor,
                                       ),
                                       const SizedBox(width: 3),
                                       Text(
                                         '${current.matchRate}% 契合',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w700,
-                                          color: Colors.amber,
+                                          color: amberColor,
                                         ),
                                       ),
                                     ],
@@ -230,14 +234,14 @@ class _DailySpotlightCardState extends State<DailySpotlightCard> {
                             if (item.ratingScore > 0)
                               Row(
                                 children: [
-                                  const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                                  Icon(Icons.star_rounded, size: 14, color: amberColor),
                                   const SizedBox(width: 3),
                                   Text(
                                     item.ratingScore.toStringAsFixed(1),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
-                                      color: Colors.amber,
+                                      color: amberColor,
                                     ),
                                   ),
                                   const SizedBox(width: 4),

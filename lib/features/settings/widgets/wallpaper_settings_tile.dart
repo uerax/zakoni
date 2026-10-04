@@ -306,7 +306,7 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (hasCurrentScopeImg)
-                    const Icon(Icons.check_rounded, color: Color(0xFF0077B6), size: 18),
+                    Icon(Icons.check_rounded, color: theme.colorScheme.primary, size: 18),
                   const SizedBox(width: 4),
                   const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
                 ],

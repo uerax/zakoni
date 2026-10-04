@@ -37,6 +37,8 @@ class NetworkSettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -52,7 +54,7 @@ class NetworkSettingsCard extends StatelessWidget {
               title: '镜像加速',
               subtitle: '国内 CDN 加速',
               trailing: currentPreset == BangumiSourcePreset.mirror
-                  ? const Icon(Icons.check_rounded, color: Color(0xFF0077B6), size: 20)
+                  ? Icon(Icons.check_rounded, color: theme.colorScheme.primary, size: 20)
                   : null,
               onTap: () => _handlePresetChanged(context, BangumiSourcePreset.mirror),
             ),
@@ -65,7 +67,7 @@ class NetworkSettingsCard extends StatelessWidget {
               subtitle: '海外直连官方源',
               showDivider: false,
               trailing: currentPreset == BangumiSourcePreset.official
-                  ? const Icon(Icons.check_rounded, color: Color(0xFF0077B6), size: 20)
+                  ? Icon(Icons.check_rounded, color: theme.colorScheme.primary, size: 20)
                   : null,
               onTap: () => _handlePresetChanged(context, BangumiSourcePreset.official),
             ),

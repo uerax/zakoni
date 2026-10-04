@@ -133,7 +133,7 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
               ),
               title: 'MiSans',
               trailing: fontMgr.currentType == AppFontType.misans
-                  ? const Icon(Icons.check_rounded, color: Color(0xFF0077B6), size: 20)
+                  ? Icon(Icons.check_rounded, color: theme.colorScheme.primary, size: 20)
                   : null,
               onTap: () => fontMgr.setFontType(AppFontType.misans),
             ),
@@ -144,7 +144,7 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
               ),
               title: '系统默认',
               trailing: fontMgr.currentType == AppFontType.system
-                  ? const Icon(Icons.check_rounded, color: Color(0xFF0077B6), size: 20)
+                  ? Icon(Icons.check_rounded, color: theme.colorScheme.primary, size: 20)
                   : null,
               onTap: () => fontMgr.setFontType(AppFontType.system),
             ),
@@ -158,7 +158,7 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
                   ),
                   title: fontMgr.customFontName,
                   trailing: fontMgr.currentType == AppFontType.custom
-                      ? const Icon(Icons.check_rounded, color: Color(0xFF0077B6), size: 20)
+                      ? Icon(Icons.check_rounded, color: theme.colorScheme.primary, size: 20)
                       : null,
                   onTap: () => fontMgr.setFontType(AppFontType.custom),
                 ),

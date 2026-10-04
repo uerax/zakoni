@@ -3,20 +3,25 @@ import 'dart:ui';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../services/app_preferences.dart';
+import '../theme/app_theme_color.dart';
 
 /// 全局外观与个性化管理器：
 /// 1. 管理应用图标（默认内置泡面猫耳 Logo，支持上传自定义图片与一键恢复默认）；
 /// 2. 管理全屏背景壁纸（支持“全局一键应用”或“各页面单独设置”多级继承）；
 /// 3. 支持壁纸视窗垂直对齐/裁剪定位（AlignmentY: -1.0 偏顶 .. 1.0 偏底，避免二次元插画人物被裁面部）；
 /// 4. 支持壁纸不透明度 (Opacity) 与高斯模糊 (Blur) 平滑微调；
-/// 5. 继承 ChangeNotifier，通过全局 ListenableBuilder 即时响应，免重启生效；
-/// 6. 整合 AppPreferences 实现配置全量落盘持久化。
+/// 5. 管理应用主题色彩（支持预设二次元色彩方案一键无缝全局热切换）；
+/// 6. 继承 ChangeNotifier，通过全局 ListenableBuilder 即时响应，免重启生效；
+/// 7. 整合 AppPreferences 实现配置全量落盘持久化。
 class AppearanceManager extends ChangeNotifier {
   static final AppearanceManager instance = AppearanceManager._internal();
 
   AppearanceManager._internal();
 
   static const String defaultLogoAsset = 'assets/images/app_logo.png';
+
+  // 当前全局主题色预设（默认薄荷绿）
+  AppThemePreset _currentThemePreset = AppThemePreset.presets.first;
 
   // 自定义应用图标 / Logo 本地文件路径（null 表示使用内置默认 Logo）
   String? _customIconPath;
@@ -35,6 +40,9 @@ class AppearanceManager extends ChangeNotifier {
   // 壁纸视觉调节参数
   double _wallpaperOpacity = 0.18;
   double _wallpaperBlur = 1.0;
+
+  AppThemePreset get currentThemePreset => _currentThemePreset;
+  Color get primaryColor => _currentThemePreset.color;
 
   String? get customIconPath => _customIconPath;
   String? get globalWallpaperPath => _globalWallpaperPath;
@@ -67,6 +75,10 @@ class AppearanceManager extends ChangeNotifier {
 
   // --- 持久化恢复方法（供 AppPreferences 初始化时调用） ---
 
+  void restoreThemePreset(String presetId, {Color? customColor}) {
+    _currentThemePreset = AppThemePreset.findById(presetId, customColor: customColor);
+  }
+
   void restoreCustomIcon(String path) {
     _customIconPath = path;
   }
@@ -90,6 +102,24 @@ class AppearanceManager extends ChangeNotifier {
     if (scale != null) _wallpaperScale = scale;
     if (opacity != null) _wallpaperOpacity = opacity;
     if (blur != null) _wallpaperBlur = blur;
+  }
+
+  // --- 主题颜色相关方法 ---
+
+  /// 设置并持久化全局预设主题色
+  void setThemePreset(AppThemePreset preset) {
+    if (_currentThemePreset.id == preset.id) return;
+    _currentThemePreset = preset;
+    AppPreferences.saveThemePreset(preset.id);
+    notifyListeners();
+  }
+
+  /// 设置并持久化自定义主题色
+  void setCustomColor(Color color) {
+    _currentThemePreset = AppThemePreset.custom(color);
+    AppPreferences.saveThemePreset(AppThemePreset.customId);
+    AppPreferences.saveCustomThemeColor(color.toARGB32());
+    notifyListeners();
   }
 
   // --- 应用图标相关方法 ---

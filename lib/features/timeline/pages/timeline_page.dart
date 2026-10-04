@@ -119,11 +119,11 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
 
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.calendar_month_rounded, color: Color(0xFF0077B6)),
-            SizedBox(width: 8),
-            Text('连载周历', style: TextStyle(fontWeight: FontWeight.bold)),
+            Icon(Icons.calendar_month_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('连载周历', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         actions: [
