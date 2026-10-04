@@ -111,6 +111,32 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
     return shelf;
   }
 
+  /// 继续追番模块构建辅助函数：
+  /// 统一绑定本地播放历史单例（WatchHistoryService），无历史时返回 SizedBox.shrink() 0 像素占位。
+  Widget _buildContinueWatchingShelf() {
+    return _buildResponsiveShelf(
+      ListenableBuilder(
+        listenable: WatchHistoryService.instance,
+        builder: (context, _) {
+          final watchHistory = WatchHistoryService.instance.items;
+          return ContinueWatchingShelf(
+            records: watchHistory,
+            onResumeWatch: (record) {
+              showAnimeDetailSheet(context, record.toBangumiItem());
+            },
+            onViewAllHistory: () {
+              Navigator.of(context).push(
+                CupertinoPageRoute(
+                  builder: (context) => const HistoryPage(),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   Future<_HomeData> _fetchHomeData({
     bool forceRefresh = false,
   }) async {
@@ -316,231 +342,289 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         }
 
         final data = snapshot.data;
-        final calendarDays = data?.calendarDays ?? [];
-        final today = data?.today ?? [];
-        final weekdayName = data?.weekdayName ?? '今日';
-        final recommendations = data?.recommendations ?? [];
-        final tv = data?.tv ?? [];
-        final movies = data?.movies ?? [];
-        final ova = data?.ova ?? [];
+        if (data == null) {
+          return const SizedBox.shrink();
+        }
 
         // 精选探索流预留数据（开关开启时使用）
         final exploreItems = <BangumiItem>[
-          ...today,
-          ...tv,
-          ...movies,
-          ...ova,
+          ...data.today,
+          ...data.tv,
+          ...data.movies,
+          ...data.ova,
         ];
         final seenIds = <int>{};
         final uniqueExploreItems = exploreItems.where((item) => seenIds.add(item.id)).toList();
+
+        final isDesktop = context.isDesktop;
 
         return RefreshIndicator(
           onRefresh: () async {
             _loadData(forceRefresh: true);
             await _dataFuture;
           },
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            // 核心防卡顿防线：精确限制可视区外预加载距离（250px），未进入视口的卡片不发起网络下载
-            scrollCacheExtent: const ScrollCacheExtent.pixels(250),
-            slivers: [
-              // 顶部预留安全高度（状态栏 + 顶栏高度 42px），首屏内容在滚动时穿透并呈现高斯模糊磨砂效果
-              SliverToBoxAdapter(
-                child: SizedBox(height: safeTop + 42),
-              ),
-
-              // 继续追番模块（响应式单一可信数据源监听：修改历史记录瞬间 0ms 同步，无需重跑网络）
-              SliverToBoxAdapter(
-                child: _buildResponsiveShelf(
-                  ListenableBuilder(
-                    listenable: WatchHistoryService.instance,
-                    builder: (context, _) {
-                      final watchHistory = WatchHistoryService.instance.items;
-                      return ContinueWatchingShelf(
-                        records: watchHistory,
-                        onResumeWatch: (record) {
-                          showAnimeDetailSheet(context, record.toBangumiItem());
-                        },
-                        onViewAllHistory: () {
-                          Navigator.of(context).push(
-                            CupertinoPageRoute(
-                              builder: (context) => const HistoryPage(),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+          child: isDesktop
+              ? _buildDesktopLayout(
+                  context: context,
+                  theme: theme,
+                  safeTop: safeTop,
+                  data: data,
+                  uniqueExploreItems: uniqueExploreItems,
+                )
+              : _buildMobileLayout(
+                  context: context,
+                  theme: theme,
+                  safeTop: safeTop,
+                  data: data,
+                  uniqueExploreItems: uniqueExploreItems,
                 ),
-              ),
-
-              // 顶部新番每日放送与算法推荐：响应式双模式（宽屏模式下左右分栏，窄屏模式下纵向流）
-              SliverToBoxAdapter(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isDesktop = constraints.maxWidth >= AppBreakpoints.medium;
-
-                    if (isDesktop && (tv.isNotEmpty || today.isNotEmpty)) {
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 8, bottom: 12),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: HomeDesktopHero(
-                                bannerItems: tv,
-                                recommendations: recommendations,
-                                calendarDays: calendarDays,
-                                todayItems: today,
-                                weekdayName: weekdayName,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-
-                    // 移动端/窄屏模式：周历全周胶囊切换 + 今日推荐算法卡片
-                    return Column(
-                      children: [
-                        if (today.isNotEmpty || calendarDays.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          TodayAnimeShelf(
-                            calendarDays: calendarDays,
-                            items: today,
-                            weekdayName: weekdayName,
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                        if (recommendations.isNotEmpty) ...[
-                          DailySpotlightCard(
-                            recommendations: recommendations,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ],
-                    );
-                  },
-                ),
-              ),
-
-              // 货架 1：热门 TV 番剧独立货架
-              SliverToBoxAdapter(
-                child: _buildResponsiveShelf(
-                  AnimeHorizontalShelf(
-                    icon: Icons.tv_rounded,
-                    title: '热门 TV 番剧',
-                    items: tv,
-                    defaultStatType: 'heat',
-                    viewAllSubtitle: '浏览全部 TV',
-                    onViewAllTap: () => _onShelfViewAllTap('TV'),
-                  ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
-
-              // 货架 2：热门剧场版独立货架
-              SliverToBoxAdapter(
-                child: _buildResponsiveShelf(
-                  AnimeHorizontalShelf(
-                    icon: Icons.movie_filter_rounded,
-                    title: '热门剧场版',
-                    items: movies,
-                    defaultStatType: 'collect',
-                    viewAllSubtitle: '浏览全部剧场版',
-                    onViewAllTap: () => _onShelfViewAllTap('剧场版'),
-                  ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
-
-              // 货架 3：热门 OVA / 特别篇独立货架
-              SliverToBoxAdapter(
-                child: _buildResponsiveShelf(
-                  AnimeHorizontalShelf(
-                    icon: Icons.album_rounded,
-                    title: '热门 OVA / 特别篇',
-                    items: ova,
-                    defaultStatType: 'collect',
-                    viewAllSubtitle: '浏览全部 OVA',
-                    onViewAllTap: () => _onShelfViewAllTap('OVA'),
-                  ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
-
-              if (_showExploreSection) ...[
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 12),
-                ),
-
-                // 纵向双列探索板块大标题
-                if (uniqueExploreItems.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.explore_rounded,
-                            size: 18,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 7),
-                          Text(
-                            '精选探索',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.2,
-                              color: theme.textTheme.titleLarge?.color,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${uniqueExploreItems.length} 部精选',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // 纵向双列精选瀑布流网格
-                if (uniqueExploreItems.isNotEmpty)
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 14,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 0.65,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          return AnimeCard(item: uniqueExploreItems[index]);
-                        },
-                        childCount: uniqueExploreItems.length,
-                      ),
-                    ),
-                  ),
-              ],
-
-              // 底部留出 96px 安全高度，保证页面滑动至最底端时不会被悬浮毛玻璃胶囊遮挡
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 96),
-              ),
-            ],
-          ),
         );
       },
     );
+  }
+
+  /// 移动端布局流：
+  /// 特殊处理说明：
+  /// 1. 继续追番优先置顶：满足手机端单手操作“即开即看”的高频直达体验；
+  /// 2. 纵向流排布：周历每日放送横滑条 + 今日推荐算法大卡片 + 热门分类货架；
+  /// 3. 精确限制可视区外预加载距离（250px），未进入视口的卡片不发起网络下载。
+  Widget _buildMobileLayout({
+    required BuildContext context,
+    required ThemeData theme,
+    required double safeTop,
+    required _HomeData data,
+    required List<BangumiItem> uniqueExploreItems,
+  }) {
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      scrollCacheExtent: const ScrollCacheExtent.pixels(250),
+      slivers: [
+        // 顶部预留安全高度（状态栏 + 顶栏高度 42px），首屏内容在滚动时穿透并呈现高斯模糊磨砂效果
+        SliverToBoxAdapter(
+          child: SizedBox(height: safeTop + 42),
+        ),
+
+        // 移动端：继续追番置顶
+        SliverToBoxAdapter(
+          child: _buildContinueWatchingShelf(),
+        ),
+
+        // 每日放送周历横滑条 + 今日算法推荐卡片
+        SliverToBoxAdapter(
+          child: Column(
+            children: [
+              if (data.today.isNotEmpty || data.calendarDays.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                TodayAnimeShelf(
+                  calendarDays: data.calendarDays,
+                  items: data.today,
+                  weekdayName: data.weekdayName,
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (data.recommendations.isNotEmpty) ...[
+                DailySpotlightCard(
+                  recommendations: data.recommendations,
+                ),
+                const SizedBox(height: 12),
+              ],
+            ],
+          ),
+        ),
+
+        // 货架列表与探索板块
+        ..._buildShelfSlivers(
+          data: data,
+          theme: theme,
+          uniqueExploreItems: uniqueExploreItems,
+        ),
+
+        // 底部留出 96px 安全高度，保证页面滑动至最底端时不会被悬浮毛玻璃胶囊遮挡
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 96),
+        ),
+      ],
+    );
+  }
+
+  /// 桌面/宽屏端大屏布局：
+  /// 特殊处理说明：
+  /// 1. HomeDesktopHero 居首：以大图轮播+6宫格周历撑起大屏开阔门面与环境流光景深；
+  /// 2. 继续追番下移至 Hero 之后：符合从“宏观焦点”到“个人记录”再到“深度探索”的认知流向，避免扁平小卡片在首屏破坏视觉质感；
+  /// 3. 货架与模块全部限制在 maxContentWidth(1200dp) 居中垂直对齐。
+  Widget _buildDesktopLayout({
+    required BuildContext context,
+    required ThemeData theme,
+    required double safeTop,
+    required _HomeData data,
+    required List<BangumiItem> uniqueExploreItems,
+  }) {
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      scrollCacheExtent: const ScrollCacheExtent.pixels(250),
+      slivers: [
+        // 顶部预留安全高度（状态栏 + 顶栏高度 42px）
+        SliverToBoxAdapter(
+          child: SizedBox(height: safeTop + 42),
+        ),
+
+        // 桌面端：Hero 大屏门面（智能推荐轮播 + 全周新番 6 宫格矩阵）
+        if (data.tv.isNotEmpty || data.today.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 12),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: HomeDesktopHero(
+                      bannerItems: data.tv,
+                      recommendations: data.recommendations,
+                      calendarDays: data.calendarDays,
+                      todayItems: data.today,
+                      weekdayName: data.weekdayName,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // 桌面端：继续追番承接在 Hero 下方
+        SliverToBoxAdapter(
+          child: _buildContinueWatchingShelf(),
+        ),
+
+        // 货架列表与探索板块
+        ..._buildShelfSlivers(
+          data: data,
+          theme: theme,
+          uniqueExploreItems: uniqueExploreItems,
+        ),
+
+        // 底部留出 96px 安全高度
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 96),
+        ),
+      ],
+    );
+  }
+
+  /// 公共分类货架与探索板块 Slivers
+  List<Widget> _buildShelfSlivers({
+    required _HomeData data,
+    required ThemeData theme,
+    required List<BangumiItem> uniqueExploreItems,
+  }) {
+    return [
+      // 货架 1：热门 TV 番剧独立货架
+      SliverToBoxAdapter(
+        child: _buildResponsiveShelf(
+          AnimeHorizontalShelf(
+            icon: Icons.tv_rounded,
+            title: '热门 TV 番剧',
+            items: data.tv,
+            defaultStatType: 'heat',
+            viewAllSubtitle: '浏览全部 TV',
+            onViewAllTap: () => _onShelfViewAllTap('TV'),
+          ),
+        ),
+      ),
+      const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+      // 货架 2：热门剧场版独立货架
+      SliverToBoxAdapter(
+        child: _buildResponsiveShelf(
+          AnimeHorizontalShelf(
+            icon: Icons.movie_filter_rounded,
+            title: '热门剧场版',
+            items: data.movies,
+            defaultStatType: 'collect',
+            viewAllSubtitle: '浏览全部剧场版',
+            onViewAllTap: () => _onShelfViewAllTap('剧场版'),
+          ),
+        ),
+      ),
+      const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+      // 货架 3：热门 OVA / 特别篇独立货架
+      SliverToBoxAdapter(
+        child: _buildResponsiveShelf(
+          AnimeHorizontalShelf(
+            icon: Icons.album_rounded,
+            title: '热门 OVA / 特别篇',
+            items: data.ova,
+            defaultStatType: 'collect',
+            viewAllSubtitle: '浏览全部 OVA',
+            onViewAllTap: () => _onShelfViewAllTap('OVA'),
+          ),
+        ),
+      ),
+      const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+      if (_showExploreSection) ...[
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 12),
+        ),
+
+        // 纵向双列探索板块大标题
+        if (uniqueExploreItems.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.explore_rounded,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 7),
+                  Text(
+                    '精选探索',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                      color: theme.textTheme.titleLarge?.color,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${uniqueExploreItems.length} 部精选',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        // 纵向双列精选瀑布流网格
+        if (uniqueExploreItems.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.65,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  return AnimeCard(item: uniqueExploreItems[index]);
+                },
+                childCount: uniqueExploreItems.length,
+              ),
+            ),
+          ),
+      ],
+    ];
   }
 
   /// 1:1 动态流光骨架屏结构：对应轮播图、今日更新与 3 行独立货架的平滑加载占位

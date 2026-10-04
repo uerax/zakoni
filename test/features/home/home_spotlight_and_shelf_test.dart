@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zakoni/core/models/bangumi/bangumi_calendar.dart';
 import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
 import 'package:zakoni/core/models/home/recommend_item.dart';
+import 'package:zakoni/core/network/bangumi_client.dart';
+import 'package:zakoni/core/services/watch_history_service.dart';
+import 'package:zakoni/features/home/pages/home_page.dart';
 import 'package:zakoni/features/home/widgets/continue_watching_shelf.dart';
 import 'package:zakoni/features/home/widgets/daily_spotlight_card.dart';
 import 'package:zakoni/features/home/widgets/home_desktop_hero.dart';
@@ -215,4 +221,120 @@ void main() {
       expect(find.textContaining('周六'), findsOneWidget);
     });
   });
+
+  group('HomePage responsive ContinueWatchingShelf placement tests', () {
+    testWidgets('Mobile (<840dp): ContinueWatchingShelf is above TodayAnimeShelf', (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await WatchHistoryService.instance.getHistory();
+
+      final dio = Dio();
+      dio.httpClientAdapter = _MockPlacementClientAdapter();
+      final client = BangumiClient(dio: dio);
+
+      await tester.pumpWidget(MaterialApp(home: HomePage(client: client)));
+      await tester.pumpAndSettle();
+
+      final continueWatchingY = tester.getTopLeft(find.byType(ContinueWatchingShelf)).dy;
+      final todayShelfY = tester.getTopLeft(find.byType(TodayAnimeShelf)).dy;
+      expect(continueWatchingY, lessThan(todayShelfY));
+    });
+
+    testWidgets('Desktop (>=840dp): ContinueWatchingShelf is below HomeDesktopHero', (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await WatchHistoryService.instance.getHistory();
+
+      final dio = Dio();
+      dio.httpClientAdapter = _MockPlacementClientAdapter();
+      final client = BangumiClient(dio: dio);
+
+      await tester.pumpWidget(MaterialApp(home: HomePage(client: client)));
+      await tester.pumpAndSettle();
+
+      final heroY = tester.getTopLeft(find.byType(HomeDesktopHero)).dy;
+      final continueWatchingY = tester.getTopLeft(find.byType(ContinueWatchingShelf)).dy;
+      expect(heroY, lessThan(continueWatchingY));
+    });
+  });
+}
+
+class _MockPlacementClientAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final now = DateTime.now();
+    final todayWeekday = now.weekday;
+
+    if (options.path.contains('calendar')) {
+      final days = List.generate(7, (i) {
+        final dayIndex = i + 1;
+        return {
+          'weekday': {'id': dayIndex, 'en': 'Day $dayIndex', 'cn': '星期$dayIndex', 'ja': ''},
+          'items': dayIndex == todayWeekday
+              ? [
+                  {
+                    'id': 1001,
+                    'type': 2,
+                    'name': 'Today Mock',
+                    'name_cn': '今日番剧',
+                    'summary': '简介',
+                    'air_date': '2026-04-01',
+                    'air_weekday': dayIndex,
+                    'rank': 1,
+                    'rating': {'score': 9.0, 'total': 100},
+                    'collection': {'doing': 100, 'collect': 200},
+                    'eps': 12,
+                    'eps_count': 12,
+                    'images': {'large': '', 'common': ''},
+                  }
+                ]
+              : [],
+        };
+      });
+      return ResponseBody.fromString(
+        jsonEncode(days),
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
+
+    return ResponseBody.fromString(
+      jsonEncode({
+        'data': [
+          {
+            'id': 2001,
+            'type': 2,
+            'name': 'TV Mock',
+            'name_cn': '热门 TV',
+            'summary': '简介',
+            'air_date': '2026-04-01',
+            'air_weekday': 1,
+            'rank': 1,
+            'rating': {'score': 8.5, 'total': 100},
+            'collection': {'doing': 100, 'collect': 200},
+            'eps': 12,
+            'eps_count': 12,
+            'images': {'large': '', 'common': ''},
+          }
+        ]
+      }),
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
