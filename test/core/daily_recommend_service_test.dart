@@ -201,22 +201,22 @@ void main() {
       // 槽位 0 (Top 1 主力)
       expect(
         DailyRecommendService.buildRecommendReason(0, '恋爱', mockItem),
-        equals('💡 命中你偏好最高的【恋爱】题材，Bangumi 8.6分'),
+        equals('命中你偏好最高的【恋爱】题材，Bangumi 8.6分'),
       );
       // 槽位 1 (Top 2 次级主力)
       expect(
         DailyRecommendService.buildRecommendReason(1, '悬疑', mockItem),
-        equals('💡 兼顾你关注的【悬疑】风向，Bangumi 8.6分'),
+        equals('兼顾你关注的【悬疑】风向，Bangumi 8.6分'),
       );
       // 槽位 3 (长尾探索)
       expect(
         DailyRecommendService.buildRecommendReason(3, '科幻', mockItem),
-        equals('💡 偶尔换换口味：捕捉到你兴趣库中的【科幻】基因，翻出的宝藏作品'),
+        equals('偶尔换换口味：捕捉到你兴趣库中的【科幻】基因，翻出的宝藏作品'),
       );
       // 冷启动
       expect(
         DailyRecommendService.buildRecommendReason(0, null, mockItem),
-        equals('💡 今日番剧推荐：Bangumi 8.6分'),
+        equals('今日番剧推荐：Bangumi 8.6分'),
       );
     });
   });

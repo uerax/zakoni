@@ -362,26 +362,27 @@ class DailyRecommendService {
   }
 
   /// 四维槽位推荐理由文案动态引擎
+  /// 特殊处理说明：文案返回纯语义文本，不包含 💡 等装饰 Emoji，避免与 UI 层的图标控件叠加显示重复。
   static String buildRecommendReason(int slotIndex, String? mainTag, BangumiItem item) {
     final scoreStr = item.ratingScore > 0 ? '${item.ratingScore.toStringAsFixed(1)}分' : '高分';
 
     // 槽位 0 (Top 1 主力)
     if (slotIndex == 0 && mainTag != null) {
-      return '💡 命中你偏好最高的【$mainTag】题材，Bangumi $scoreStr';
+      return '命中你偏好最高的【$mainTag】题材，Bangumi $scoreStr';
     }
 
     // 槽位 1~2 (Top 2~3 次级主力)
     if ((slotIndex == 1 || slotIndex == 2) && mainTag != null) {
-      return '💡 兼顾你关注的【$mainTag】风向，Bangumi $scoreStr';
+      return '兼顾你关注的【$mainTag】风向，Bangumi $scoreStr';
     }
 
     // 槽位 3~4 (长尾探索)
     if ((slotIndex == 3 || slotIndex == 4) && mainTag != null) {
-      return '💡 偶尔换换口味：捕捉到你兴趣库中的【$mainTag】基因，翻出的宝藏作品';
+      return '偶尔换换口味：捕捉到你兴趣库中的【$mainTag】基因，翻出的宝藏作品';
     }
 
     // 冷启动 / 退化全量
-    return '💡 今日番剧推荐：Bangumi $scoreStr';
+    return '今日番剧推荐：Bangumi $scoreStr';
   }
 
   /// 辅助方法：将番剧列表批量包装为带默认推荐理由的实体
