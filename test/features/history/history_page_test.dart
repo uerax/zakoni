@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zakoni/core/services/app_preferences.dart';
+import 'package:zakoni/core/services/watch_history_service.dart';
 import 'package:zakoni/features/history/pages/history_page.dart';
+import 'package:zakoni/features/home/widgets/continue_watching_shelf.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -10,6 +12,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await AppPreferences.init();
+    WatchHistoryService.instance.resetForTest();
   });
 
   group('HistoryPage widget tests', () {
@@ -69,6 +72,45 @@ void main() {
       expect(find.text('暂无播放历史'), findsOneWidget);
       expect(find.text('快去挑选喜欢的动画开始追番吧'), findsOneWidget);
       expect(find.byIcon(Icons.history_toggle_off_rounded), findsOneWidget);
+    });
+
+    testWidgets('Deleting an item reactively updates listening widgets like ContinueWatchingShelf from AB to AC', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final history = await WatchHistoryService.instance.getHistory();
+      expect(history.length, equals(3));
+      final itemB = history[1]; // B: 迷宫饭
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListenableBuilder(
+              listenable: WatchHistoryService.instance,
+              builder: (context, _) => ContinueWatchingShelf(
+                records: WatchHistoryService.instance.items,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 最初手机端展示前 2 部：葬送的芙莉莲 (A) 和 迷宫饭 (B)
+      expect(find.text('葬送的芙莉莲'), findsOneWidget);
+      expect(find.text('迷宫饭'), findsOneWidget);
+      expect(find.text('间谍过家家 第二季'), findsNothing);
+
+      // 删除 B (迷宫饭)
+      await WatchHistoryService.instance.remove(itemB.id);
+      await tester.pumpAndSettle();
+
+      // 响应式自动更新为：葬送的芙莉莲 (A) 和 间谍过家家 第二季 (C)！迷宫饭 (B) 消失！
+      expect(find.text('葬送的芙莉莲'), findsOneWidget);
+      expect(find.text('迷宫饭'), findsNothing);
+      expect(find.text('间谍过家家 第二季'), findsOneWidget);
     });
   });
 }

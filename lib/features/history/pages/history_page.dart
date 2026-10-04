@@ -20,7 +20,6 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  List<WatchHistoryItem> _items = [];
   bool _isLoading = true;
 
   @override
@@ -30,10 +29,9 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _loadHistory() async {
-    final history = await WatchHistoryService.getHistory();
+    await WatchHistoryService.instance.getHistory();
     if (mounted) {
       setState(() {
-        _items = history;
         _isLoading = false;
       });
     }
@@ -41,10 +39,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _deleteItem(WatchHistoryItem item) async {
     HapticFeedback.lightImpact();
-    await WatchHistoryService.remove(item.id);
-    setState(() {
-      _items.removeWhere((i) => i.id == item.id);
-    });
+    await WatchHistoryService.instance.remove(item.id);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -79,10 +74,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
     if (confirmed == true) {
       HapticFeedback.mediumImpact();
-      await WatchHistoryService.clear();
-      setState(() {
-        _items = [];
-      });
+      await WatchHistoryService.instance.clear();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('播放历史已清空')),
@@ -95,33 +87,38 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final groups = groupWatchHistory(_items);
-    final stats = computeHistoryStats(_items);
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text(
-          '播放历史',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-        ),
-        centerTitle: true,
-        actions: [
-          if (_items.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep_rounded),
-              tooltip: '清空历史',
-              onPressed: _confirmClearAll,
+    return ListenableBuilder(
+      listenable: WatchHistoryService.instance,
+      builder: (context, _) {
+        final items = WatchHistoryService.instance.items;
+        final groups = groupWatchHistory(items);
+        final stats = computeHistoryStats(items);
+
+        return Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          appBar: AppBar(
+            title: const Text(
+              '播放历史',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
             ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _items.isEmpty
-              ? _buildEmptyState(context, theme)
-              : CustomScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  slivers: [
+            centerTitle: true,
+            actions: [
+              if (items.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.delete_sweep_rounded),
+                  tooltip: '清空历史',
+                  onPressed: _confirmClearAll,
+                ),
+            ],
+          ),
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : items.isEmpty
+                  ? _buildEmptyState(context, theme)
+                  : CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
                     // 1. 顶部数据指标胶囊统计栏
                     SliverToBoxAdapter(
                       child: Padding(
@@ -188,6 +185,8 @@ class _HistoryPageState extends State<HistoryPage> {
                     ),
                   ],
                 ),
+        );
+      },
     );
   }
 

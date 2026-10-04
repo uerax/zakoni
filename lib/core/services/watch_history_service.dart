@@ -1,15 +1,25 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../models/history/watch_history_item.dart';
 import 'app_preferences.dart';
 
-/// 播放历史与继续观看本地持久化服务（对齐 animaku apps/web/src/stores/history.ts）：
-/// 1. 负责记录用户观看番剧的最新进度、所属集数、视频源插件 (pluginName) 与线路 (road)；
-/// 2. 幂等与去重策略：同一番剧同一集数仅保留最新一条记录，新记录置顶，最多持久化 200 条；
-/// 3. 测试与冷启动保护：在未开发视频播放器或本地历史为空时，主动注入 3 条具备真实视频源与 Bangumi 封面的种子数据供测试。
-class WatchHistoryService {
+/// 播放历史与继续观看响应式单一数据源服务（对齐 animaku apps/web/src/stores/history.ts 与 Flutter ChangeNotifier 模式）：
+/// 1. 响应式单一可信源：继承 ChangeNotifier，任何对历史的增删改均自动通过 notifyListeners() 广播至全应用所有监听页面；
+/// 2. 独立于网络请求：本地播放历史与慢速网络 API 完全解耦，首页与历史页通过 ListenableBuilder 毫秒级动态同步；
+/// 3. 单动漫聚合策略：同一番剧最新集数置顶更新，每部动漫在历史中只占一行，彻底杜绝列表刷屏；
+/// 4. 容量与持久化管理：上限 200 条，落盘持久化至 AppPreferences；
+/// 5. 冷启动种子数据：在本地无历史时自动注入 3 条具备真实视频源与 Bangumi 封面的测试数据。
+class WatchHistoryService extends ChangeNotifier {
+  static final WatchHistoryService instance = WatchHistoryService._();
   WatchHistoryService._();
 
   static const int maxItems = 200;
+
+  List<WatchHistoryItem> _items = [];
+  bool _isInitialized = false;
+
+  /// 内存中当前的播放历史列表（只读不可变快照）
+  List<WatchHistoryItem> get items => List.unmodifiable(_items);
 
   /// 预置的 3 部真实测试数据（包含视频源、线路与时长进度）
   static List<WatchHistoryItem> get initialMockSeeds {
@@ -57,19 +67,26 @@ class WatchHistoryService {
     ];
   }
 
-  /// 获取播放历史列表（若本地缓存为空，自动落盘并返回 3 条测试数据）
-  static Future<List<WatchHistoryItem>> getHistory() async {
+  /// 获取播放历史列表（首次调用自动加载持久化缓存，为空时自动注入种子数据）
+  Future<List<WatchHistoryItem>> getHistory({bool forceReload = false}) async {
+    if (_isInitialized && !forceReload) {
+      return _items;
+    }
+
     final rawJson = AppPreferences.getWatchHistoryJson();
     if (rawJson != null && rawJson.isNotEmpty) {
       try {
         final decoded = jsonDecode(rawJson);
         if (decoded is List) {
-          final items = decoded
+          final loaded = decoded
               .whereType<Map<String, dynamic>>()
               .map((j) => WatchHistoryItem.fromJson(j))
               .toList();
-          if (items.isNotEmpty) {
-            return items;
+          if (loaded.isNotEmpty) {
+            _items = loaded;
+            _isInitialized = true;
+            notifyListeners();
+            return _items;
           }
         }
       } catch (_) {}
@@ -77,47 +94,75 @@ class WatchHistoryService {
 
     // 本地缓存为空时，注入种子数据并异步落盘
     final seeds = initialMockSeeds;
-    await saveHistory(seeds);
-    return seeds;
+    _items = List.of(seeds);
+    _isInitialized = true;
+    await _persist();
+    notifyListeners();
+    return _items;
   }
 
-  /// 全量保存历史记录
-  static Future<void> saveHistory(List<WatchHistoryItem> items) async {
-    final jsonList = items.take(maxItems).map((e) => e.toJson()).toList();
+  /// 内部持久化辅助方法
+  Future<void> _persist() async {
+    final jsonList = _items.take(maxItems).map((e) => e.toJson()).toList();
     await AppPreferences.saveWatchHistoryJson(jsonEncode(jsonList));
   }
 
+  /// 全量保存历史记录（更新内存、落盘并广播）
+  Future<void> saveHistory(List<WatchHistoryItem> newItems) async {
+    _items = List.of(newItems.take(maxItems));
+    _isInitialized = true;
+    await _persist();
+    notifyListeners();
+  }
+
   /// 更新或插入单条播放进度（最新在前，同番剧聚合替换为最新进度，每部动漫占一行）
-  static Future<void> recordProgress(WatchHistoryItem entry) async {
-    final currentList = await getHistory();
+  Future<void> recordProgress(WatchHistoryItem entry) async {
+    if (!_isInitialized) await getHistory();
+
     final updatedList = <WatchHistoryItem>[entry];
 
     // 核心策略：同一番剧只保留最新一条记录（按 bangumiId 聚合更新），杜绝移动端列表刷屏
-    for (final item in currentList) {
+    for (final item in _items) {
       if (item.bangumiId != entry.bangumiId) {
         updatedList.add(item);
       }
     }
 
-    await saveHistory(updatedList);
+    _items = updatedList.take(maxItems).toList();
+    await _persist();
+    notifyListeners();
   }
 
   /// 移除指定 ID 的记录
-  static Future<void> remove(String id) async {
-    final currentList = await getHistory();
-    final filtered = currentList.where((item) => item.id != id).toList();
-    await saveHistory(filtered);
+  Future<void> remove(String id) async {
+    if (!_isInitialized) await getHistory();
+
+    _items.removeWhere((item) => item.id == id);
+    await _persist();
+    notifyListeners();
   }
 
   /// 批量删除记录
-  static Future<void> removeMany(Set<String> ids) async {
-    final currentList = await getHistory();
-    final filtered = currentList.where((item) => !ids.contains(item.id)).toList();
-    await saveHistory(filtered);
+  Future<void> removeMany(Set<String> ids) async {
+    if (!_isInitialized) await getHistory();
+
+    _items.removeWhere((item) => ids.contains(item.id));
+    await _persist();
+    notifyListeners();
   }
 
   /// 清空播放历史
-  static Future<void> clear() async {
+  Future<void> clear() async {
+    _items.clear();
+    _isInitialized = true;
     await AppPreferences.clearWatchHistory();
+    notifyListeners();
+  }
+
+  /// 重置初始化状态（主要用于单元测试隔离）
+  @visibleForTesting
+  void resetForTest() {
+    _items = [];
+    _isInitialized = false;
   }
 }

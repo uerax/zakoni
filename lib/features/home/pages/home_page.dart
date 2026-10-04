@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../../../core/models/bangumi/bangumi_calendar.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
-import '../../../core/models/history/watch_history_item.dart';
 import '../../../core/models/home/recommend_item.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/services/daily_recommend_service.dart';
@@ -25,7 +24,6 @@ typedef _HomeData = ({
   List<BangumiItem> today,
   String weekdayName,
   List<RecommendItem> recommendations,
-  List<WatchHistoryItem> watchHistory,
   List<BangumiItem> tv,
   List<BangumiItem> movies,
   List<BangumiItem> ova,
@@ -63,6 +61,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   @override
   void initState() {
     super.initState();
+    WatchHistoryService.instance.getHistory();
     _loadData();
   }
 
@@ -115,8 +114,6 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   Future<_HomeData> _fetchHomeData({
     bool forceRefresh = false,
   }) async {
-    final watchHistoryFuture = WatchHistoryService.getHistory();
-
     final results = await Future.wait([
       widget.client.getCalendar(forceRefresh: forceRefresh),
       widget.client.getTrending(limit: 18, forceRefresh: forceRefresh),
@@ -158,14 +155,11 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
       forceRefresh: forceRefresh,
     );
 
-    final watchHistory = await watchHistoryFuture;
-
     return (
       calendarDays: calendarDays,
       today: todayItems,
       weekdayName: weekdayName,
       recommendations: recommendations,
-      watchHistory: watchHistory,
       tv: tv,
       movies: movies,
       ova: ova,
@@ -326,7 +320,6 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         final today = data?.today ?? [];
         final weekdayName = data?.weekdayName ?? '今日';
         final recommendations = data?.recommendations ?? [];
-        final watchHistory = data?.watchHistory ?? [];
         final tv = data?.tv ?? [];
         final movies = data?.movies ?? [];
         final ova = data?.ova ?? [];
@@ -356,19 +349,25 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
                 child: SizedBox(height: safeTop + 42),
               ),
 
-              // 继续追番模块（数据驱动，无记录时 0 像素折叠隐身）
+              // 继续追番模块（响应式单一可信数据源监听：修改历史记录瞬间 0ms 同步，无需重跑网络）
               SliverToBoxAdapter(
                 child: _buildResponsiveShelf(
-                  ContinueWatchingShelf(
-                    records: watchHistory,
-                    onResumeWatch: (record) {
-                      showAnimeDetailSheet(context, record.toBangumiItem());
-                    },
-                    onViewAllHistory: () {
-                      Navigator.of(context).push(
-                        CupertinoPageRoute(
-                          builder: (context) => const HistoryPage(),
-                        ),
+                  ListenableBuilder(
+                    listenable: WatchHistoryService.instance,
+                    builder: (context, _) {
+                      final watchHistory = WatchHistoryService.instance.items;
+                      return ContinueWatchingShelf(
+                        records: watchHistory,
+                        onResumeWatch: (record) {
+                          showAnimeDetailSheet(context, record.toBangumiItem());
+                        },
+                        onViewAllHistory: () {
+                          Navigator.of(context).push(
+                            CupertinoPageRoute(
+                              builder: (context) => const HistoryPage(),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),

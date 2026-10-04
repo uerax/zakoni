@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/network/bangumi_client.dart';
 import 'core/providers/bangumi_providers.dart';
 import 'core/services/app_preferences.dart';
+import 'core/services/watch_history_service.dart';
 import 'core/utils/font_manager.dart';
 import 'core/utils/scroll_behavior.dart';
 import 'features/main_navigation_shell.dart';
@@ -15,6 +16,7 @@ void main() async {
 
   // 1. 初始化并恢复本地持久化配置（网络线路、字体、壁纸等）
   await AppPreferences.init();
+  await WatchHistoryService.instance.getHistory();
 
   // 2. 依据运行平台动态调优 Flutter 全局 ImageCache 显存水线与图片缓存数量：
   // 移动端：100MB / 200 张，保障滑动流畅并防止显存溢出；

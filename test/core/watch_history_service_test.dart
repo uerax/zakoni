@@ -10,6 +10,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await AppPreferences.init();
+    WatchHistoryService.instance.resetForTest();
   });
 
   group('WatchHistoryItem & WatchHistoryService tests', () {
@@ -47,7 +48,7 @@ void main() {
     });
 
     test('getHistory returns 3 mock seeds with video sources on empty cache', () async {
-      final history = await WatchHistoryService.getHistory();
+      final history = await WatchHistoryService.instance.getHistory();
 
       expect(history.length, equals(3));
       expect(history[0].title, equals('葬送的芙莉莲'));
@@ -70,8 +71,14 @@ void main() {
       expect(persistedJson, contains('omofun'));
     });
 
-    test('recordProgress prepends new record and deduplicates same episode', () async {
-      await WatchHistoryService.getHistory(); // 初始化 3 条种子
+    test('recordProgress prepends new record and deduplicates same anime, notifying listeners', () async {
+      await WatchHistoryService.instance.getHistory(); // 初始化 3 条种子
+
+      var notified = false;
+      void listener() {
+        notified = true;
+      }
+      WatchHistoryService.instance.addListener(listener);
 
       final newProgress = WatchHistoryItem(
         id: WatchHistoryItem.buildId(400650, 15),
@@ -85,15 +92,18 @@ void main() {
         updatedAt: DateTime.now().millisecondsSinceEpoch,
       );
 
-      await WatchHistoryService.recordProgress(newProgress);
-      final updated = await WatchHistoryService.getHistory();
+      await WatchHistoryService.instance.recordProgress(newProgress);
+      final updated = await WatchHistoryService.instance.getHistory();
 
+      expect(notified, isTrue);
       // 数量仍为 3（同番剧聚合替换为最新集数）
       expect(updated.length, equals(3));
       // 最新记录排在第一位，且集数为 15
       expect(updated.first.bangumiId, equals(400650));
       expect(updated.first.episode, equals(15));
       expect(updated.first.position, equals(1200.0));
+
+      WatchHistoryService.instance.removeListener(listener);
     });
 
     test('groupWatchHistory and computeHistoryStats algorithms work correctly', () {
@@ -145,16 +155,25 @@ void main() {
       expect(stats.totalWatchHours, closeTo(0.67, 0.05));
     });
 
-    test('remove and clear methods work as expected', () async {
-      final history = await WatchHistoryService.getHistory();
+    test('remove and clear methods work as expected and notify listeners', () async {
+      final history = await WatchHistoryService.instance.getHistory();
       expect(history.length, equals(3));
 
-      await WatchHistoryService.remove(history.first.id);
-      final afterRemove = await WatchHistoryService.getHistory();
-      expect(afterRemove.length, equals(2));
+      var removeNotified = false;
+      WatchHistoryService.instance.addListener(() => removeNotified = true);
 
-      await WatchHistoryService.clear();
+      await WatchHistoryService.instance.remove(history.first.id);
+      final afterRemove = await WatchHistoryService.instance.getHistory();
+      expect(afterRemove.length, equals(2));
+      expect(removeNotified, isTrue);
+
+      var clearNotified = false;
+      WatchHistoryService.instance.addListener(() => clearNotified = true);
+
+      await WatchHistoryService.instance.clear();
       expect(AppPreferences.getWatchHistoryJson(), isNull);
+      expect(WatchHistoryService.instance.items, isEmpty);
+      expect(clearNotified, isTrue);
     });
   });
 }
