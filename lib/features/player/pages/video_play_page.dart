@@ -1,14 +1,10 @@
 import 'dart:io';
-import 'dart:ui';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/models/bangumi/bangumi_episode.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/services/bangumi_oped_service.dart';
-import '../../common/widgets/bouncing_scale_card.dart';
-import '../../common/widgets/cached_anime_image.dart';
 import '../controller/playback_controller.dart';
 import '../danmaku/danmaku.dart';
 import '../source/auto_source_pick_coordinator.dart';
@@ -18,12 +14,12 @@ import '../source/source_aggregator.dart';
 import '../source/source_bundle_manager.dart';
 import '../source/source_keyword_matcher.dart';
 import '../source/utils/playable_slot_engine.dart';
-import '../widgets/episode_picker_section.dart';
-import '../widgets/player_controls.dart';
 import '../widgets/player_side_panel.dart';
+import '../widgets/video_player_layouts.dart';
+import '../widgets/video_player_placeholder.dart';
+import '../widgets/video_player_surface_with_controls.dart';
+import '../widgets/video_play_tabs.dart';
 import '../widgets/video_source_view.dart';
-import '../widgets/video_surface.dart';
-import '../widgets/watch_meta_view.dart';
 
 /// zakoni 统一多端视频播放页面 (1:1 严格对齐 animaku 完整视频源生命周期与架构规范)
 ///
@@ -52,31 +48,22 @@ class VideoPlayPage extends StatefulWidget {
 
   /// 视频/番剧标题
   final String title;
-
   /// Bangumi 详情数据模型 (Seed)
   final BangumiItem? bangumiItem;
-
   /// 番剧海报封面地址 (Seed)
   final String? coverUrl;
-
   /// 预置静态视频流地址 (若不为空则直接起播)
   final String? videoUrl;
-
   /// 防盗链请求头 (如 Referer)
   final Map<String, String>? httpHeaders;
-
   /// 断点续播初始时间戳
   final Duration? initialPosition;
-
   /// 预加载弹幕数据
   final List<DanmakuItem>? danmakuItems;
-
   /// 总集数占位参数
   final int episodeCount;
-
   /// 当前播放集数 (从 1 开始，若为 null 则表示未起播占位态)
   final int? currentEpisode;
-
   /// 切集回调
   final ValueChanged<int>? onEpisodeSelected;
 
@@ -125,6 +112,9 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     final idx = _selectedRoadIndex.clamp(0, _chapterRoads.length - 1);
     return _chapterRoads[idx].episodes;
   }
+
+  int get _displayEpisodeCount =>
+      _currentSlots.isNotEmpty ? _currentSlots.length : (_currentEpisodes.isNotEmpty ? _currentEpisodes.length : widget.episodeCount);
 
   /// 使用 PlayableSlotEngine 构建双层对齐的标准槽位列表
   List<PlayableSlot> get _currentSlots {
@@ -797,13 +787,8 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     ]);
   }
 
-  void _toggleFullscreen() {
-    if (_isFullscreen) {
-      _exitFullscreen();
-    } else {
-      _enterFullscreen();
-    }
-  }
+  void _toggleFullscreen() =>
+      _isFullscreen ? _exitFullscreen() : _enterFullscreen();
 
   void _handleBackPressed() {
     if (_isSidePanelOpen) {
@@ -819,12 +804,9 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     Navigator.of(context).maybePop();
   }
 
-  String get _resolvedCoverUrl {
-    if (widget.coverUrl != null && widget.coverUrl!.isNotEmpty) {
-      return widget.coverUrl!;
-    }
-    return _effectiveBangumiItem?.coverUrl ?? '';
-  }
+  String get _resolvedCoverUrl => (widget.coverUrl?.isNotEmpty ?? false)
+      ? widget.coverUrl!
+      : (_effectiveBangumiItem?.coverUrl ?? '');
 
   @override
   Widget build(BuildContext context) {
@@ -865,718 +847,151 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   /// 顶部播放器或未起播海报占位组件
   Widget _buildPlayerOrPlaceholder({required bool isFullscreen}) {
     if (!_hasStartedPlayback) {
-      return _buildInitialPlaceholder();
+      return VideoPlayerInitialPlaceholder(
+        coverUrl: _resolvedCoverUrl,
+        title: widget.title,
+        isLoadingChapters: _isLoadingChapters,
+        selectedSourceName: _selectedSourceName,
+        hasEpisodes: _currentEpisodes.isNotEmpty,
+        onBackPressed: _handleBackPressed,
+        onPlayPressed: () {
+          if (_currentEpisodes.isNotEmpty) {
+            _selectEpisode(_activeEpisode ?? 1);
+          }
+        },
+      );
     }
 
     final epTitle = _activeEpisode != null ? ' - 第 $_activeEpisode 话' : '';
     final primaryColor = Theme.of(context).colorScheme.primary;
 
-    return Stack(
-      children: [
-        VideoSurface(
-          controller: _playbackController,
-          danmakuController: _danmakuController,
-          overlay: PlayerControls(
-            controller: _playbackController,
-            title: '${widget.title}$epTitle',
-            danmakuController: _danmakuController,
-            isFullscreen: isFullscreen,
-            onToggleFullscreen: _toggleFullscreen,
-            onBackPressed: _handleBackPressed,
-            onOpenEpisodePicker: isFullscreen
-                ? () => setState(() {
-                      _sidePanelInitialTab = PlayerSidePanelTab.episodes;
-                      _isSidePanelOpen = !_isSidePanelOpen;
-                    })
-                : null,
-            onOpenSidePanel: isFullscreen
-                ? (tab) => setState(() {
-                      _sidePanelInitialTab = tab;
-                      _isSidePanelOpen = true;
-                    })
-                : null,
-            onNextEpisode: (_activeEpisode != null &&
-                    _activeEpisode! < _currentEpisodes.length)
-                ? () => _selectEpisode(_activeEpisode! + 1)
-                : null,
-            onPrevEpisode: (_activeEpisode != null && _activeEpisode! > 1)
-                ? () => _selectEpisode(_activeEpisode! - 1)
-                : null,
-            opedSegment: _currentOpedSegment,
-          ),
-        ),
-
-        // HUD Toast 悬浮提示胶囊
-        if (_hudToast != null)
-          Positioned(
-            top: 20,
-            left: 20,
-            right: 20,
-            child: Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 16),
-                        const SizedBox(width: 8),
-                        Text(
-                          _hudToast!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-        // iOS 风格解析失败提示磨砂卡片
-        if (_resolveError != null)
-          Container(
-            color: Colors.black.withValues(alpha: 0.55),
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            alignment: Alignment.center,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 36),
-                      const SizedBox(height: 10),
-                      Text(
-                        _resolveError!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          BouncingScaleCard(
-                            scaleDown: 0.94,
-                            onTap: () {
-                              if (_activeEpisode != null) {
-                                _selectEpisode(_activeEpisode!);
-                              } else {
-                                _startDefaultSourceSearch(autoPlayFirst: true);
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.25),
-                                  width: 0.5,
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.refresh_rounded, color: Colors.white, size: 15),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    '重试',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          BouncingScaleCard(
-                            scaleDown: 0.94,
-                            onTap: () {
-                              _autoPicker.onUserAction();
-                              _tabController.animateTo(1);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                              decoration: BoxDecoration(
-                                color: primaryColor,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 16),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    '切换视频源',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
+    return VideoPlayerSurfaceWithControls(
+      controller: _playbackController,
+      title: '${widget.title}$epTitle',
+      danmakuController: _danmakuController,
+      isFullscreen: isFullscreen,
+      onToggleFullscreen: _toggleFullscreen,
+      onBackPressed: _handleBackPressed,
+      onOpenEpisodePicker: isFullscreen
+          ? () => setState(() {
+                _sidePanelInitialTab = PlayerSidePanelTab.episodes;
+                _isSidePanelOpen = !_isSidePanelOpen;
+              })
+          : null,
+      onOpenSidePanel: isFullscreen
+          ? (tab) => setState(() {
+                _sidePanelInitialTab = tab;
+                _isSidePanelOpen = true;
+              })
+          : null,
+      onNextEpisode: (_activeEpisode != null &&
+              _activeEpisode! < _currentEpisodes.length)
+          ? () => _selectEpisode(_activeEpisode! + 1)
+          : null,
+      onPrevEpisode: (_activeEpisode != null && _activeEpisode! > 1)
+          ? () => _selectEpisode(_activeEpisode! - 1)
+          : null,
+      opedSegment: _currentOpedSegment,
+      hudToast: _hudToast,
+      resolveError: _resolveError,
+      primaryColor: primaryColor,
+      onRetryResolve: () {
+        if (_activeEpisode != null) {
+          _selectEpisode(_activeEpisode!);
+        } else {
+          _startDefaultSourceSearch(autoPlayFirst: true);
+        }
+      },
+      onSwitchSource: () {
+        _autoPicker.onUserAction();
+        _tabController.animateTo(1);
+      },
     );
   }
 
-  /// 未起播海报占位组件 (iOS Ambient & Frosted Play Button)
-  Widget _buildInitialPlaceholder() {
-    final cover = _resolvedCoverUrl;
-
-    return Stack(
-      fit: StackFit.expand,
+  /// 详情 / 视频源 / 选集 组合分段面板
+  Widget _buildTabSection() {
+    return Column(
       children: [
-        if (cover.isNotEmpty)
-          CachedAnimeImage(
-            imageUrl: cover,
-            fit: BoxFit.cover,
-          )
-        else
-          Container(color: Colors.black87),
-
-        // 柔和暗角与氛围蒙层
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.6),
-                Colors.black.withValues(alpha: 0.45),
-                Colors.black.withValues(alpha: 0.72),
-              ],
-            ),
-          ),
-        ),
-
-        // 顶部返回与标题
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.16),
-                            width: 0.5,
-                          ),
-                        ),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                          onPressed: _handleBackPressed,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.2,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black54,
-                            blurRadius: 6,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // 中央磨砂播放按钮
-        Center(
-          child: BouncingScaleCard(
-            scaleDown: 0.92,
-            onTap: () {
-              if (_currentEpisodes.isNotEmpty) {
-                _selectEpisode(_activeEpisode ?? 1);
-              }
-            },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(36),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      width: 1,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // 底部 iOS 磨砂提示胶囊条
-        Positioned(
-          bottom: 12,
-          left: 16,
-          right: 16,
-          child: Center(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.16),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_isLoadingChapters)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 6),
-                          child: CupertinoActivityIndicator(
-                            color: Colors.white70,
-                            radius: 6,
-                          ),
-                        )
-                      else
-                        const Icon(
-                          Icons.touch_app_outlined,
-                          color: Colors.white70,
-                          size: 14,
-                        ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          _isLoadingChapters
-                              ? '正在同步「$_selectedSourceName」选集...'
-                              : (_currentEpisodes.isNotEmpty
-                                  ? '分集已就绪 · 请在下方选择集数开始播放'
-                                  : '请在下方选择播放源或选集'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: -0.1,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+        VideoPlaySegmentedTabBar(tabController: _tabController),
+        Expanded(
+          child: VideoPlayTabContentView(
+            tabController: _tabController,
+            title: widget.title,
+            bangumiItem: _effectiveBangumiItem,
+            coverUrl: _resolvedCoverUrl,
+            episodeCount: _displayEpisodeCount,
+            sources: _sources,
+            selectedSourceId: _selectedSourceId,
+            selectedSourceName: _selectedSourceName,
+            onSourceSelected: _handleSourceSelected,
+            aggregator: _aggregator,
+            sourceNotice: _sourceNotice,
+            keywordOptions: _keywordOptions,
+            onUserAction: _autoPicker.onUserAction,
+            currentEpisode: _activeEpisode,
+            isLoadingChapters: _isLoadingChapters,
+            hasEpisodes: _currentEpisodes.isNotEmpty,
+            currentSlots: _currentSlots,
+            roadNames: _roadNames,
+            selectedRoadIndex: _selectedRoadIndex,
+            mappedEpisodeTitles: _mappedEpisodeTitles,
+            onRoadSelected: (idx) => setState(() => _selectedRoadIndex = idx),
+            onRefreshEpisodes: () =>
+                _startDefaultSourceSearch(autoPlayFirst: false),
+            onSelectEpisode: _selectEpisode,
+            onSelectSlot: _selectSlot,
           ),
         ),
       ],
-    );
-  }
-
-  /// 选集 Tab 核心渲染器
-  Widget _buildEpisodeSectionBody() {
-    if (_isLoadingChapters) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CupertinoActivityIndicator(radius: 12),
-            const SizedBox(height: 12),
-            Text(
-              '正在从「$_selectedSourceName」加载分集...',
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_currentEpisodes.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.search_off_rounded, size: 48, color: Colors.grey),
-              const SizedBox(height: 12),
-              Text(
-                '「$_selectedSourceName」暂未检索到该番剧分集',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                '建议切换到其他备用视频源查找资源',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              BouncingScaleCard(
-                scaleDown: 0.95,
-                onTap: () {
-                  _autoPicker.onUserAction();
-                  _tabController.animateTo(1);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.swap_horiz_rounded, size: 17, color: Colors.white),
-                      SizedBox(width: 6),
-                      Text(
-                        '前往「视频源」选择',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return EpisodePickerSection(
-      episodeCount: _currentSlots.isNotEmpty ? _currentSlots.length : _currentEpisodes.length,
-      currentEpisode: _activeEpisode,
-      roads: _roadNames,
-      activeRoadIndex: _selectedRoadIndex,
-      episodeTitles: _mappedEpisodeTitles,
-      slots: _currentSlots,
-      onRoadSelected: (idx) => setState(() => _selectedRoadIndex = idx),
-      onRefresh: () => _startDefaultSourceSearch(autoPlayFirst: false),
-      onSelectEpisode: _selectEpisode,
-      onSelectSlot: _selectSlot,
-    );
-  }
-
-  /// iOS 风格极简精致滑动胶囊分段控制器
-  Widget _buildSegmentedTabBar(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.colorScheme.primary;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Container(
-            height: 32,
-            padding: const EdgeInsets.all(2.5),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDark ? Colors.white.withAlpha(18) : Colors.black.withAlpha(12),
-                width: 0.5,
-              ),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              splashFactory: NoSplash.splashFactory,
-              overlayColor: WidgetStateProperty.all(Colors.transparent),
-              dividerColor: Colors.transparent,
-              padding: EdgeInsets.zero,
-              labelPadding: EdgeInsets.zero,
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicator: BoxDecoration(
-                color: isDark ? Colors.white.withAlpha(36) : Colors.white,
-                borderRadius: BorderRadius.circular(13.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1.5),
-                  ),
-                ],
-              ),
-              labelColor: isDark ? Colors.white : primaryColor,
-              unselectedLabelColor: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.65),
-              labelStyle: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.2,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w500,
-                letterSpacing: -0.2,
-              ),
-              tabs: const [
-                Tab(height: 27, text: '番剧详情'),
-                Tab(height: 27, text: '视频源'),
-                Tab(height: 27, text: '选集'),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 
   /// 1. 全屏横屏布局 (带 iOS/Kazumi 风格磨砂悬浮抽屉 PlayerSidePanel)
   Widget _buildFullscreenLayout() {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: _buildPlayerOrPlaceholder(isFullscreen: true),
-        ),
-        PlayerSidePanel(
-          isOpen: _isSidePanelOpen,
-          initialTab: _sidePanelInitialTab,
-          onClose: () => setState(() => _isSidePanelOpen = false),
-          episodeCount: _currentSlots.isNotEmpty ? _currentSlots.length : _currentEpisodes.length,
-          currentEpisode: _activeEpisode,
-          roads: _roadNames,
-          activeRoadIndex: _selectedRoadIndex,
-          episodeTitles: _mappedEpisodeTitles,
-          slots: _currentSlots,
-          isLoadingEpisodes: _isLoadingChapters,
-          onSelectEpisode: (ep) => _selectEpisode(ep),
-          onSelectSlot: (slot) => _selectSlot(slot),
-          onRoadSelected: (idx) => setState(() => _selectedRoadIndex = idx),
-          onRefreshEpisodes: () =>
-              _startDefaultSourceSearch(autoPlayFirst: false),
-          sources: _sources,
-          selectedSourceId: _selectedSourceId,
-          aggregator: _aggregator,
-          onSourceSelected: (src) => _handleSourceSelected(src),
-          danmakuController: _danmakuController,
-          controller: _playbackController,
-        ),
-      ],
+    return VideoPlayerFullscreenLayout(
+      playerWidget: _buildPlayerOrPlaceholder(isFullscreen: true),
+      sidePanelWidget: PlayerSidePanel(
+        isOpen: _isSidePanelOpen,
+        initialTab: _sidePanelInitialTab,
+        onClose: () => setState(() => _isSidePanelOpen = false),
+        episodeCount: _displayEpisodeCount,
+        currentEpisode: _activeEpisode,
+        roads: _roadNames,
+        activeRoadIndex: _selectedRoadIndex,
+        episodeTitles: _mappedEpisodeTitles,
+        slots: _currentSlots,
+        isLoadingEpisodes: _isLoadingChapters,
+        onSelectEpisode: (ep) => _selectEpisode(ep),
+        onSelectSlot: (slot) => _selectSlot(slot),
+        onRoadSelected: (idx) => setState(() => _selectedRoadIndex = idx),
+        onRefreshEpisodes: () =>
+            _startDefaultSourceSearch(autoPlayFirst: false),
+        sources: _sources,
+        selectedSourceId: _selectedSourceId,
+        aggregator: _aggregator,
+        onSourceSelected: (src) => _handleSourceSelected(src),
+        danmakuController: _danmakuController,
+        controller: _playbackController,
+      ),
     );
   }
 
   /// 2. 桌面/宽屏并排布局 (左侧 16:9 + 右侧 3 Tab)
   Widget _buildDesktopLayout() {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.title,
-          style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.3),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: _handleBackPressed,
-        ),
-      ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 3,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: _buildPlayerOrPlaceholder(isFullscreen: false),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Column(
-              children: [
-                _buildSegmentedTabBar(context),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      WatchMetaView(
-                        title: widget.title,
-                        bangumiItem: _effectiveBangumiItem,
-                        coverUrl: _resolvedCoverUrl,
-                        episodeCount: _currentEpisodes.isNotEmpty
-                            ? _currentEpisodes.length
-                            : widget.episodeCount,
-                      ),
-                      VideoSourceView(
-                        sources: _sources,
-                        selectedSourceId: _selectedSourceId,
-                        onSourceSelected: _handleSourceSelected,
-                        onSelectHit: (src, hit, [List<SourceChapterRoad>? cachedRoads]) => _handleSourceSelected(src, hit, cachedRoads),
-                        aggregator: _aggregator,
-                        hintMessage: _sourceNotice,
-                        keywordOptions: _keywordOptions,
-                        onUserAction: _autoPicker.onUserAction,
-                        currentEpisodeNumber: _activeEpisode,
-                      ),
-                      _buildEpisodeSectionBody(),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return VideoPlayerDesktopLayout(
+      title: widget.title,
+      onBackPressed: _handleBackPressed,
+      playerWidget: _buildPlayerOrPlaceholder(isFullscreen: false),
+      tabSection: _buildTabSection(),
     );
   }
 
   /// 3. 移动端竖屏布局 (上方 16:9 + 下方 iOS 风格 3 Tab)
   Widget _buildMobileLayout() {
-    return SafeArea(
-      top: true,
-      bottom: false,
-      child: Column(
-        children: [
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: _buildPlayerOrPlaceholder(isFullscreen: false),
-          ),
-          _buildSegmentedTabBar(context),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                WatchMetaView(
-                  title: widget.title,
-                  bangumiItem: _effectiveBangumiItem,
-                  coverUrl: _resolvedCoverUrl,
-                  episodeCount: _currentEpisodes.isNotEmpty
-                      ? _currentEpisodes.length
-                      : widget.episodeCount,
-                ),
-                VideoSourceView(
-                  sources: _sources,
-                  selectedSourceId: _selectedSourceId,
-                  onSourceSelected: _handleSourceSelected,
-                  onSelectHit: (src, hit, [List<SourceChapterRoad>? cachedRoads]) => _handleSourceSelected(src, hit, cachedRoads),
-                  aggregator: _aggregator,
-                  hintMessage: _sourceNotice,
-                  keywordOptions: _keywordOptions,
-                  onUserAction: _autoPicker.onUserAction,
-                  currentEpisodeNumber: _activeEpisode,
-                ),
-                _buildEpisodeSectionBody(),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return VideoPlayerMobileLayout(
+      playerWidget: _buildPlayerOrPlaceholder(isFullscreen: false),
+      tabSection: _buildTabSection(),
     );
   }
 }

@@ -95,11 +95,13 @@ class SourceAggregator extends ChangeNotifier {
   final Map<String, AggregatedSourceState> _states = {};
   final List<String> _queue = [];
   final Map<String, CancelToken> _cancelTokens = {};
+  final Map<String, Timer> _timeoutTimers = {};
   final Set<String> _probeDone = {};
   final Set<String> _activeAutoJobs = {};
   final Set<String> _autoProbedSources = {};
   final Map<String, String> _customKeywords = {};
   int _activeJobs = 0;
+  bool _disposed = false;
 
   int _currentBangumiId = 0;
   String? _activeSourceId;
@@ -145,6 +147,7 @@ class SourceAggregator extends ChangeNotifier {
     _activeJobs = 0;
     _queue.clear();
     _cancelTokens.clear();
+    _timeoutTimers.clear();
     _probeDone.clear();
     _activeAutoJobs.clear();
     _autoProbedSources.clear();
@@ -290,17 +293,23 @@ class SourceAggregator extends ChangeNotifier {
     final sId = sourceId.trim();
     if (sId.isEmpty) return;
 
-    // 取消当前该源自身的旧请求 (若有)
-    _cancelTokens[sId]?.cancel('prioritizeSource');
-    _cancelTokens.remove(sId);
+    // 取消当前该源自身的旧请求 (若有)，必须先清除定时器并检查 isCancelled，规避 Dio 重复取消警告
+    _timeoutTimers.remove(sId)?.cancel();
+    final oldToken = _cancelTokens.remove(sId);
+    if (oldToken != null && !oldToken.isCancelled) {
+      oldToken.cancel('prioritizeSource');
+    }
     _probeDone.remove(sId);
 
     // 核心抢占逻辑：若并发已满且用户发起了手动操作，抢占并取消一个后台自动任务
     if (isUserAction && _activeJobs >= concurrencyLimit) {
       for (final autoJobId in _activeAutoJobs.toList()) {
         if (autoJobId != sId && _cancelTokens.containsKey(autoJobId)) {
-          _cancelTokens[autoJobId]?.cancel('preempted_by_user');
-          _cancelTokens.remove(autoJobId);
+          _timeoutTimers.remove(autoJobId)?.cancel();
+          final autoToken = _cancelTokens.remove(autoJobId);
+          if (autoToken != null && !autoToken.isCancelled) {
+            autoToken.cancel('preempted_by_user');
+          }
           _activeAutoJobs.remove(autoJobId);
           _probeDone.remove(autoJobId);
           // 将被挤掉的后台任务推回队尾，后续空闲时恢复
@@ -411,14 +420,18 @@ class SourceAggregator extends ChangeNotifier {
     final cancelToken = CancelToken();
     _cancelTokens[sourceId] = cancelToken;
 
-    Timer? timeoutTimer;
-    timeoutTimer = Timer(const Duration(milliseconds: probeTimeoutMs), () {
-      cancelToken.cancel('probe_timeout_5s');
+    // 集中管理超时定时器：由 _timeoutTimers 统一持有，页面退出或任务抢占时可立即取消，
+    // 同时通过 !cancelToken.isCancelled 避免被 reset/抢占后重复取消触发 Dio 警告。
+    final timeoutTimer = Timer(const Duration(milliseconds: probeTimeoutMs), () {
+      if (!cancelToken.isCancelled) {
+        cancelToken.cancel('probe_timeout_5s');
+      }
     });
+    _timeoutTimers[sourceId] = timeoutTimer;
 
     try {
       if (kw.isEmpty || RegExp(r'^番剧\s*\d+$').hasMatch(kw)) {
-        timeoutTimer.cancel();
+        _timeoutTimers.remove(sourceId)?.cancel();
         _states[sourceId] = AggregatedSourceState(
           meta: meta,
           status: SourceProbeStatus.empty,
@@ -431,7 +444,7 @@ class SourceAggregator extends ChangeNotifier {
 
       final runtime = SourceBundleManager.instance.runtime;
       final rawHits = await runtime.search(sourceId, kw);
-      timeoutTimer.cancel();
+      _timeoutTimers.remove(sourceId)?.cancel();
 
       // 请求成功，记录熔断器成功状态
       PluginCircuitBreaker.instance.recordSuccess(sourceId);
@@ -498,7 +511,7 @@ class SourceAggregator extends ChangeNotifier {
         }
       }
     } catch (e) {
-      timeoutTimer.cancel();
+      _timeoutTimers.remove(sourceId)?.cancel();
       final isTimeout = cancelToken.isCancelled ||
           e.toString().contains('probe_timeout_5s') ||
           e.toString().toLowerCase().contains('timeout');
@@ -521,15 +534,24 @@ class SourceAggregator extends ChangeNotifier {
   void _finishJob(String sourceId) {
     _activeJobs--;
     _activeAutoJobs.remove(sourceId);
+    _timeoutTimers.remove(sourceId)?.cancel();
     _cancelTokens.remove(sourceId);
+    if (_disposed) return;
     notifyListeners();
     _processQueue();
   }
 
   void _cancelAll() {
+    for (final timer in _timeoutTimers.values) {
+      timer.cancel();
+    }
+    _timeoutTimers.clear();
+
     for (final token in _cancelTokens.values) {
       try {
-        token.cancel('reset');
+        if (!token.isCancelled) {
+          token.cancel('reset');
+        }
       } catch (_) {}
     }
     _cancelTokens.clear();
@@ -537,6 +559,7 @@ class SourceAggregator extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _cancelAll();
     super.dispose();
   }

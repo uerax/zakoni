@@ -1,0 +1,187 @@
+import 'package:flutter/material.dart';
+import 'package:zakoni/core/services/bangumi_oped_service.dart';
+import 'package:zakoni/features/player/controller/playback_controller.dart';
+import 'package:zakoni/features/player/controller/playback_state.dart';
+import 'player_panel_widgets.dart';
+
+/// 播放器设置面板主体（片头片尾、超分辨率 Anime4K、画幅比例）
+class PlayerSettingsPanelBody extends StatelessWidget {
+  const PlayerSettingsPanelBody({
+    super.key,
+    required this.controller,
+    required this.primaryColor,
+    required this.autoSkipOpedNotifier,
+    this.opedSegment,
+    this.isCurrentlyInOp = false,
+    this.isCurrentlyInEd = false,
+    this.onSkipCurrentSegment,
+    this.onDismiss,
+    this.onTriggerSkipToast,
+  });
+
+  final ZakoniPlaybackController controller;
+  final Color primaryColor;
+  final ValueNotifier<bool> autoSkipOpedNotifier;
+  final EpisodeOpedSegment? opedSegment;
+  final bool isCurrentlyInOp;
+  final bool isCurrentlyInEd;
+  final VoidCallback? onSkipCurrentSegment;
+  final VoidCallback? onDismiss;
+  final ValueChanged<String>? onTriggerSkipToast;
+
+  static String _formatSeconds(int seconds) {
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final seg = opedSegment;
+    String opedSubtitle = '未配置片头片尾时间戳';
+    if (seg != null && (seg.hasOp || seg.hasEd)) {
+      final List<String> parts = [];
+      if (seg.hasOp) {
+        parts.add('OP ${_formatSeconds(seg.opStart!)}-${_formatSeconds(seg.opEnd!)}');
+      }
+      if (seg.hasEd) {
+        parts.add('ED ${_formatSeconds(seg.edStart!)}-${_formatSeconds(seg.edEnd!)}');
+      }
+      opedSubtitle = parts.join(' · ');
+    }
+
+    final isInside = isCurrentlyInOp || isCurrentlyInEd;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 1. 片头片尾跳过
+          const PanelSectionHeader(title: '片头片尾智能跳过'),
+          ValueListenableBuilder<bool>(
+            valueListenable: autoSkipOpedNotifier,
+            builder: (context, autoSkip, _) {
+              return PanelSwitchRow(
+                title: '自动跳过片头片尾',
+                subtitle: opedSubtitle,
+                value: autoSkip,
+                primaryColor: primaryColor,
+                onChanged: (val) {
+                  autoSkipOpedNotifier.value = val;
+                  onTriggerSkipToast?.call(val ? '已开启自动跳过片头片尾' : '已关闭自动跳过片头片尾');
+                },
+              );
+            },
+          ),
+          if (isInside) ...[
+            const SizedBox(height: 4),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.withValues(alpha: 0.22),
+                foregroundColor: Colors.amber,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: const BorderSide(color: Colors.amber, width: 0.5),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 6),
+              ),
+              icon: const Icon(Icons.fast_forward_rounded, size: 15),
+              label: Text(
+                isCurrentlyInOp ? '立即跳过片头' : '立即跳过片尾',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              onPressed: () {
+                onSkipCurrentSegment?.call();
+                onDismiss?.call();
+              },
+            ),
+          ],
+
+          const SizedBox(height: 10),
+
+          // 2. 动漫超分辨率 Anime4K
+          const PanelSectionHeader(title: '动漫超分辨率 (Anime4K)'),
+          ValueListenableBuilder<PlaybackCoreState>(
+            valueListenable: controller.core,
+            builder: (context, coreState, _) {
+              final cur = coreState.superResolution;
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    PanelOptionChip(
+                      label: '关闭',
+                      selected: cur == SuperResolutionMode.off,
+                      primaryColor: primaryColor,
+                      onTap: () => controller.setSuperResolution(SuperResolutionMode.off),
+                    ),
+                    PanelOptionChip(
+                      label: '效率档',
+                      selected: cur == SuperResolutionMode.efficiency,
+                      primaryColor: primaryColor,
+                      onTap: () => controller.setSuperResolution(SuperResolutionMode.efficiency),
+                    ),
+                    PanelOptionChip(
+                      label: '质量档',
+                      selected: cur == SuperResolutionMode.quality,
+                      primaryColor: primaryColor,
+                      onTap: () => controller.setSuperResolution(SuperResolutionMode.quality),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 10),
+
+          // 3. 画面画幅比例
+          const PanelSectionHeader(title: '画面填充比例'),
+          ValueListenableBuilder<PlaybackCoreState>(
+            valueListenable: controller.core,
+            builder: (context, coreState, _) {
+              final cur = coreState.videoFit;
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    PanelOptionChip(
+                      label: '默认(16:9)',
+                      selected: cur == BoxFit.contain,
+                      primaryColor: primaryColor,
+                      onTap: () => controller.setVideoFit(BoxFit.contain),
+                    ),
+                    PanelOptionChip(
+                      label: '铺满裁剪',
+                      selected: cur == BoxFit.cover,
+                      primaryColor: primaryColor,
+                      onTap: () => controller.setVideoFit(BoxFit.cover),
+                    ),
+                    PanelOptionChip(
+                      label: '全屏拉伸',
+                      selected: cur == BoxFit.fill,
+                      primaryColor: primaryColor,
+                      onTap: () => controller.setVideoFit(BoxFit.fill),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
