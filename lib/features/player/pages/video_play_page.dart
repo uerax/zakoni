@@ -163,9 +163,14 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     ].map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
   }
 
+  late final ValueNotifier<bool> _autoPlayNextNotifier;
+  bool _lastPlaybackCompleted = false;
+
   @override
   void initState() {
     super.initState();
+    _autoPlayNextNotifier =
+        ValueNotifier<bool>(PlayerPreferencesService.instance.autoPlayNext);
     _activeEpisode = widget.currentEpisode;
     _danmakuController = DanmakuController();
     _danmakuCoordinator = DanmakuSessionCoordinator(
@@ -174,11 +179,13 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     _playbackController = ZakoniPlaybackController(
       danmakuController: _danmakuController,
     );
+    _playbackController.core.addListener(_onPlaybackCoreStateChanged);
 
-    // 预热并同步用户上次持久化的弹幕外观设置
+    // 预热并同步用户上次持久化的弹幕外观设置与连播偏好
     PlayerPreferencesService.instance.initialize().then((_) {
       if (mounted) {
         _danmakuController.updateSettings(PlayerPreferencesService.instance.danmakuSettings);
+        _autoPlayNextNotifier.value = PlayerPreferencesService.instance.autoPlayNext;
       }
     });
 
@@ -782,13 +789,30 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     }
   }
 
+  void _onPlaybackCoreStateChanged() {
+    final isCompleted = _playbackController.core.value.completed;
+    if (isCompleted != _lastPlaybackCompleted) {
+      _lastPlaybackCompleted = isCompleted;
+      if (isCompleted && _autoPlayNextNotifier.value) {
+        if (_activeEpisode != null &&
+            _activeEpisode! < _currentEpisodes.length) {
+          final nextEp = _activeEpisode! + 1;
+          _showHudToast('本集播放完毕，自动播放第 $nextEp 话');
+          _selectEpisode(nextEp);
+        }
+      }
+    }
+  }
+
   @override
   void dispose() {
     if (_isFullscreen) {
       _exitFullscreen();
     }
     _tabController.dispose();
+    _playbackController.core.removeListener(_onPlaybackCoreStateChanged);
     _playbackController.dispose();
+    _autoPlayNextNotifier.dispose();
     _danmakuCoordinator.dispose();
     _danmakuController.dispose();
     _aggregator.removeListener(_onAggregatorUpdated);
@@ -918,6 +942,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
           ? () => _selectEpisode(_activeEpisode! - 1)
           : null,
       opedSegment: _currentOpedSegment,
+      autoPlayNextNotifier: _autoPlayNextNotifier,
       hudToast: _hudToast,
       resolveError: _resolveError,
       primaryColor: primaryColor,

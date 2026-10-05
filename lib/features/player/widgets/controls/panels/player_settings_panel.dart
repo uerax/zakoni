@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:zakoni/core/services/bangumi_oped_service.dart';
 import 'package:zakoni/features/player/controller/playback_controller.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
+import 'package:zakoni/features/player/services/player_preferences_service.dart';
 import 'player_panel_widgets.dart';
 
-/// 播放器设置面板主体（片头片尾、超分辨率 Anime4K、画幅比例、屏幕亮度）
+/// 播放器设置面板主体（连播与跳过、播放速度、超分辨率 Anime4K、画幅比例、屏幕亮度）
 class PlayerSettingsPanelBody extends StatelessWidget {
   const PlayerSettingsPanelBody({
     super.key,
     required this.controller,
     required this.primaryColor,
     required this.autoSkipOpedNotifier,
+    this.autoPlayNextNotifier,
     this.brightnessNotifier,
     this.opedSegment,
     this.isCurrentlyInOp = false,
@@ -23,6 +25,7 @@ class PlayerSettingsPanelBody extends StatelessWidget {
   final ZakoniPlaybackController controller;
   final Color primaryColor;
   final ValueNotifier<bool> autoSkipOpedNotifier;
+  final ValueNotifier<bool>? autoPlayNextNotifier;
   final ValueNotifier<double>? brightnessNotifier;
   final EpisodeOpedSegment? opedSegment;
   final bool isCurrentlyInOp;
@@ -60,8 +63,27 @@ class PlayerSettingsPanelBody extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 1. 片头片尾跳过
-          const PanelSectionHeader(title: '片头片尾智能跳过'),
+          // 1. 播放连播与片头片尾跳过
+          const PanelSectionHeader(title: '连播与跳过'),
+          if (autoPlayNextNotifier != null) ...[
+            ValueListenableBuilder<bool>(
+              valueListenable: autoPlayNextNotifier!,
+              builder: (context, autoPlayNext, _) {
+                return PanelSwitchRow(
+                  title: '自动播放下一集',
+                  subtitle: '当前集播放完毕后自动切换至下一集',
+                  value: autoPlayNext,
+                  primaryColor: primaryColor,
+                  onChanged: (val) {
+                    autoPlayNextNotifier!.value = val;
+                    PlayerPreferencesService.instance.saveAutoPlayNext(val);
+                    onTriggerSkipToast?.call(val ? '已开启自动播放下一集' : '已关闭自动播放下一集');
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 6),
+          ],
           ValueListenableBuilder<bool>(
             valueListenable: autoSkipOpedNotifier,
             builder: (context, autoSkip, _) {
@@ -103,7 +125,37 @@ class PlayerSettingsPanelBody extends StatelessWidget {
 
           const SizedBox(height: 10),
 
-          // 2. 动漫超分辨率 Anime4K
+          // 2. 播放速度
+          const PanelSectionHeader(title: '播放速度'),
+          ValueListenableBuilder<PlaybackCoreState>(
+            valueListenable: controller.core,
+            builder: (context, coreState, _) {
+              final cur = coreState.playbackRate;
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    for (final speed in const [0.75, 1.0, 1.25, 1.5, 2.0])
+                      PanelOptionChip(
+                        label: '${speed}x',
+                        selected: (cur - speed).abs() < 0.01,
+                        primaryColor: primaryColor,
+                        onTap: () => controller.setPlaybackRate(speed),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 10),
+
+          // 3. 动漫超分辨率 Anime4K
           const PanelSectionHeader(title: '动漫超分辨率 (Anime4K)'),
           ValueListenableBuilder<PlaybackCoreState>(
             valueListenable: controller.core,
@@ -144,7 +196,7 @@ class PlayerSettingsPanelBody extends StatelessWidget {
 
           const SizedBox(height: 10),
 
-          // 3. 画面画幅比例
+          // 4. 画面画幅比例
           const PanelSectionHeader(title: '画面填充比例'),
           ValueListenableBuilder<PlaybackCoreState>(
             valueListenable: controller.core,
@@ -183,7 +235,7 @@ class PlayerSettingsPanelBody extends StatelessWidget {
             },
           ),
 
-          // 4. 屏幕亮度调节
+          // 5. 屏幕亮度调节
           if (brightnessNotifier != null) ...[
             const SizedBox(height: 10),
             const PanelSectionHeader(title: '屏幕亮度'),

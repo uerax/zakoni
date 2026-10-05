@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zakoni/features/player/controller/playback_controller.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
+import 'package:zakoni/features/player/widgets/controls/danmaku_settings_icon.dart';
 import 'package:zakoni/features/player/widgets/player_controls.dart';
 import 'package:zakoni/features/player/widgets/player_indicators.dart';
 
@@ -53,14 +54,18 @@ void main() {
       // 验证标题呈现
       expect(find.text('测试动画第01话'), findsOneWidget);
 
-      // 验证设置按钮与弹幕面板设置按钮
+      // 验证设置按钮与自绘弹幕面板设置图标 (DanmakuSettingsIcon)
       expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+      expect(find.byType(DanmakuSettingsIcon), findsOneWidget);
+
+      // 验证控制栏上一集与下一集按钮已移除
+      expect(find.byIcon(Icons.skip_previous_rounded), findsNothing);
+      expect(find.byIcon(Icons.skip_next_rounded), findsNothing);
 
       // 验证存在播放按钮与中央暂停标识
       expect(find.byIcon(Icons.play_arrow_rounded), findsNWidgets(2));
 
-      // 验证倍速按钮存在，点击展开验证选项已精简（倒序排布且无 0.5x 与 3.0x）
+      // 验证倍速按钮在控制栏存在，点击展开验证选项已精简（倒序排布且无 0.5x 与 3.0x）
       expect(find.text('1x'), findsOneWidget);
       await tester.tap(find.text('1x'));
       await tester.pumpAndSettle();
@@ -280,7 +285,10 @@ void main() {
 
       // 验证设置面板展示
       expect(find.text('播放设置'), findsOneWidget);
-      expect(find.text('片头片尾智能跳过'), findsOneWidget);
+      expect(find.text('连播与跳过'), findsOneWidget);
+      expect(find.text('自动播放下一集'), findsOneWidget);
+      expect(find.text('自动跳过片头片尾'), findsOneWidget);
+      expect(find.text('播放速度'), findsOneWidget);
       expect(find.text('动漫超分辨率 (Anime4K)'), findsOneWidget);
       expect(find.text('画面填充比例'), findsOneWidget);
       expect(find.text('屏幕亮度'), findsOneWidget);
@@ -296,7 +304,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(controller.core.value.videoFit, equals(BoxFit.fill));
 
-      // 点击亮度暗室快捷档位
+      // 滚动至亮度选项并点击暗室快捷档位
+      await tester.scrollUntilVisible(find.text('暗室 (30%)'), 100);
       await tester.tap(find.text('暗室 (30%)'));
       await tester.pumpAndSettle();
       expect(find.text('30%'), findsOneWidget);
@@ -322,9 +331,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 点击弹幕设置图标 (Icons.tune_rounded)
-      expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.tune_rounded));
+      // 点击自绘弹幕设置图标 (DanmakuSettingsIcon)
+      expect(find.byType(DanmakuSettingsIcon), findsOneWidget);
+      await tester.tap(find.byType(DanmakuSettingsIcon));
       await tester.pumpAndSettle();
 
       // 验证弹幕面板内容展现

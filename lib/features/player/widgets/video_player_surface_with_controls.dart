@@ -28,6 +28,7 @@ class VideoPlayerSurfaceWithControls extends StatelessWidget {
     required this.primaryColor,
     required this.onRetryResolve,
     required this.onSwitchSource,
+    this.autoPlayNextNotifier,
   });
 
   final ZakoniPlaybackController controller;
@@ -47,6 +48,7 @@ class VideoPlayerSurfaceWithControls extends StatelessWidget {
   final Color primaryColor;
   final VoidCallback onRetryResolve;
   final VoidCallback onSwitchSource;
+  final ValueNotifier<bool>? autoPlayNextNotifier;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +70,7 @@ class VideoPlayerSurfaceWithControls extends StatelessWidget {
             onNextEpisode: onNextEpisode,
             onPrevEpisode: onPrevEpisode,
             opedSegment: opedSegment,
+            autoPlayNextNotifier: autoPlayNextNotifier,
           ),
         ),
 

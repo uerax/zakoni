@@ -11,6 +11,8 @@ import 'package:zakoni/features/player/widgets/player_indicators.dart';
 import 'package:zakoni/features/player/widgets/player_side_panel.dart';
 import 'package:zakoni/features/player/widgets/player_skip_toast.dart';
 
+import 'package:zakoni/features/player/services/player_preferences_service.dart';
+
 import 'controls/controls_bottom_bar.dart';
 import 'controls/controls_top_bar.dart';
 import 'controls/panels/player_danmaku_panel.dart';
@@ -38,6 +40,7 @@ class PlayerControls extends StatefulWidget {
     this.onOpenSidePanel,
     this.opedSegment,
     this.autoSkipOped = true,
+    this.autoPlayNextNotifier,
   });
 
   final ZakoniPlaybackController controller;
@@ -53,6 +56,7 @@ class PlayerControls extends StatefulWidget {
   final ValueChanged<PlayerSidePanelTab>? onOpenSidePanel;
   final EpisodeOpedSegment? opedSegment;
   final bool autoSkipOped;
+  final ValueNotifier<bool>? autoPlayNextNotifier;
 
   @override
   State<PlayerControls> createState() => _PlayerControlsState();
@@ -74,6 +78,8 @@ class _PlayerControlsState extends State<PlayerControls> {
   bool _lastPlaying = false;
 
   late final ValueNotifier<bool> _autoSkipOpedNotifier;
+  late final ValueNotifier<bool> _autoPlayNextNotifier;
+  bool _internalAutoPlayNext = false;
   _ActiveControlPanel _activePanel = _ActiveControlPanel.none;
   bool _showVolumeSlider = false;
   bool _showSpeedPopup = false;
@@ -114,6 +120,14 @@ class _PlayerControlsState extends State<PlayerControls> {
   void initState() {
     super.initState();
     _autoSkipOpedNotifier = ValueNotifier<bool>(widget.autoSkipOped);
+    if (widget.autoPlayNextNotifier != null) {
+      _autoPlayNextNotifier = widget.autoPlayNextNotifier!;
+      _internalAutoPlayNext = false;
+    } else {
+      _autoPlayNextNotifier = ValueNotifier<bool>(
+          PlayerPreferencesService.instance.autoPlayNext);
+      _internalAutoPlayNext = true;
+    }
     _keyboardFocusNode = FocusNode();
     _lastPlaying = widget.controller.core.value.playing;
     widget.controller.timeline.addListener(_checkAutoSkip);
@@ -146,6 +160,14 @@ class _PlayerControlsState extends State<PlayerControls> {
     if (oldWidget.autoSkipOped != widget.autoSkipOped) {
       _autoSkipOpedNotifier.value = widget.autoSkipOped;
     }
+    if (oldWidget.autoPlayNextNotifier != widget.autoPlayNextNotifier &&
+        widget.autoPlayNextNotifier != null) {
+      if (_internalAutoPlayNext) {
+        _autoPlayNextNotifier.dispose();
+        _internalAutoPlayNext = false;
+      }
+      _autoPlayNextNotifier = widget.autoPlayNextNotifier!;
+    }
   }
 
   @override
@@ -159,6 +181,9 @@ class _PlayerControlsState extends State<PlayerControls> {
     _keyboardFocusNode.dispose();
     _brightnessNotifier.dispose();
     _autoSkipOpedNotifier.dispose();
+    if (_internalAutoPlayNext) {
+      _autoPlayNextNotifier.dispose();
+    }
     super.dispose();
   }
 
@@ -508,6 +533,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                                 controller: widget.controller,
                                 primaryColor: primaryColor,
                                 autoSkipOpedNotifier: _autoSkipOpedNotifier,
+                                autoPlayNextNotifier: _autoPlayNextNotifier,
                                 brightnessNotifier: _brightnessNotifier,
                                 opedSegment: widget.opedSegment,
                                 isCurrentlyInOp: _isCurrentlyInOp,
@@ -816,8 +842,6 @@ class _PlayerControlsState extends State<PlayerControls> {
                         danmakuController: widget.danmakuController,
                         opedSegment: widget.opedSegment,
                         isFullscreen: widget.isFullscreen,
-                        onPrevEpisode: widget.onPrevEpisode,
-                        onNextEpisode: widget.onNextEpisode,
                         onToggleFullscreen: widget.onToggleFullscreen,
                         onSeekingSliderChanged: (val) =>
                             setState(() => _isSeekingSlider = val),
@@ -964,6 +988,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                           controller: widget.controller,
                           primaryColor: primaryColor,
                           autoSkipOpedNotifier: _autoSkipOpedNotifier,
+                          autoPlayNextNotifier: _autoPlayNextNotifier,
                           brightnessNotifier: _brightnessNotifier,
                           opedSegment: widget.opedSegment,
                           isCurrentlyInOp: _isCurrentlyInOp,
