@@ -1,5 +1,20 @@
 import 'package:flutter/material.dart';
 
+/// 动漫超分辨率画质增强模式 (基于 Anime4K 着色器)
+enum SuperResolutionMode {
+  off(label: '关闭', description: '原画输出'),
+  efficiency(label: '效率档', description: '轻度降噪与快速超分'),
+  quality(label: '质量档', description: '高质量 CNN 重建超分');
+
+  const SuperResolutionMode({
+    required this.label,
+    required this.description,
+  });
+
+  final String label;
+  final String description;
+}
+
 /// 播放器低频核心状态（仅在宏观状态变化时触发更新）
 @immutable
 class PlaybackCoreState {
@@ -13,6 +28,7 @@ class PlaybackCoreState {
     this.volume = 1.0,
     this.muted = false,
     this.videoFit = BoxFit.contain,
+    this.superResolution = SuperResolutionMode.off,
     this.isMeteredNetwork = false,
     this.errorMessage,
   });
@@ -44,6 +60,9 @@ class PlaybackCoreState {
   /// 画面缩放模式
   final BoxFit videoFit;
 
+  /// 超分辨率画质模式
+  final SuperResolutionMode superResolution;
+
   /// 当前是否处于移动蜂窝计费网络（对应 16MB 省流缓冲）
   final bool isMeteredNetwork;
 
@@ -62,6 +81,7 @@ class PlaybackCoreState {
     double? volume,
     bool? muted,
     BoxFit? videoFit,
+    SuperResolutionMode? superResolution,
     bool? isMeteredNetwork,
     String? errorMessage,
     bool clearError = false,
@@ -76,6 +96,7 @@ class PlaybackCoreState {
       volume: volume ?? this.volume,
       muted: muted ?? this.muted,
       videoFit: videoFit ?? this.videoFit,
+      superResolution: superResolution ?? this.superResolution,
       isMeteredNetwork: isMeteredNetwork ?? this.isMeteredNetwork,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );

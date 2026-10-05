@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -277,7 +278,10 @@ class ZakoniPlaybackController {
   /// 播放 / 暂停切换
   Future<void> togglePlay() async {
     final player = _player;
-    if (player == null) return;
+    if (player == null) {
+      core.value = core.value.copyWith(playing: !core.value.playing);
+      return;
+    }
     if (core.value.playing) {
       await pause();
     } else {
@@ -287,14 +291,20 @@ class ZakoniPlaybackController {
 
   Future<void> play() async {
     final player = _player;
-    if (player == null) return;
+    if (player == null) {
+      core.value = core.value.copyWith(playing: true);
+      return;
+    }
     await player.play();
     danmakuController?.resume();
   }
 
   Future<void> pause() async {
     final player = _player;
-    if (player == null) return;
+    if (player == null) {
+      core.value = core.value.copyWith(playing: false);
+      return;
+    }
     await player.pause();
     danmakuController?.pause();
   }
@@ -395,6 +405,32 @@ class ZakoniPlaybackController {
   /// 切换画面缩放模式
   void setVideoFit(BoxFit fit) {
     core.value = core.value.copyWith(videoFit: fit);
+  }
+
+  /// 切换 Anime4K 超分辨率画质增强模式
+  Future<void> setSuperResolution(SuperResolutionMode mode) async {
+    core.value = core.value.copyWith(superResolution: mode);
+    final player = _player;
+    if (player == null) return;
+    try {
+      final platform = player.platform;
+      if (platform is NativePlayer) {
+        if (mode == SuperResolutionMode.off) {
+          await platform.command(['change-list', 'glsl-shaders', 'clr', '']);
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// 高清截取当前视频帧画面
+  Future<Uint8List?> screenshot({String format = 'image/png'}) async {
+    final player = _player;
+    if (player == null) return null;
+    try {
+      return await player.screenshot(format: format);
+    } catch (_) {
+      return null;
+    }
   }
 
   // ==========================

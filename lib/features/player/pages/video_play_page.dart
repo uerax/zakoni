@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../core/models/bangumi/bangumi_episode.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/network/bangumi_client.dart';
+import '../../../core/services/bangumi_oped_service.dart';
 import '../../common/widgets/bouncing_scale_card.dart';
 import '../../common/widgets/cached_anime_image.dart';
 import '../controller/playback_controller.dart';
@@ -16,6 +17,7 @@ import '../source/source_bundle_manager.dart';
 import '../source/source_keyword_matcher.dart';
 import '../widgets/episode_picker_section.dart';
 import '../widgets/player_controls.dart';
+import '../widgets/player_side_panel.dart';
 import '../widgets/video_source_view.dart';
 import '../widgets/video_surface.dart';
 import '../widgets/watch_meta_view.dart';
@@ -85,6 +87,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
   bool _isFullscreen = false;
   bool _isSidePanelOpen = false;
+  PlayerSidePanelTab _sidePanelInitialTab = PlayerSidePanelTab.episodes;
   int? _activeEpisode;
   bool _hasStartedPlayback = false;
 
@@ -102,8 +105,10 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   // Bangumi 官方数据补全
   BangumiItem? _fullBangumiItem;
   List<BangumiEpisode>? _officialEpisodes;
+  Map<int, EpisodeOpedSegment> _opedData = {};
 
   BangumiItem? get _effectiveBangumiItem => _fullBangumiItem ?? widget.bangumiItem;
+  EpisodeOpedSegment? get _currentOpedSegment => _opedData[_activeEpisode ?? 1];
 
   List<SourceEpisode> get _currentEpisodes {
     if (_chapterRoads.isEmpty) return [];
@@ -208,10 +213,12 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       final client = BangumiClient();
       final subject = await client.getSubject(bId);
       final eps = await client.getEpisodes(bId);
+      final oped = await BangumiOpedService.instance.getOpedData(bId);
       if (mounted) {
         setState(() {
           _fullBangumiItem = subject;
           _officialEpisodes = eps;
+          _opedData = oped;
         });
       }
     } catch (_) {
@@ -555,6 +562,10 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   }
 
   void _handleBackPressed() {
+    if (_isSidePanelOpen) {
+      setState(() => _isSidePanelOpen = false);
+      return;
+    }
     if (_isFullscreen) {
       _exitFullscreen();
       return;
@@ -576,10 +587,14 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return PopScope(
-      canPop: !_isFullscreen,
+      canPop: !_isFullscreen && !_isSidePanelOpen,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _isFullscreen) {
-          _exitFullscreen();
+        if (!didPop) {
+          if (_isSidePanelOpen) {
+            setState(() => _isSidePanelOpen = false);
+          } else if (_isFullscreen) {
+            _exitFullscreen();
+          }
         }
       },
       child: Scaffold(
@@ -625,8 +640,25 @@ class _VideoPlayPageState extends State<VideoPlayPage>
             onToggleFullscreen: _toggleFullscreen,
             onBackPressed: _handleBackPressed,
             onOpenEpisodePicker: isFullscreen
-                ? () => setState(() => _isSidePanelOpen = !_isSidePanelOpen)
+                ? () => setState(() {
+                      _sidePanelInitialTab = PlayerSidePanelTab.episodes;
+                      _isSidePanelOpen = !_isSidePanelOpen;
+                    })
                 : null,
+            onOpenSidePanel: isFullscreen
+                ? (tab) => setState(() {
+                      _sidePanelInitialTab = tab;
+                      _isSidePanelOpen = true;
+                    })
+                : null,
+            onNextEpisode: (_activeEpisode != null &&
+                    _activeEpisode! < _currentEpisodes.length)
+                ? () => _selectEpisode(_activeEpisode! + 1)
+                : null,
+            onPrevEpisode: (_activeEpisode != null && _activeEpisode! > 1)
+                ? () => _selectEpisode(_activeEpisode! - 1)
+                : null,
+            opedSegment: _currentOpedSegment,
           ),
         ),
 
@@ -1105,87 +1137,34 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     );
   }
 
-  /// 1. 全屏横屏布局 (带 iOS 磨砂悬浮抽屉)
+  /// 1. 全屏横屏布局 (带 iOS/Kazumi 风格磨砂悬浮抽屉 PlayerSidePanel)
   Widget _buildFullscreenLayout() {
     return Stack(
       children: [
         Positioned.fill(
           child: _buildPlayerOrPlaceholder(isFullscreen: true),
         ),
-        if (_isSidePanelOpen)
-          Positioned(
-            top: 0,
-            bottom: 0,
-            right: 0,
-            width: 320,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.78),
-                    border: Border(
-                      left: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.16),
-                        width: 0.5,
-                      ),
-                    ),
-                  ),
-                  child: SafeArea(
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                '快速选集',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.15),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: IconButton(
-                                    padding: EdgeInsets.zero,
-                                    icon: const Icon(
-                                      Icons.close_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    onPressed: () =>
-                                        setState(() => _isSidePanelOpen = false),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Divider(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          height: 1,
-                          thickness: 0.5,
-                        ),
-                        Expanded(child: _buildEpisodeSectionBody()),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+        PlayerSidePanel(
+          isOpen: _isSidePanelOpen,
+          initialTab: _sidePanelInitialTab,
+          onClose: () => setState(() => _isSidePanelOpen = false),
+          episodeCount: _currentEpisodes.length,
+          currentEpisode: _activeEpisode,
+          roads: _roadNames,
+          activeRoadIndex: _selectedRoadIndex,
+          episodeTitles: _mappedEpisodeTitles,
+          isLoadingEpisodes: _isLoadingChapters,
+          onSelectEpisode: (ep) => _selectEpisode(ep),
+          onRoadSelected: (idx) => setState(() => _selectedRoadIndex = idx),
+          onRefreshEpisodes: () =>
+              _startDefaultSourceSearch(autoPlayFirst: false),
+          sources: _sources,
+          selectedSourceId: _selectedSourceId,
+          aggregator: _aggregator,
+          onSourceSelected: _handleSourceSelected,
+          danmakuController: _danmakuController,
+          controller: _playbackController,
+        ),
       ],
     );
   }
