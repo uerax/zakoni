@@ -60,8 +60,16 @@ void main() {
       // 验证存在播放按钮与中央暂停标识
       expect(find.byIcon(Icons.play_arrow_rounded), findsNWidgets(2));
 
-      // 验证倍速按钮存在
+      // 验证倍速按钮存在，点击展开验证选项已精简且无 3.0x
       expect(find.text('1x'), findsOneWidget);
+      await tester.tap(find.text('1x'));
+      await tester.pumpAndSettle();
+      expect(find.text('2.0x'), findsOneWidget);
+      expect(find.text('3.0x'), findsNothing);
+      expect(find.text('3x'), findsNothing);
+      await tester.tap(find.text('1.25x'));
+      await tester.pumpAndSettle();
+      expect(controller.core.value.playbackRate, 1.25);
 
       // 验证选集按钮存在
       expect(find.text('选集'), findsOneWidget);

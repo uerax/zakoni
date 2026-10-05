@@ -1474,15 +1474,17 @@ class _PlayerControlsState extends State<PlayerControls> {
         return PopupMenuButton<double>(
           tooltip: '播放倍速',
           initialValue: coreState.playbackRate,
-          elevation: 8,
-          color: const Color(0xFF1E1E22),
+          elevation: 6,
+          color: const Color(0xFF1E1E22).withValues(alpha: 0.95),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(10),
             side: BorderSide(
-              color: Colors.white.withValues(alpha: 0.12),
+              color: Colors.white.withValues(alpha: 0.1),
               width: 0.5,
             ),
           ),
+          constraints: const BoxConstraints(minWidth: 84, maxWidth: 96),
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
             child: Text(
@@ -1504,27 +1506,31 @@ class _PlayerControlsState extends State<PlayerControls> {
             widget.controller.setPlaybackRate(speed);
           },
           itemBuilder: (context) => [
-            for (final speed in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0])
+            // 特殊处理说明：
+            // 精简倍速面板选项，移除不常用的 3.0x，保留 0.5x~2.0x 常用档位，
+            // 并采用高度 30 的轻量小弹层排布，避免大幅遮挡正在播放的画面
+            for (final speed in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0])
               PopupMenuItem(
                 value: speed,
-                height: 38,
+                height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       '${speed}x',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: speed == coreState.playbackRate
                             ? FontWeight.bold
-                            : FontWeight.normal,
+                            : FontWeight.w500,
                         color: speed == coreState.playbackRate
                             ? primaryColor
-                            : Colors.white,
+                            : Colors.white.withValues(alpha: 0.88),
                       ),
                     ),
                     if (speed == coreState.playbackRate)
-                      Icon(Icons.check_rounded, color: primaryColor, size: 16),
+                      Icon(Icons.check_rounded, color: primaryColor, size: 14),
                   ],
                 ),
               ),

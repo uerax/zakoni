@@ -34,6 +34,21 @@ class NetworkConnectivityService {
     if (_initialized) return;
     _initialized = true;
 
+    // 单测环境跳过底层平台通道调用
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      return;
+    }
+
+    // 特殊处理说明：
+    // 桌面端（Windows / macOS / Linux）固定视作无计费高速网络（Wi-Fi / 有线以太网）。
+    // 在桌面端跳过注册 onConnectivityChanged EventChannel 事件流，
+    // 彻底杜绝 connectivity_plus 插件在 Windows 11 下调用 NetworkManager::StartListen 触发的系统级 PlatformException 启动报错。
+    final isDesktop = !kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+    if (isDesktop) {
+      _isMeteredNotifier.value = false;
+      return;
+    }
+
     try {
       final initialResults = await _connectivity.checkConnectivity();
       _applyConnectivityResults(initialResults);
@@ -41,12 +56,17 @@ class NetworkConnectivityService {
       debugPrint('[NetworkConnectivityService] 初始化检测网络类型失败: $e');
     }
 
-    _subscription = _connectivity.onConnectivityChanged.listen(
-      _applyConnectivityResults,
-      onError: (Object error) {
-        debugPrint('[NetworkConnectivityService] 网络状态监听异常: $error');
-      },
-    );
+    try {
+      _subscription = _connectivity.onConnectivityChanged.listen(
+        _applyConnectivityResults,
+        onError: (Object error) {
+          debugPrint('[NetworkConnectivityService] 网络状态监听异常: $error');
+        },
+        cancelOnError: false,
+      );
+    } catch (e) {
+      debugPrint('[NetworkConnectivityService] 注册网络状态流监听失败: $e');
+    }
   }
 
   void _applyConnectivityResults(List<ConnectivityResult> results) {
