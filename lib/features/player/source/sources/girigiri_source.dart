@@ -18,7 +18,7 @@ class GirigiriSource extends VideoSource {
   String get id => 'girigiri';
 
   @override
-  String get name => '爱动漫';
+  String get name => 'girigiri';
 
   @override
   String get version => '1.3.0';
@@ -129,7 +129,7 @@ class GirigiriSource extends VideoSource {
         RegExp(r'player_aaaa\s*=\s*(\{[\s\S]*?\})').firstMatch(html);
 
     if (match == null) {
-      throw Exception('未在爱动漫播放页找到 player_aaaa 配置');
+      throw Exception('未在girigiri播放页找到 player_aaaa 配置');
     }
 
     final player = jsonDecode(match.group(1)!) as Map<String, dynamic>;
@@ -158,7 +158,7 @@ class GirigiriSource extends VideoSource {
 
     rawUrl = rawUrl.replaceAll(r'\/', '/').trim();
     if (!rawUrl.startsWith('http')) {
-      throw Exception('爱动漫直链格式不正确: $rawUrl');
+      throw Exception('girigiri直链格式不正确: $rawUrl');
     }
 
     return SourceResolveResult(

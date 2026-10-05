@@ -1,12 +1,29 @@
 import 'dart:math' as math;
-import '../../../core/models/bangumi/bangumi_item.dart';
+import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
+import 'models/source_models.dart';
+import 'utils/chinese_s2t_converter.dart';
 
-/// 标题预清洗与关键词候选池生成 (1:1 严格对齐 animaku packages/shared/src/plugin.ts 规范)
+/// 视频源标题语言偏好 (1:1 严格对齐 animaku TitlePreference)
+enum TitlePreference {
+  /// 标准中文名优先 (带空格，如 "间谍过家家 第二季")
+  chinese,
+
+  /// 紧凑中文名优先 (去除季数前空格，如 "间谍过家家第二季"，适用于 mifun 等源)
+  chineseCompact,
+
+  /// 日文原名优先 (如 "SPY×FAMILY"，适用于 xifan-next, moonci, omofun, libvio)
+  original,
+
+  /// 繁体中文优先 (自动简转繁，适用于 anime1 等源)
+  traditional,
+}
+
+/// 标题预清洗与关键词候选池生成引擎 (1:1 严格对齐 animaku packages/shared/src/plugin.ts 规范)
 class SourceKeywordMatcher {
   SourceKeywordMatcher._();
 
   static final RegExp _seasonPattern = RegExp(
-    r'\s*(?:(?:第\s*[一二三四五六七八九十\d]+\s*[季期部])|(?:Season\s*\d+)|(?:Part\s*\d+)|(?:S\d+)|(?:[第上下][季期])|(?:[上下前后]篇?)|(?:特别篇|总集篇|番外篇|剧场版))\s*$',
+    r'\s*(?:第\s*[一二三四五六七八九十\d]+\s*[季期部]|Season\s*\d+|S\d+|Part\s*\d+|[第上下][季期]|[上下前后]篇?|[一二三四五六七八九十\d]+章|特别篇|总集篇|番外篇|剧场版|[一-龥]{2,6}[篇編])\s*$',
     caseSensitive: false,
   );
 
@@ -34,6 +51,11 @@ class SourceKeywordMatcher {
     caseSensitive: false,
   );
 
+  /// 过滤无效的超短前缀黑名单 (对齐 animaku SHORT_PREFIX_BLACKLIST)
+  static const Set<String> _shortPrefixBlacklist = {
+    're', 'fate', 'ova', 'oad', 'sp', 'part', '剧场版', '特别篇', '总集篇',
+  };
+
   /// 解析中文数字 (1~99)
   static int? parseChineseNumber(String raw) {
     if (raw.isEmpty) return null;
@@ -60,23 +82,53 @@ class SourceKeywordMatcher {
     return null;
   }
 
+  /// 获取指定视频源的默认标题语言偏好
+  static TitlePreference getPreferenceForSource(String? sourceId) {
+    final sId = sourceId?.toLowerCase().trim();
+    if (sId == 'anime1') {
+      return TitlePreference.traditional;
+    }
+    if (sId == 'mifun') {
+      return TitlePreference.chineseCompact;
+    }
+    if (sId == 'xifan-next' || sId == 'moonci' || sId == 'omofun' || sId == 'libvio') {
+      return TitlePreference.original;
+    }
+    return TitlePreference.chinese;
+  }
+
   /// 依据视频源语言偏好解析最优单关键词 (1:1 严格对齐 animaku resolvePluginDefaultKeyword 规范)
   static String resolveDefaultKeyword({
     required String defaultTitle,
     BangumiItem? item,
     String? sourceId,
+    TitlePreference? preference,
   }) {
+    final pref = preference ?? getPreferenceForSource(sourceId);
     final name = (item?.name ?? '').trim();
     final nameCn = (item?.nameCn ?? '').trim();
     final fb = defaultTitle.trim();
 
-    // 针对偏好日语原名的源 (如 xifan-next, anime1, moonci)
-    final preferOriginal = sourceId == 'xifan-next' || sourceId == 'anime1' || sourceId == 'moonci';
-    if (preferOriginal && name.isNotEmpty) {
-      return name;
+    if (pref == TitlePreference.original) {
+      if (name.isNotEmpty) return name;
+      if (nameCn.isNotEmpty) return nameCn;
+      return fb;
     }
 
     final chineseTitle = nameCn.isNotEmpty ? nameCn : (name.isNotEmpty ? name : fb);
+
+    if (pref == TitlePreference.chineseCompact) {
+      // 移除 "第X季" 前面的空格：例如 "碧蓝之海 第二季" -> "碧蓝之海第二季"
+      return chineseTitle.replaceAllMapped(
+        RegExp(r'\s+(第\s*[一二三四五六七八九十\d]+\s*[季期部])'),
+        (m) => m.group(1)!,
+      );
+    }
+
+    if (pref == TitlePreference.traditional) {
+      return ChineseS2TConverter.convert(chineseTitle);
+    }
+
     return chineseTitle;
   }
 
@@ -91,6 +143,17 @@ class SourceKeywordMatcher {
       base = base.replaceAll(_seasonPattern, '').trim();
     }
     return base.isNotEmpty ? base : fullTitle;
+  }
+
+  /// 剥离特殊标点符号 (对齐 animaku stripSymbols)
+  static String stripSymbols(String text) {
+    return text
+        .replaceAll(
+          RegExp(r'[!@#$%^&*()_+\-=\[\]{};\x27:"\\|,.<>/?~～·・：；（）【】「」]'),
+          ' ',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   /// 依据视频源语言偏好生成多级关键词候选池 (对齐 animaku buildSearchKeywords)
@@ -115,16 +178,18 @@ class SourceKeywordMatcher {
     void push(String s) {
       final t = s.replaceAll(RegExp(r'\s+'), ' ').trim();
       if (t.length < 2) return;
+      if (t.length < 4 && _shortPrefixBlacklist.contains(t.toLowerCase())) return;
+      if (t.length > 60) return;
       if (!variants.any((v) => v.toLowerCase() == t.toLowerCase())) {
         variants.add(t);
       }
     }
 
     for (final title in titles) {
-      // 1. 完整原名
+      // 1. 完整原名 (Tier 1)
       push(title);
 
-      // 2. 紧凑季数（如 "间谍过家家 第三季" -> "间谍过家家第三季"）
+      // 2. 紧凑季数 (Tier 2/3)
       final compactSeason = title.replaceAllMapped(
         RegExp(r'\s+(第\s*[一二三四五六七八九十\d]+\s*[季期部])'),
         (m) => m.group(1)!,
@@ -153,7 +218,14 @@ class SourceKeywordMatcher {
       final noTilde = title.replaceAll(RegExp(r'[～~].*?[～~]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
       if (noTilde.isNotEmpty && noTilde != title) {
         push(noTilde);
-        push(extractBaseTitle(noTilde));
+        final noTildeBase = extractBaseTitle(noTilde);
+        if (noTildeBase.isNotEmpty && noTildeBase != noTilde) {
+          push(noTildeBase);
+          push(noTildeBase.replaceAllMapped(
+            RegExp(r'\s+(第\s*[一二三四五六七八九十\d]+\s*[季期部])'),
+            (m) => m.group(1)!,
+          ));
+        }
       }
 
       // 6. 括号副标题清洗
@@ -161,21 +233,85 @@ class SourceKeywordMatcher {
       if (noBracket.isNotEmpty && noBracket != title) {
         push(noBracket);
       }
+
+      // 7. 冒号前缀提取 (长度必须 >= 4 且不在黑名单中)
+      final colonHead = title.split(RegExp(r'[\s　:：\-–—·・]')).first.trim();
+      if (colonHead.length >= 4 && !_shortPrefixBlacklist.contains(colonHead.toLowerCase())) {
+        push(colonHead);
+      }
     }
 
-    // 优先排序：针对某些偏好日语原名的源（如 xifan-next），在候选池中提升日文原名
-    final preferOriginal = sourceId == 'xifan-next' || sourceId == 'moonci' || sourceId == 'omofun';
-    if (preferOriginal && nameOriginal.isNotEmpty) {
+    // 针对偏好日语原名的源（如 xifan-next, moonci），在候选池中将日文原名排到首位
+    final pref = getPreferenceForSource(sourceId);
+    if (pref == TitlePreference.original && nameOriginal.isNotEmpty) {
       variants.remove(nameOriginal);
       variants.insert(0, nameOriginal);
-      // 紧跟中文名
       if (nameCn.isNotEmpty) {
         variants.remove(nameCn);
         variants.insert(1, nameCn);
       }
+    } else if (pref == TitlePreference.traditional) {
+      // 繁体源优先全量繁体化候选词
+      final tradList = variants.map(ChineseS2TConverter.convert).toList();
+      for (final t in tradList) {
+        if (!variants.contains(t)) variants.insert(0, t);
+      }
     }
 
     return variants;
+  }
+
+  /// 展开单个搜索关键词为由短至长的出站备选词列表 (1:1 对齐 animaku expandKeywordCandidates)
+  static List<String> expandKeywordCandidates(
+    String keyword, {
+    bool traditionalChinese = false,
+    bool stripPunctuation = false,
+  }) {
+    var raw = keyword.trim();
+    if (raw.isEmpty) return const [];
+
+    if (traditionalChinese) {
+      raw = ChineseS2TConverter.convert(raw).trim();
+    }
+
+    if (stripPunctuation) {
+      raw = stripSymbols(raw);
+    }
+
+    final out = <String>[];
+    void push(String s) {
+      final t = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (t.length < 2 || t.length > 48) return;
+      if (!out.any((x) => x.toLowerCase() == t.toLowerCase())) {
+        out.add(t);
+      }
+    }
+
+    // 1. 冒号/空格前缀
+    final head = raw.split(RegExp(r'[\s　:：\-–—·・]')).first.trim();
+    if (head.isNotEmpty) push(head);
+
+    // 2. 去除括号
+    push(raw.replaceAll(RegExp(r'[（(][^）)]*[）)]'), ' '));
+
+    // 3. 去除季数标记
+    push(
+      raw
+          .replaceAll(RegExp(r'(第?\s*\d+\s*[期季部作]|S\s*\d+|Season\s*\d+)', caseSensitive: false), ' ')
+          .replaceAll(RegExp(r'\s+'), ' '),
+    );
+
+    // 4. 原始完整词
+    push(raw);
+
+    // 短词优先尝试
+    out.sort((a, b) {
+      final diff = a.length.compareTo(b.length);
+      if (diff != 0) return diff;
+      return a.compareTo(b);
+    });
+
+    return out.take(4).toList();
   }
 
   /// 计算两个标题的相似度 (1:1 严格对齐 animaku titleSimilarity 算法，含季数强校验 Season Guard)
@@ -243,5 +379,23 @@ class SourceKeywordMatcher {
       if (score > maxScore) maxScore = score;
     }
     return maxScore;
+  }
+
+  /// 对搜索命中结果按标题相似度由高到低排序 (1:1 对齐 animaku rankSearchItems)
+  static List<SourceSearchResult> rankSearchHits(
+    List<SourceSearchResult> items,
+    List<String> references,
+  ) {
+    if (items.isEmpty) return items;
+    final sorted = List<SourceSearchResult>.from(items);
+    sorted.sort((a, b) {
+      final sb = bestSimilarity(b.name, references);
+      final sa = bestSimilarity(a.name, references);
+      if (sb != sa) {
+        return sb.compareTo(sa); // 降序
+      }
+      return a.name.length.compareTo(b.name.length);
+    });
+    return sorted;
   }
 }

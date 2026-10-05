@@ -28,7 +28,7 @@ void main() {
       ),
       const VideoSourceItem(
         id: 'girigiri',
-        name: '爱动漫',
+        name: 'girigiri',
         description: '原画直连',
       ),
     ];
@@ -86,7 +86,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('稀饭Next'), findsOneWidget);
-      expect(find.text('爱动漫'), findsOneWidget);
+      expect(find.text('girigiri'), findsOneWidget);
 
       // 切换到「弹幕」Tab
       await tester.tap(find.text('弹幕'));

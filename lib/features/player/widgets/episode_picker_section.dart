@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../common/widgets/bouncing_scale_card.dart';
+import '../source/utils/playable_slot_engine.dart';
 
 /// 律动音波小动画（iOS 风格播放中音波指示器）
 class _PlayingBarsAnimation extends StatefulWidget {
@@ -68,6 +69,8 @@ class EpisodePickerSection extends StatefulWidget {
     required this.episodeCount,
     this.currentEpisode,
     required this.onSelectEpisode,
+    this.onSelectSlot,
+    this.slots,
     this.onRefresh,
     this.roads = const ['官方主线路', '备用线路 2'],
     this.activeRoadIndex = 0,
@@ -79,6 +82,8 @@ class EpisodePickerSection extends StatefulWidget {
   final int episodeCount;
   final int? currentEpisode;
   final ValueChanged<int> onSelectEpisode;
+  final ValueChanged<PlayableSlot>? onSelectSlot;
+  final List<PlayableSlot>? slots;
   final VoidCallback? onRefresh;
   final List<String> roads;
   final int activeRoadIndex;
@@ -135,7 +140,9 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.colorScheme.primary;
 
-    final total = widget.episodeCount;
+    final slots = widget.slots;
+    final hasSlots = slots != null && slots.isNotEmpty;
+    final total = hasSlots ? slots.length : widget.episodeCount;
     final isMultiRange = total > 40;
     final numRanges = isMultiRange ? (total / _rangeSize).ceil() : 1;
 
@@ -419,13 +426,29 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
                       itemCount: epList.length,
                       itemBuilder: (context, index) {
                         final ep = epList[index];
-                        final isPlaying = ep == widget.currentEpisode;
-                        final isWatched =
-                            !isPlaying && widget.watchedEpisodes.contains(ep);
+                        final itemIdx = ep - 1;
+                        PlayableSlot? slot;
+                        if (hasSlots && itemIdx >= 0 && itemIdx < slots.length) {
+                          slot = slots[itemIdx];
+                        }
+
+                        final isPlaying = slot != null
+                            ? (slot.canonicalEp == widget.currentEpisode)
+                            : (ep == widget.currentEpisode);
+                        final isWatched = !isPlaying &&
+                            widget.watchedEpisodes.contains(slot?.canonicalEp ?? ep);
+                        final cardTitle = slot != null ? slot.cardLabel : _resolveTitle(ep);
 
                         return BouncingScaleCard(
                           scaleDown: 0.95,
-                          onTap: () => widget.onSelectEpisode(ep),
+                          onTap: () {
+                            if (slot != null) {
+                              widget.onSelectSlot?.call(slot);
+                              widget.onSelectEpisode(slot.canonicalEp);
+                            } else {
+                              widget.onSelectEpisode(ep);
+                            }
+                          },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             alignment: Alignment.center,
@@ -466,7 +489,7 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
                                       const SizedBox(width: 4),
                                     ],
                                     Text(
-                                      _resolveTitle(ep),
+                                      cardTitle,
                                       style: TextStyle(
                                         color: isPlaying
                                             ? Colors.white

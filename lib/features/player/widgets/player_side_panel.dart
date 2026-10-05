@@ -5,6 +5,7 @@ import 'package:zakoni/features/player/controller/playback_controller.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
 import 'package:zakoni/features/player/source/source_aggregator.dart';
+import 'package:zakoni/features/player/source/utils/playable_slot_engine.dart';
 import 'package:zakoni/features/player/widgets/episode_picker_section.dart';
 import 'package:zakoni/features/player/widgets/video_source_view.dart';
 
@@ -31,6 +32,8 @@ class PlayerSidePanel extends StatefulWidget {
     required this.onSelectEpisode,
     this.onRoadSelected,
     this.onRefreshEpisodes,
+    this.slots,
+    this.onSelectSlot,
     required this.sources,
     required this.selectedSourceId,
     required this.onSourceSelected,
@@ -50,7 +53,9 @@ class PlayerSidePanel extends StatefulWidget {
   final List<String> roads;
   final int activeRoadIndex;
   final List<String> episodeTitles;
+  final List<PlayableSlot>? slots;
   final ValueChanged<int> onSelectEpisode;
+  final ValueChanged<PlayableSlot>? onSelectSlot;
   final ValueChanged<int>? onRoadSelected;
   final VoidCallback? onRefreshEpisodes;
   final bool isLoadingEpisodes;
@@ -370,17 +375,20 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
 
     return EpisodePickerSection(
       key: const ValueKey('side_panel_episodes'),
-      episodeCount: widget.episodeCount,
+      episodeCount: widget.slots != null && widget.slots!.isNotEmpty
+          ? widget.slots!.length
+          : widget.episodeCount,
       currentEpisode: widget.currentEpisode,
       roads: widget.roads,
       activeRoadIndex: widget.activeRoadIndex,
       episodeTitles: widget.episodeTitles,
+      slots: widget.slots,
       onRoadSelected: widget.onRoadSelected,
       onRefresh: widget.onRefreshEpisodes,
       onSelectEpisode: (ep) {
         widget.onSelectEpisode(ep);
-        // 点选后可选不关闭抽屉或自动延迟关闭
       },
+      onSelectSlot: widget.onSelectSlot,
     );
   }
 
@@ -395,7 +403,10 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
       aggregator: widget.aggregator,
       onSourceSelected: (src) {
         widget.onSourceSelected(src);
-        // 自动切回选集 Tab
+        setState(() => _activeTab = PlayerSidePanelTab.episodes);
+      },
+      onSelectHit: (src, hit, [cachedRoads = const []]) {
+        widget.onSourceSelected(src);
         setState(() => _activeTab = PlayerSidePanelTab.episodes);
       },
     );

@@ -166,7 +166,7 @@ class _SourceSettingsCardState extends State<SourceSettingsCard> {
                 bg: Color(0xFF34C759),
               ),
               title: '内置视频源集合',
-              subtitle: '支持稀饭Next、次元城、爱动漫、月之祠等',
+              subtitle: '支持稀饭Next、次元城、girigiri、月之祠等',
               showDivider: true,
               trailing: Text(
                 '${sources.length} 个就绪',

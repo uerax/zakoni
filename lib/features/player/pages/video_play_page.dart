@@ -11,10 +11,13 @@ import '../../common/widgets/bouncing_scale_card.dart';
 import '../../common/widgets/cached_anime_image.dart';
 import '../controller/playback_controller.dart';
 import '../danmaku/danmaku.dart';
+import '../source/auto_source_pick_coordinator.dart';
 import '../source/models/source_models.dart';
+import '../source/services/source_binding_service.dart';
 import '../source/source_aggregator.dart';
 import '../source/source_bundle_manager.dart';
 import '../source/source_keyword_matcher.dart';
+import '../source/utils/playable_slot_engine.dart';
 import '../widgets/episode_picker_section.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_side_panel.dart';
@@ -22,13 +25,16 @@ import '../widgets/video_source_view.dart';
 import '../widgets/video_surface.dart';
 import '../widgets/watch_meta_view.dart';
 
-/// zakoni 统一多端视频播放页面
-/// 遵循 animaku 官方交互与数据生命周期规范：
-/// 1. 页面入参作为 Seed 占位，避免白屏等待；
-/// 2. 入场异步拉取 Bangumi 权威番剧数据与官方分集列表（用于弹幕与历史续播集数 Mapping）；
-/// 3. 初始仅向默认视频源发起搜索，搜到即拉取真实分集；
-/// 4. 默认源未匹配时，自动展开「视频源」Tab，并在后台并发探测前 6 个源，供用户选择；
-/// 5. 选集严格根据视频源返回的真实章节渲染，绝不虚假填充；用户点选后直连播放。
+/// zakoni 统一多端视频播放页面 (1:1 严格对齐 animaku 完整视频源生命周期与架构规范)
+///
+/// 核心流程与规范：
+/// 1. 初始 0ms 直开: 检查 SourceBindingService，若命中该番剧在该源的历史绑定，直接取 sourceUrl 提取分集，跳过搜索；
+/// 2. 关键词智能装配: 依据各源语言偏好 (TitlePreference) 解析最优单关键词，规避无效多轮串行网络阻塞；
+/// 3. 单源自动选定 (Season Guard): 打分 >= 0.55 且无季数冲突才自动采用，低于门槛则停留在 needsPick 供用户确认；
+/// 4. 默认源未收录时并发保底探测: 自动在后台启动 SourceAggregator 探测前 6 个保底源 (3 并发 + 5s 超时熔断)；
+/// 5. 自适应宽限选源仲裁器 (AutoSourcePickCoordinator): 1200ms 宽限窗口判定高优先级源；用户手动点击即时互斥锁死；
+/// 6. PlayableSlot 双层集数对齐: 自动过滤 PV/SP/特典，1:1 对齐 Bangumi 官方正片，根治剧名带数字被正则误杀问题；
+/// 7. 视频源卡片抽屉 (Drawer): 搜出多条时供手动点选条目、候选关键词胶囊快捷换词、自定义输入框强制 bypassCache 重测。
 class VideoPlayPage extends StatefulWidget {
   const VideoPlayPage({
     super.key,
@@ -84,6 +90,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   late final DanmakuController _danmakuController;
   late final TabController _tabController;
   late final SourceAggregator _aggregator;
+  late final AutoSourcePickCoordinator _autoPicker;
 
   bool _isFullscreen = false;
   bool _isSidePanelOpen = false;
@@ -98,6 +105,8 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   bool _isLoadingChapters = false;
   String? _resolveError;
   String? _sourceNotice;
+  String? _hudToast;
+  bool _defaultSearchEmpty = false;
 
   List<SourceChapterRoad> _chapterRoads = [];
   int _selectedRoadIndex = 0;
@@ -108,6 +117,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   Map<int, EpisodeOpedSegment> _opedData = {};
 
   BangumiItem? get _effectiveBangumiItem => _fullBangumiItem ?? widget.bangumiItem;
+  int get _effectiveBangumiId => _effectiveBangumiItem?.id ?? widget.bangumiItem?.id ?? 0;
   EpisodeOpedSegment? get _currentOpedSegment => _opedData[_activeEpisode ?? 1];
 
   List<SourceEpisode> get _currentEpisodes {
@@ -116,26 +126,18 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     return _chapterRoads[idx].episodes;
   }
 
+  /// 使用 PlayableSlotEngine 构建双层对齐的标准槽位列表
+  List<PlayableSlot> get _currentSlots {
+    return PlayableSlotEngine.buildPlayableSlots(
+      episodes: _currentEpisodes,
+      officialEpisodes: _officialEpisodes,
+    );
+  }
+
   List<String> get _mappedEpisodeTitles {
-    final episodes = _currentEpisodes;
-    if (episodes.isEmpty) return [];
-
-    // 对齐 animaku 规范：优先按 Bangumi 权威正片列表 (type == 0) 位置映射集数编号
-    final officialMain = (_officialEpisodes ?? [])
-        .where((e) => e.type == 0)
-        .toList()
-      ..sort((a, b) => a.sort.compareTo(b.sort));
-
-    return List.generate(episodes.length, (i) {
-      if (i < officialMain.length) {
-        final bgm = officialMain[i];
-        final epNum = bgm.ep ?? bgm.sort;
-        final isInt = epNum == epNum.roundToDouble();
-        final numStr = isInt ? epNum.toInt().toString().padLeft(2, '0') : epNum.toString();
-        return '第 $numStr 话';
-      }
-      return '第 ${(i + 1).toString().padLeft(2, '0')} 话';
-    });
+    final slots = _currentSlots;
+    if (slots.isEmpty) return [];
+    return slots.map((s) => s.displayTitle).toList();
   }
 
   List<String> get _roadNames {
@@ -151,6 +153,24 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     return item.name;
   }
 
+  /// 多层级备选候选词列表 (供卡片抽屉推荐胶囊使用)
+  List<String> get _keywordOptions {
+    return SourceKeywordMatcher.buildCandidates(
+      defaultTitle: widget.title,
+      item: _effectiveBangumiItem,
+      sourceId: _selectedSourceId,
+    );
+  }
+
+  List<String> get _titleRefs {
+    return [
+      if (_effectiveBangumiItem?.nameCn.isNotEmpty ?? false) _effectiveBangumiItem!.nameCn,
+      if (_effectiveBangumiItem?.name.isNotEmpty ?? false) _effectiveBangumiItem!.name,
+      widget.title,
+      ...(_effectiveBangumiItem?.alias ?? const <String>[]),
+    ].map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -159,10 +179,27 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     _playbackController = ZakoniPlaybackController(
       danmakuController: _danmakuController,
     );
+
+    // 初始化并发源探测器
     _aggregator = SourceAggregator();
-    _aggregator.addListener(() {
-      if (mounted) setState(() {});
-    });
+    _aggregator.addListener(_onAggregatorUpdated);
+
+    // 初始化自适应宽限自动选源仲裁器 (对齐 animaku useAutoSourcePick)
+    _autoPicker = AutoSourcePickCoordinator(
+      onSwitchSource: (meta, hit) {
+        if (!mounted) return;
+        _showHudToast('默认源未收录，已为你切换至 ${meta.name}');
+        _handleSourceSelected(
+          _sources.firstWhere((s) => s.id == meta.id, orElse: () => VideoSourceItem(id: meta.id, name: meta.name, description: '')),
+          hit,
+        );
+      },
+      onAllFallbacksFailed: () {
+        if (!mounted) return;
+        _showHudToast('所有备用源自动检索完毕，请在面板中换词重搜');
+        _tabController.animateTo(1);
+      },
+    );
 
     // 默认聚焦第 3 个 Tab「选集」(index: 2)
     _tabController = TabController(
@@ -170,6 +207,21 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       vsync: this,
       initialIndex: 2,
     );
+    _tabController.addListener(() {
+      if (_tabController.index == 1) {
+        // 用户切换到「视频源」Tab，触发互斥锁避免自动抢占
+        _autoPicker.onUserAction();
+        _aggregator.syncAndProbe(
+          bangumiId: _effectiveBangumiId,
+          defaultTitle: widget.title,
+          item: _effectiveBangumiItem,
+          activeSourceId: _selectedSourceId,
+          isOpen: true,
+          autoProbeOnFallback: _defaultSearchEmpty,
+          sourceOrder: _sources.map((s) => s.id).toList(),
+        );
+      }
+    });
 
     if (widget.danmakuItems != null && widget.danmakuItems!.isNotEmpty) {
       _danmakuController.loadItems(widget.danmakuItems!);
@@ -181,6 +233,9 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     // 待首帧构建完成后安全启动起播或检索
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      // 预先后台初始化持久化绑定服务
+      SourceBindingService.instance.initialize().ignore();
+
       // 若有显式传入的固定 URL 则直接起播
       if (_activeEpisode != null &&
           widget.videoUrl != null &&
@@ -188,8 +243,32 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         _hasStartedPlayback = true;
         _initPlayback();
       } else {
-        // 否则启动默认视频源检索流程
+        // 启动主流程：先查绑定，再查默认源，未命中则后台探测保底源
         _startDefaultSourceSearch(autoPlayFirst: _activeEpisode != null);
+      }
+    });
+  }
+
+  void _onAggregatorUpdated() {
+    if (!mounted) return;
+    setState(() {});
+
+    // 驱动自动选源仲裁器判断是否执行 0ms 秒提或 1200ms 宽限切换
+    _autoPicker.update(
+      bangumiId: _effectiveBangumiId,
+      enabled: _defaultSearchEmpty && _chapterRoads.isEmpty,
+      sources: _aggregator.states,
+      inFlightSources: _aggregator.inFlightSources,
+      sourceOrder: _sources.map((s) => s.id).toList(),
+      allFallbacksExhausted: _aggregator.allFallbacksExhausted,
+    );
+  }
+
+  void _showHudToast(String message) {
+    setState(() => _hudToast = message);
+    Future.delayed(const Duration(milliseconds: 3500), () {
+      if (mounted && _hudToast == message) {
+        setState(() => _hudToast = null);
       }
     });
   }
@@ -226,7 +305,10 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     }
   }
 
-  /// 只触发默认源检索；若未匹配则展开视频源面板并发探测
+  /// 启动主检索流程：
+  /// Step 1: 检查持久化绑定 (SourceBindingService) -> 若存在直接 0ms 秒开；
+  /// Step 2: 绑定不存在时向默认源发起精准检索 -> 若命中 (score >= 0.55) 则建立绑定并起播；
+  /// Step 3: 若默认源未收录 -> 标记 defaultSearchEmpty，后台静默并发探测保底源，由 AutoSourcePickCoordinator 仲裁。
   Future<void> _startDefaultSourceSearch({bool autoPlayFirst = false}) async {
     if (!mounted) return;
     setState(() {
@@ -236,32 +318,58 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     });
 
     try {
-      // 单测环境无 C++ 动态库守护
       if (Platform.environment.containsKey('FLUTTER_TEST')) {
-        _chapterRoads = [
-          SourceChapterRoad(
-            name: '默认线路',
-            episodes: List.generate(
-              widget.episodeCount,
-              (i) => SourceEpisode(name: '第 ${i + 1} 话', url: 'https://test/ep${i + 1}'),
-            ),
-          )
-        ];
-        _isLoadingChapters = false;
+        setState(() {
+          _chapterRoads = [
+            SourceChapterRoad(
+              name: '默认线路',
+              episodes: List.generate(
+                widget.episodeCount,
+                (i) => SourceEpisode(name: '第 ${i + 1} 话', url: 'https://test/ep${i + 1}'),
+              ),
+            )
+          ];
+          _isLoadingChapters = false;
+        });
         return;
       }
 
       await SourceBundleManager.instance.initialize();
       final runtime = SourceBundleManager.instance.runtime;
+      final bangumiId = _effectiveBangumiId;
 
-      final titleRefs = <String>[
-        if (_effectiveBangumiItem?.nameCn.isNotEmpty ?? false) _effectiveBangumiItem!.nameCn,
-        if (_effectiveBangumiItem?.name.isNotEmpty ?? false) _effectiveBangumiItem!.name,
-        widget.title,
-        ...(_effectiveBangumiItem?.alias ?? const <String>[]),
-      ];
+      // ==========================================
+      // Step 1: 优先检查历史持久化绑定 (0ms 直开)
+      // ==========================================
+      final binding = SourceBindingService.instance.getBinding(bangumiId, _selectedSourceId);
+      if (binding != null && binding.sourceUrl.isNotEmpty) {
+        try {
+          final roads = await runtime.chapters(_selectedSourceId, binding.sourceUrl);
+          if (roads.isNotEmpty && roads.any((r) => r.episodes.isNotEmpty)) {
+            if (!mounted) return;
+            setState(() {
+              _chapterRoads = roads;
+              _selectedRoadIndex = 0;
+              _isLoadingChapters = false;
+              _defaultSearchEmpty = false;
+            });
 
-      // 1. 首选单关键词极速精准直搜 (对齐 animaku resolvePluginDefaultKeyword 机制，杜绝多轮串行网络阻塞)
+            if (autoPlayFirst && _currentEpisodes.isNotEmpty) {
+              _selectEpisode(_activeEpisode ?? 1);
+            } else if (_currentEpisodes.isNotEmpty) {
+              runtime.resolve(_selectedSourceId, _currentEpisodes.first.url).ignore();
+            }
+            return;
+          }
+        } catch (_) {
+          // 绑定失效 (如源站下架/URL变更)，自动移除失效绑定并平滑降级至 Step 2
+          await SourceBindingService.instance.removeBinding(bangumiId, _selectedSourceId);
+        }
+      }
+
+      // ==========================================
+      // Step 2: 默认源单关键词精准检索
+      // ==========================================
       final primaryKw = SourceKeywordMatcher.resolveDefaultKeyword(
         defaultTitle: widget.title,
         item: _effectiveBangumiItem,
@@ -270,34 +378,34 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
       SourceSearchResult? bestHit;
       if (primaryKw.isNotEmpty) {
-        final hits = await runtime.search(_selectedSourceId, primaryKw);
-        for (final h in hits) {
-          final sim = SourceKeywordMatcher.bestSimilarity(h.name, titleRefs);
-          if (sim >= 0.55) {
-            bestHit = h;
-            break;
+        final rawHits = await runtime.search(_selectedSourceId, primaryKw);
+        final ranked = SourceKeywordMatcher.rankSearchHits(rawHits, _titleRefs);
+        if (ranked.isNotEmpty) {
+          final score = SourceKeywordMatcher.bestSimilarity(ranked.first.name, _titleRefs);
+          if (score >= SourceAggregator.autoPickMinSimilarity) {
+            bestHit = ranked.first;
           }
         }
       }
 
-      // 2. 若首选关键词未命中，使用中文备用名尝试 1 次快速回退检索
+      // 回退尝试中文备用名检索
       if (bestHit == null) {
         final fallbackKw = (_effectiveBangumiItem?.nameCn.isNotEmpty ?? false)
             ? _effectiveBangumiItem!.nameCn
             : widget.title;
         if (fallbackKw.isNotEmpty && fallbackKw != primaryKw) {
-          final hits = await runtime.search(_selectedSourceId, fallbackKw);
-          for (final h in hits) {
-            final sim = SourceKeywordMatcher.bestSimilarity(h.name, titleRefs);
-            if (sim >= 0.55) {
-              bestHit = h;
-              break;
+          final rawHits = await runtime.search(_selectedSourceId, fallbackKw);
+          final ranked = SourceKeywordMatcher.rankSearchHits(rawHits, _titleRefs);
+          if (ranked.isNotEmpty) {
+            final score = SourceKeywordMatcher.bestSimilarity(ranked.first.name, _titleRefs);
+            if (score >= SourceAggregator.autoPickMinSimilarity) {
+              bestHit = ranked.first;
             }
           }
         }
       }
 
-      // Case A: 默认源成功匹配
+      // 默认源成功命中！
       if (bestHit != null) {
         final roads = await runtime.chapters(_selectedSourceId, bestHit.url);
         if (roads.isNotEmpty && roads.any((r) => r.episodes.isNotEmpty)) {
@@ -306,35 +414,47 @@ class _VideoPlayPageState extends State<VideoPlayPage>
             _chapterRoads = roads;
             _selectedRoadIndex = 0;
             _isLoadingChapters = false;
+            _defaultSearchEmpty = false;
           });
+
+          // 记录持久化绑定，供下次瞬间 0ms 起播
+          await SourceBindingService.instance.setBinding(
+            bangumiId: bangumiId,
+            sourceId: _selectedSourceId,
+            sourceUrl: bestHit.url,
+            title: bestHit.name,
+            referenceTitles: _titleRefs,
+          );
 
           if (autoPlayFirst && _currentEpisodes.isNotEmpty) {
             _selectEpisode(_activeEpisode ?? 1);
           } else if (_currentEpisodes.isNotEmpty) {
-            // 静默预热第 1 集直链，用户点击选集时直接从内存缓存 0ms 瞬间起播
             runtime.resolve(_selectedSourceId, _currentEpisodes.first.url).ignore();
           }
           return;
         }
       }
 
-      // Case B: 默认源未匹配 -> 自动展开视频源面板并并发探测备用源
+      // ==========================================
+      // Step 3: 默认源未收录 -> 启动后台并发保底探测
+      // ==========================================
       if (!mounted) return;
       setState(() {
         _isLoadingChapters = false;
         _chapterRoads = [];
+        _defaultSearchEmpty = true;
         _sourceNotice = '默认源未收录《${widget.title}》，已为你并发检索备用播放源';
       });
 
-      // 自动切换到「视频源」Tab (index: 1)
-      _tabController.animateTo(1);
-
-      // 后台并发探测排名前 6 个源
-      _aggregator.probeSources(
+      // 启动后台探测器 (严格限制前 6 个源，3 并发，5s 超时)
+      _aggregator.syncAndProbe(
+        bangumiId: bangumiId,
         defaultTitle: widget.title,
         item: _effectiveBangumiItem,
-        skipSourceId: _selectedSourceId,
-        limit: 6,
+        activeSourceId: _selectedSourceId,
+        isOpen: _tabController.index == 1,
+        autoProbeOnFallback: true,
+        sourceOrder: _sources.map((s) => s.id).toList(),
       );
     } catch (e) {
       if (!mounted) return;
@@ -345,8 +465,46 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     }
   }
 
-  /// 用户在视频源面板选择某源 (折叠面板，切回选集并拉取真实分集)
-  Future<void> _handleSourceSelected(VideoSourceItem src) async {
+  /// 用户或仲裁器选择某视频源及条目 (切源并提取真实分集)
+  Future<void> _handleSourceSelected(
+    VideoSourceItem src, [
+    SourceSearchResult? directHit,
+    List<SourceChapterRoad>? cachedRoads,
+  ]) async {
+    _autoPicker.onUserAction();
+
+    // 0ms 秒级直开：若探测器中已预先验活并缓存了分集线路，直接采纳，彻底杜绝“切过去又开始检索然后报错”
+    if (cachedRoads != null &&
+        cachedRoads.isNotEmpty &&
+        cachedRoads.any((r) => r.episodes.isNotEmpty)) {
+      setState(() {
+        _selectedSourceId = src.id;
+        _chapterRoads = cachedRoads;
+        _selectedRoadIndex = 0;
+        _isLoadingChapters = false;
+        _resolveError = null;
+        _sourceNotice = null;
+        _defaultSearchEmpty = false;
+      });
+
+      _tabController.animateTo(2);
+
+      if (directHit != null && _effectiveBangumiId > 0) {
+        SourceBindingService.instance.setBinding(
+          bangumiId: _effectiveBangumiId,
+          sourceId: src.id,
+          sourceUrl: directHit.url,
+          title: directHit.name,
+          referenceTitles: _titleRefs,
+        ).ignore();
+      }
+
+      if (_hasStartedPlayback && _currentSlots.isNotEmpty) {
+        _selectEpisode(_activeEpisode ?? 1);
+      }
+      return;
+    }
+
     setState(() {
       _selectedSourceId = src.id;
       _chapterRoads = [];
@@ -362,37 +520,47 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
     try {
       if (Platform.environment.containsKey('FLUTTER_TEST')) {
-        _chapterRoads = [
-          SourceChapterRoad(
-            name: '默认线路',
-            episodes: List.generate(
-              widget.episodeCount,
-              (i) => SourceEpisode(name: '第 ${i + 1} 话', url: 'https://test/ep${i + 1}'),
-            ),
-          )
-        ];
-        _isLoadingChapters = false;
+        setState(() {
+          _chapterRoads = [
+            SourceChapterRoad(
+              name: '默认线路',
+              episodes: List.generate(
+                widget.episodeCount,
+                (i) => SourceEpisode(name: '第 ${i + 1} 话', url: 'https://test/ep${i + 1}'),
+              ),
+            )
+          ];
+          _isLoadingChapters = false;
+        });
         return;
       }
 
       final runtime = SourceBundleManager.instance.runtime;
+      final bangumiId = _effectiveBangumiId;
 
-      // 检查当前源是否在探测器中已有命中缓存
-      final probeHit = _aggregator.items
-          .cast<AggregatedSourceState?>()
-          .firstWhere((p) => p?.meta.id == src.id && p?.matchedHit != null, orElse: () => null)
-          ?.matchedHit;
+      String? targetUrl = directHit?.url;
+      String? targetTitle = directHit?.name;
 
-      String? targetUrl = probeHit?.url;
-
+      // 检查探测器是否已有就绪条目
       if (targetUrl == null) {
-        final titleRefs = <String>[
-          if (_effectiveBangumiItem?.nameCn.isNotEmpty ?? false) _effectiveBangumiItem!.nameCn,
-          if (_effectiveBangumiItem?.name.isNotEmpty ?? false) _effectiveBangumiItem!.name,
-          widget.title,
-          ...(_effectiveBangumiItem?.alias ?? const <String>[]),
-        ];
+        final probeState = _aggregator.states[src.id];
+        if (probeState?.matchedHit != null) {
+          targetUrl = probeState!.matchedHit!.url;
+          targetTitle = probeState.matchedHit!.name;
+        }
+      }
 
+      // 检查持久化绑定
+      if (targetUrl == null) {
+        final binding = SourceBindingService.instance.getBinding(bangumiId, src.id);
+        if (binding != null && binding.sourceUrl.isNotEmpty) {
+          targetUrl = binding.sourceUrl;
+          targetTitle = binding.title;
+        }
+      }
+
+      // 若均无现成链接，发起单源搜索
+      if (targetUrl == null) {
         final primaryKw = SourceKeywordMatcher.resolveDefaultKeyword(
           defaultTitle: widget.title,
           item: _effectiveBangumiItem,
@@ -401,12 +569,10 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
         if (primaryKw.isNotEmpty) {
           final hits = await runtime.search(src.id, primaryKw);
-          for (final h in hits) {
-            final sim = SourceKeywordMatcher.bestSimilarity(h.name, titleRefs);
-            if (sim >= 0.55) {
-              targetUrl = h.url;
-              break;
-            }
+          final ranked = SourceKeywordMatcher.rankSearchHits(hits, _titleRefs);
+          if (ranked.isNotEmpty) {
+            targetUrl = ranked.first.url;
+            targetTitle = ranked.first.name;
           }
         }
 
@@ -415,20 +581,18 @@ class _VideoPlayPageState extends State<VideoPlayPage>
               ? _effectiveBangumiItem!.nameCn
               : widget.title;
           if (fallbackKw.isNotEmpty && fallbackKw != primaryKw) {
-            final fallbackHits = await runtime.search(src.id, fallbackKw);
-            for (final h in fallbackHits) {
-              final sim = SourceKeywordMatcher.bestSimilarity(h.name, titleRefs);
-              if (sim >= 0.55) {
-                targetUrl = h.url;
-                break;
-              }
+            final hits = await runtime.search(src.id, fallbackKw);
+            final ranked = SourceKeywordMatcher.rankSearchHits(hits, _titleRefs);
+            if (ranked.isNotEmpty) {
+              targetUrl = ranked.first.url;
+              targetTitle = ranked.first.name;
             }
           }
         }
       }
 
       if (targetUrl == null) {
-        throw Exception('在「${src.name}」未检索到《${widget.title}》');
+        throw Exception('在「${src.name}」未检索到《${widget.title}》，请在面板中展开换词');
       }
 
       final roads = await runtime.chapters(src.id, targetUrl);
@@ -441,9 +605,21 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         _chapterRoads = roads;
         _selectedRoadIndex = 0;
         _isLoadingChapters = false;
+        _defaultSearchEmpty = false;
       });
 
-      // 若之前处于在播态，换源后自动续播当前集数
+      // 写入持久化绑定
+      if (targetTitle != null && targetUrl.isNotEmpty) {
+        await SourceBindingService.instance.setBinding(
+          bangumiId: bangumiId,
+          sourceId: src.id,
+          sourceUrl: targetUrl,
+          title: targetTitle,
+          referenceTitles: _titleRefs,
+        );
+      }
+
+      // 若之前处于在播态，换源后自动无缝续播当前集数
       if (_hasStartedPlayback && _currentEpisodes.isNotEmpty) {
         _selectEpisode(_activeEpisode ?? 1);
       }
@@ -456,8 +632,74 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     }
   }
 
+  /// 通过 PlayableSlot 起播 (严格按照 Bangumi 映射对应真实媒体地址，彻底杜绝 PV/花絮错位)
+  Future<void> _selectSlot(PlayableSlot slot) async {
+    _autoPicker.onUserAction();
+
+    setState(() {
+      _activeEpisode = slot.canonicalEp;
+      _hasStartedPlayback = true;
+      _resolveError = null;
+    });
+
+    widget.onEpisodeSelected?.call(slot.canonicalEp);
+
+    // 1. 若有预置直接流地址 (或单测环境测试流)
+    if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
+      await _playbackController.open(
+        widget.videoUrl!,
+        httpHeaders: widget.httpHeaders,
+      );
+      return;
+    }
+
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      await _playbackController.open(slot.pageUrl);
+      return;
+    }
+
+    // 2. 否则通过当前视频源解析真实直链
+    try {
+      final runtime = SourceBundleManager.instance.runtime;
+      final result = await runtime.resolve(_selectedSourceId, slot.pageUrl);
+
+      if (result.url.isEmpty) {
+        throw Exception('视频源未能生成有效媒体地址');
+      }
+
+      await _playbackController.open(
+        result.url,
+        httpHeaders: result.headers,
+      );
+
+      // 后台静默预热下一集
+      final slots = _currentSlots;
+      final currentIdx = slots.indexOf(slot);
+      if (currentIdx != -1 && currentIdx + 1 < slots.length) {
+        runtime.resolve(_selectedSourceId, slots[currentIdx + 1].pageUrl).ignore();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _resolveError = '播放解析失败: ${e.toString().replaceFirst("Exception: ", "")}';
+      });
+    }
+  }
+
   /// 用户点击选集起播 (严格对应视频源真实分集，mapping 通过 index 互相链接)
   Future<void> _selectEpisode(int ep) async {
+    final slots = _currentSlots;
+    if (slots.isNotEmpty) {
+      final targetSlot = slots.firstWhere(
+        (s) => s.canonicalEp == ep,
+        orElse: () => (ep - 1 >= 0 && ep - 1 < slots.length) ? slots[ep - 1] : slots.first,
+      );
+      await _selectSlot(targetSlot);
+      return;
+    }
+
+    _autoPicker.onUserAction();
+
     final episodes = _currentEpisodes;
     if (episodes.isEmpty || ep < 1 || ep > episodes.length) {
       return;
@@ -509,7 +751,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         httpHeaders: result.headers,
       );
 
-      // 后台静默预热下一集播放直链（存入直链 LRU 缓存，实现切集秒开）
+      // 后台静默预热下一集播放直链
       if (epIndex + 1 < episodes.length) {
         runtime.resolve(_selectedSourceId, episodes[epIndex + 1].url).ignore();
       }
@@ -529,7 +771,9 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     _tabController.dispose();
     _playbackController.dispose();
     _danmakuController.dispose();
+    _aggregator.removeListener(_onAggregatorUpdated);
     _aggregator.dispose();
+    _autoPicker.dispose();
     super.dispose();
   }
 
@@ -662,6 +906,48 @@ class _VideoPlayPageState extends State<VideoPlayPage>
           ),
         ),
 
+        // HUD Toast 悬浮提示胶囊
+        if (_hudToast != null)
+          Positioned(
+            top: 20,
+            left: 20,
+            right: 20,
+            child: Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          _hudToast!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
         // iOS 风格解析失败提示磨砂卡片
         if (_resolveError != null)
           Container(
@@ -692,7 +978,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 13,
+                          fontSize: 13.5,
                           fontWeight: FontWeight.w500,
                           letterSpacing: -0.2,
                         ),
@@ -740,7 +1026,10 @@ class _VideoPlayPageState extends State<VideoPlayPage>
                           const SizedBox(width: 12),
                           BouncingScaleCard(
                             scaleDown: 0.94,
-                            onTap: () => _tabController.animateTo(1),
+                            onTap: () {
+                              _autoPicker.onUserAction();
+                              _tabController.animateTo(1);
+                            },
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                               decoration: BoxDecoration(
@@ -871,6 +1160,41 @@ class _VideoPlayPageState extends State<VideoPlayPage>
           ),
         ),
 
+        // 中央磨砂播放按钮
+        Center(
+          child: BouncingScaleCard(
+            scaleDown: 0.92,
+            onTap: () {
+              if (_currentEpisodes.isNotEmpty) {
+                _selectEpisode(_activeEpisode ?? 1);
+              }
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(36),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
         // 底部 iOS 磨砂提示胶囊条
         Positioned(
           bottom: 12,
@@ -937,7 +1261,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     );
   }
 
-  /// 选集 Tab 核心渲染器 (严格根据视频源真实数据渲染，绝不填充伪造按钮)
+  /// 选集 Tab 核心渲染器
   Widget _buildEpisodeSectionBody() {
     if (_isLoadingChapters) {
       return Center(
@@ -985,7 +1309,10 @@ class _VideoPlayPageState extends State<VideoPlayPage>
               const SizedBox(height: 16),
               BouncingScaleCard(
                 scaleDown: 0.95,
-                onTap: () => _tabController.animateTo(1),
+                onTap: () {
+                  _autoPicker.onUserAction();
+                  _tabController.animateTo(1);
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
                   decoration: BoxDecoration(
@@ -1016,18 +1343,20 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     }
 
     return EpisodePickerSection(
-      episodeCount: _currentEpisodes.length,
+      episodeCount: _currentSlots.isNotEmpty ? _currentSlots.length : _currentEpisodes.length,
       currentEpisode: _activeEpisode,
       roads: _roadNames,
       activeRoadIndex: _selectedRoadIndex,
       episodeTitles: _mappedEpisodeTitles,
+      slots: _currentSlots,
       onRoadSelected: (idx) => setState(() => _selectedRoadIndex = idx),
       onRefresh: () => _startDefaultSourceSearch(autoPlayFirst: false),
       onSelectEpisode: _selectEpisode,
+      onSelectSlot: _selectSlot,
     );
   }
 
-  /// iOS 风格极简精致滑动胶囊分段控制器 (Slender iOS Segmented Control)
+  /// iOS 风格极简精致滑动胶囊分段控制器
   Widget _buildSegmentedTabBar(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -1103,20 +1432,22 @@ class _VideoPlayPageState extends State<VideoPlayPage>
           isOpen: _isSidePanelOpen,
           initialTab: _sidePanelInitialTab,
           onClose: () => setState(() => _isSidePanelOpen = false),
-          episodeCount: _currentEpisodes.length,
+          episodeCount: _currentSlots.isNotEmpty ? _currentSlots.length : _currentEpisodes.length,
           currentEpisode: _activeEpisode,
           roads: _roadNames,
           activeRoadIndex: _selectedRoadIndex,
           episodeTitles: _mappedEpisodeTitles,
+          slots: _currentSlots,
           isLoadingEpisodes: _isLoadingChapters,
           onSelectEpisode: (ep) => _selectEpisode(ep),
+          onSelectSlot: (slot) => _selectSlot(slot),
           onRoadSelected: (idx) => setState(() => _selectedRoadIndex = idx),
           onRefreshEpisodes: () =>
               _startDefaultSourceSearch(autoPlayFirst: false),
           sources: _sources,
           selectedSourceId: _selectedSourceId,
           aggregator: _aggregator,
-          onSourceSelected: _handleSourceSelected,
+          onSourceSelected: (src) => _handleSourceSelected(src),
           danmakuController: _danmakuController,
           controller: _playbackController,
         ),
@@ -1186,8 +1517,12 @@ class _VideoPlayPageState extends State<VideoPlayPage>
                         sources: _sources,
                         selectedSourceId: _selectedSourceId,
                         onSourceSelected: _handleSourceSelected,
+                        onSelectHit: (src, hit, [List<SourceChapterRoad>? cachedRoads]) => _handleSourceSelected(src, hit, cachedRoads),
                         aggregator: _aggregator,
                         hintMessage: _sourceNotice,
+                        keywordOptions: _keywordOptions,
+                        onUserAction: _autoPicker.onUserAction,
+                        currentEpisodeNumber: _activeEpisode,
                       ),
                       _buildEpisodeSectionBody(),
                     ],
@@ -1229,8 +1564,12 @@ class _VideoPlayPageState extends State<VideoPlayPage>
                   sources: _sources,
                   selectedSourceId: _selectedSourceId,
                   onSourceSelected: _handleSourceSelected,
+                  onSelectHit: (src, hit, [List<SourceChapterRoad>? cachedRoads]) => _handleSourceSelected(src, hit, cachedRoads),
                   aggregator: _aggregator,
                   hintMessage: _sourceNotice,
+                  keywordOptions: _keywordOptions,
+                  onUserAction: _autoPicker.onUserAction,
+                  currentEpisodeNumber: _activeEpisode,
                 ),
                 _buildEpisodeSectionBody(),
               ],

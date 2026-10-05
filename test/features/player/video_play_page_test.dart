@@ -71,7 +71,7 @@ void main() {
       expect(find.text('倒序'), findsOneWidget);
     });
 
-    testWidgets('4. 在「视频源」选择后自动平滑切回「选集」Tab', (tester) async {
+    testWidgets('4. 优化点 1 验证：未探活的非绿色源点击后绝不跳转选集 Tab', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: VideoPlayPage(
@@ -87,14 +87,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(VideoSourceView), findsOneWidget);
-      expect(find.text('爱动漫'), findsOneWidget);
+      expect(find.text('girigiri'), findsOneWidget);
 
-      // 点击爱动漫换源
-      await tester.tap(find.text('爱动漫'));
+      // 点击处于待探活状态的girigiri
+      await tester.tap(find.text('girigiri'));
       await tester.pumpAndSettle();
 
-      // 验证已自动切回选集 Tab（展示 EpisodePickerSection）
-      expect(find.byType(EpisodePickerSection), findsOneWidget);
+      // 严格验证：绝不跳转选集 Tab，仍然保持在视频源看板！
+      expect(find.byType(VideoSourceView), findsOneWidget);
+      expect(find.byType(EpisodePickerSection), findsNothing);
     });
   });
 }
