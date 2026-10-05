@@ -66,6 +66,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   late final ValueNotifier<bool> _autoSkipOpedNotifier;
   _ActiveControlPanel _activePanel = _ActiveControlPanel.none;
   bool _showVolumeSlider = false;
+  bool _showSpeedPopup = false;
 
   late final FocusNode _keyboardFocusNode;
 
@@ -271,6 +272,7 @@ class _PlayerControlsState extends State<PlayerControls> {
             _visible = false;
             _showLockButton = false;
             _showVolumeSlider = false;
+            _showSpeedPopup = false;
           });
         }
       }
@@ -290,12 +292,21 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   void _toggleControls() {
     if (_isLocked) return;
+    if (_showSpeedPopup || _showVolumeSlider) {
+      setState(() {
+        _showSpeedPopup = false;
+        _showVolumeSlider = false;
+      });
+      _startHideTimer();
+      return;
+    }
     setState(() {
       _visible = !_visible;
       _showLockButton = _visible;
       if (!_visible) {
         _activePanel = _ActiveControlPanel.none;
         _showVolumeSlider = false;
+        _showSpeedPopup = false;
       }
       if (_visible) {
         _startHideTimer();
@@ -329,6 +340,7 @@ class _PlayerControlsState extends State<PlayerControls> {
         _showLockButton = true;
         _activePanel = _ActiveControlPanel.none;
         _showVolumeSlider = false;
+        _showSpeedPopup = false;
         _handleShowLockedNotice();
       } else {
         _visible = true;
@@ -1192,8 +1204,8 @@ class _PlayerControlsState extends State<PlayerControls> {
               ),
             ),
 
-          // 7. 垂直音量调节透明点击遮罩（点击外部关闭垂直音量条）
-          if (_showVolumeSlider)
+          // 7. 垂直音量调节面板（遮罩在下，悬浮卡片在上，手势 100% 灵敏不被遮挡）
+          if (_showVolumeSlider) ...[
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -1204,6 +1216,31 @@ class _PlayerControlsState extends State<PlayerControls> {
                 child: const ColoredBox(color: Colors.transparent),
               ),
             ),
+            Positioned(
+              right: (widget.onToggleFullscreen != null ? 38.0 : 10.0),
+              bottom: 46,
+              child: _buildVerticalVolumePopup(primaryColor),
+            ),
+          ],
+
+          // 8. 垂直倍速调节浮层面板（0ms 瞬间直出无渐变路由，遮罩在下，卡片在上，居于正常 Widget 树绝无黄色下划线）
+          if (_showSpeedPopup) ...[
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() => _showSpeedPopup = false);
+                  _startHideTimer();
+                },
+                child: const ColoredBox(color: Colors.transparent),
+              ),
+            ),
+            Positioned(
+              right: (widget.onToggleFullscreen != null ? 74.0 : 46.0),
+              bottom: 46,
+              child: _buildVerticalSpeedPopup(primaryColor),
+            ),
+          ],
 
           // 8. 全屏模式下内置悬浮「播放设置」与「弹幕设置」半透明毛玻璃浮层面板
           if (widget.isFullscreen && _activePanel != _ActiveControlPanel.none) ...[
@@ -1240,6 +1277,7 @@ class _PlayerControlsState extends State<PlayerControls> {
       setState(() {
         _activePanel = _activePanel == panel ? _ActiveControlPanel.none : panel;
         _showVolumeSlider = false;
+        _showSpeedPopup = false;
         if (_activePanel != _ActiveControlPanel.none) {
           _hideTimer?.cancel();
         } else {
@@ -1252,6 +1290,7 @@ class _PlayerControlsState extends State<PlayerControls> {
       setState(() {
         _activePanel = _ActiveControlPanel.none;
         _showVolumeSlider = false;
+        _showSpeedPopup = false;
       });
 
       showModalBottomSheet(
@@ -1338,41 +1377,30 @@ class _PlayerControlsState extends State<PlayerControls> {
       valueListenable: widget.controller.core,
       builder: (context, coreState, _) {
         final isMuted = coreState.muted || coreState.volume <= 0.001;
-        return Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.bottomCenter,
-          children: [
-            IconButton(
-              iconSize: 19,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-              icon: Icon(
-                isMuted
-                    ? Icons.volume_off_rounded
-                    : (coreState.volume > 0.5
-                        ? Icons.volume_up_rounded
-                        : Icons.volume_down_rounded),
-                color: isMuted ? Colors.white54 : Colors.white,
-                size: 19,
-              ),
-              tooltip: isMuted ? '取消静音' : '音量调节',
-              onPressed: () {
-                setState(() {
-                  _showVolumeSlider = !_showVolumeSlider;
-                  if (_showVolumeSlider) {
-                    _activePanel = _ActiveControlPanel.none;
-                  }
-                });
-                _startHideTimer();
-              },
-            ),
-            // 垂直毛玻璃音量滑块：精准挂在音量按钮正上方，0 偏差！
-            if (_showVolumeSlider)
-              Positioned(
-                bottom: 30,
-                child: _buildVerticalVolumePopup(primaryColor),
-              ),
-          ],
+        return IconButton(
+          iconSize: 19,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+          icon: Icon(
+            isMuted
+                ? Icons.volume_off_rounded
+                : (coreState.volume > 0.5
+                    ? Icons.volume_up_rounded
+                    : Icons.volume_down_rounded),
+            color: isMuted ? Colors.white54 : Colors.white,
+            size: 19,
+          ),
+          tooltip: isMuted ? '取消静音' : '音量调节',
+          onPressed: () {
+            setState(() {
+              _showVolumeSlider = !_showVolumeSlider;
+              if (_showVolumeSlider) {
+                _showSpeedPopup = false;
+                _activePanel = _ActiveControlPanel.none;
+              }
+            });
+            _startHideTimer();
+          },
         );
       },
     );
@@ -1382,15 +1410,14 @@ class _PlayerControlsState extends State<PlayerControls> {
     return ValueListenableBuilder<PlaybackCoreState>(
       valueListenable: widget.controller.core,
       builder: (context, coreState, _) {
-        final isMuted = coreState.muted || coreState.volume <= 0.001;
         return ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
             child: Container(
               width: 36,
-              height: 125,
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              height: 112,
+              padding: const EdgeInsets.fromLTRB(4, 7, 4, 8),
               decoration: BoxDecoration(
                 color: const Color(0xEE16161C),
                 borderRadius: BorderRadius.circular(16),
@@ -1417,45 +1444,19 @@ class _PlayerControlsState extends State<PlayerControls> {
                       fontFeatures: [FontFeature.tabularFigures()],
                     ),
                   ),
+                  const SizedBox(height: 5),
+                  // 特殊处理说明：
+                  // 彻底移除原先手势错位的 RotatedBox(quarterTurns: 3) + 水平 Slider，
+                  // 改用原生基于 Y 轴坐标计算的专属垂直音量滑轨，完美支持鼠标任意点击与上下拖拽，
+                  // 移除面板底部多余小喇叭，拉到底部即为 0 音量自动静音。
                   Expanded(
-                    child: RotatedBox(
-                      quarterTurns: 3,
-                      child: SliderTheme(
-                        data: SliderThemeData(
-                          trackHeight: 3,
-                          thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 5),
-                          overlayShape: const RoundSliderOverlayShape(
-                              overlayRadius: 8),
-                          activeTrackColor: primaryColor,
-                          inactiveTrackColor: Colors.white24,
-                          thumbColor: Colors.white,
-                        ),
-                        child: Slider(
-                          value: coreState.volume.clamp(0.0, 1.0),
-                          onChanged: (val) {
-                            _startHideTimer();
-                            widget.controller.setVolume(val);
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      _startHideTimer();
-                      widget.controller.toggleMute();
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Icon(
-                        isMuted
-                            ? Icons.volume_off_rounded
-                            : Icons.volume_down_rounded,
-                        color: Colors.white70,
-                        size: 14,
-                      ),
+                    child: _VerticalVolumeBar(
+                      volume: coreState.volume,
+                      activeColor: primaryColor,
+                      onChanged: (val) {
+                        _startHideTimer();
+                        widget.controller.setVolume(val);
+                      },
                     ),
                   ),
                 ],
@@ -1471,28 +1472,32 @@ class _PlayerControlsState extends State<PlayerControls> {
     return ValueListenableBuilder<PlaybackCoreState>(
       valueListenable: widget.controller.core,
       builder: (context, coreState, _) {
-        return PopupMenuButton<double>(
-          tooltip: '播放倍速',
-          initialValue: coreState.playbackRate,
-          elevation: 6,
-          color: const Color(0xFF1E1E22).withValues(alpha: 0.95),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(
-              color: Colors.white.withValues(alpha: 0.1),
-              width: 0.5,
-            ),
-          ),
-          constraints: const BoxConstraints(minWidth: 84, maxWidth: 96),
-          padding: EdgeInsets.zero,
-          child: Padding(
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            setState(() {
+              _showSpeedPopup = !_showSpeedPopup;
+              if (_showSpeedPopup) {
+                _showVolumeSlider = false;
+                _activePanel = _ActiveControlPanel.none;
+              }
+            });
+            _startHideTimer();
+          },
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+            decoration: BoxDecoration(
+              color: _showSpeedPopup
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+            ),
             child: Text(
               coreState.playbackRate == 1.0
                   ? '1x'
                   : '${coreState.playbackRate}x',
               style: TextStyle(
-                color: coreState.playbackRate != 1.0
+                color: (_showSpeedPopup || coreState.playbackRate != 1.0)
                     ? primaryColor
                     : Colors.white.withValues(alpha: 0.9),
                 fontSize: 12,
@@ -1501,42 +1506,98 @@ class _PlayerControlsState extends State<PlayerControls> {
               ),
             ),
           ),
-          onSelected: (speed) {
-            _startHideTimer();
-            widget.controller.setPlaybackRate(speed);
-          },
-          itemBuilder: (context) => [
-            // 特殊处理说明：
-            // 精简倍速面板选项，移除不常用的 3.0x，保留 0.5x~2.0x 常用档位，
-            // 并采用高度 30 的轻量小弹层排布，避免大幅遮挡正在播放的画面
-            for (final speed in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0])
-              PopupMenuItem(
-                value: speed,
-                height: 30,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${speed}x',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: speed == coreState.playbackRate
-                            ? FontWeight.bold
-                            : FontWeight.w500,
-                        color: speed == coreState.playbackRate
-                            ? primaryColor
-                            : Colors.white.withValues(alpha: 0.88),
-                      ),
-                    ),
-                    if (speed == coreState.playbackRate)
-                      Icon(Icons.check_rounded, color: primaryColor, size: 14),
-                  ],
-                ),
-              ),
-          ],
         );
       },
+    );
+  }
+
+  Widget _buildVerticalSpeedPopup(Color primaryColor) {
+    // 特殊处理说明：
+    // 向上展开的气泡按降序排列：顶部 2.0x -> 底部 0.75x，贴合由低到高靠近 1x 按钮的直觉排布；
+    // 移除极少使用的 0.5x 与 3.0x，只保留 5 档核心倍速，更显小巧克制
+    const speeds = [2.0, 1.5, 1.25, 1.0, 0.75];
+    return ValueListenableBuilder<PlaybackCoreState>(
+      valueListenable: widget.controller.core,
+      builder: (context, coreState, _) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              width: 82,
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xEE16161C),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  width: 0.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final speed in speeds)
+                    _buildSpeedItem(
+                        speed, coreState.playbackRate, primaryColor),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSpeedItem(
+    double speed,
+    double currentRate,
+    Color primaryColor,
+  ) {
+    final isSelected = speed == currentRate;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        widget.controller.setPlaybackRate(speed);
+        setState(() => _showSpeedPopup = false);
+        _startHideTimer();
+      },
+      child: Container(
+        height: 25,
+        padding: const EdgeInsets.symmetric(horizontal: 7),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? primaryColor.withValues(alpha: 0.18)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '${speed}x',
+              style: TextStyle(
+                color: isSelected
+                    ? primaryColor
+                    : Colors.white.withValues(alpha: 0.9),
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                letterSpacing: -0.2,
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_rounded, color: primaryColor, size: 12),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2135,6 +2196,95 @@ class _PlayerControlsState extends State<PlayerControls> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 专用原生垂直音量滑槽组件：
+/// 纯手势驱动（无需 RotatedBox），基于局部 Y 轴高度精准响应点击与上下拖动，
+/// 完美解决 Windows 桌面端鼠标无法驱动旋转后水平 Slider 的顽疾。
+class _VerticalVolumeBar extends StatelessWidget {
+  final double volume; // 0.0 ~ 1.0
+  final Color activeColor;
+  final ValueChanged<double> onChanged;
+
+  const _VerticalVolumeBar({
+    required this.volume,
+    required this.activeColor,
+    required this.onChanged,
+  });
+
+  void _handleTouch(Offset localPosition, double height) {
+    if (height <= 0) return;
+    // 顶部 (y=0) 是 1.0，底部 (y=height) 是 0.0
+    final val = (1.0 - (localPosition.dy / height)).clamp(0.0, 1.0);
+    onChanged(val);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxHeight;
+        final clampedVol = volume.clamp(0.0, 1.0);
+        final filledHeight = height * clampedVol;
+        const trackWidth = 3.5;
+        const thumbRadius = 6.0;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (details) => _handleTouch(details.localPosition, height),
+          onVerticalDragUpdate: (details) =>
+              _handleTouch(details.localPosition, height),
+          child: SizedBox(
+            width: double.infinity,
+            height: height,
+            child: Stack(
+              alignment: Alignment.bottomCenter,
+              children: [
+                // 1. 底层轨道 (灰色)
+                Container(
+                  width: trackWidth,
+                  height: height,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(trackWidth / 2),
+                  ),
+                ),
+                // 2. 已填充音量 (主题色)
+                Container(
+                  width: trackWidth,
+                  height: filledHeight,
+                  decoration: BoxDecoration(
+                    color: activeColor,
+                    borderRadius: BorderRadius.circular(trackWidth / 2),
+                  ),
+                ),
+                // 3. 滑块圆球 (白色)
+                Positioned(
+                  bottom: (filledHeight - thumbRadius)
+                      .clamp(0.0, height - thumbRadius * 2),
+                  child: Container(
+                    width: thumbRadius * 2,
+                    height: thumbRadius * 2,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

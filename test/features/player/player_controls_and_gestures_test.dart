@@ -60,11 +60,12 @@ void main() {
       // 验证存在播放按钮与中央暂停标识
       expect(find.byIcon(Icons.play_arrow_rounded), findsNWidgets(2));
 
-      // 验证倍速按钮存在，点击展开验证选项已精简且无 3.0x
+      // 验证倍速按钮存在，点击展开验证选项已精简（倒序排布且无 0.5x 与 3.0x）
       expect(find.text('1x'), findsOneWidget);
       await tester.tap(find.text('1x'));
       await tester.pumpAndSettle();
       expect(find.text('2.0x'), findsOneWidget);
+      expect(find.text('0.5x'), findsNothing);
       expect(find.text('3.0x'), findsNothing);
       expect(find.text('3x'), findsNothing);
       await tester.tap(find.text('1.25x'));
@@ -73,6 +74,24 @@ void main() {
 
       // 验证选集按钮存在
       expect(find.text('选集'), findsOneWidget);
+
+      // 验证音量调节面板展开与无多余小喇叭
+      expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.volume_up_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('100'), findsOneWidget);
+      // 面板底部小喇叭已按需求移除
+      expect(find.byIcon(Icons.volume_down_rounded), findsNothing);
+
+      // 验证垂直音量槽点击调节生效（点击中间位置瞬间调节音量）
+      final volume100Pos = tester.getCenter(find.text('100'));
+      await tester.tapAt(Offset(volume100Pos.dx, volume100Pos.dy + 45));
+      await tester.pumpAndSettle();
+      expect(controller.core.value.volume, lessThan(0.9));
+
+      // 点击屏幕任意位置收起音量面板
+      await tester.tapAt(const Offset(100, 100));
+      await tester.pumpAndSettle();
 
       // 验证全屏下存在屏幕锁定浮动按钮
       expect(find.byType(PlayerLockFloatingButton), findsOneWidget);
