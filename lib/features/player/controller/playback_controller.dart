@@ -117,12 +117,13 @@ class ZakoniPlaybackController {
         await platform.setProperty('af', 'scaletempo2=max-speed=8');
 
         // 2. 特殊处理说明：
-        // 必须通过 stream-lavf-o 给 FFmpeg 底层网络协议层 (AVIO/HTTP) 传递重连与容错参数。
-        // 过去传入 demuxer-lavf-o 会被 FFmpeg 忽略（报 Could not set AVOption reconnect），
-        // 导致网络波动、Range 请求断开时直接触发 EOF 误判为播放结束。
+        // 针对点播视频网络流 (MP4/HLS)，仅配置基础的 reconnect 与 reconnect_on_network_error，
+        // 严禁配置 reconnect_at_eof=1 或 reconnect_streamed=1！
+        // 那些参数是专用于不可 Seek 的直播流的；在点播视频 Seek 时，旧 Range 结束会被误判为流异常触发重连，
+        // 导致向对端发起并发连接并遭遇服务器 TCP RST (-0x4e)，进而引发卡死与流损坏。
         await platform.setProperty(
           'stream-lavf-o',
-          'reconnect=1,reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5,reconnect_on_network_error=1',
+          'reconnect=1,reconnect_on_network_error=1,reconnect_delay_max=2',
         );
 
         // 3. 特殊处理说明：
@@ -135,10 +136,10 @@ class ZakoniPlaybackController {
         await platform.setProperty('demuxer-seekable-cache', 'yes');
 
         // 5. 特殊处理说明：
-        // 严禁设置 force-seekable=yes，防止不支持 Range 的网络流被暴力寻道抛出 AVERROR_EOF；
-        // 将 hr-seek 设为 no，使用关键帧快速定位，杜绝跨分片高精度逐帧解码失败引发的流断开跳到结尾。
-        await platform.setProperty('force-seekable', 'no');
-        await platform.setProperty('hr-seek', 'no');
+        // 必须配置 force-seekable=yes，确保网络 MP4 始终被 libmpv 标记为可寻道流；
+        // 禁止设为 no，否则在网络流发生重定向或首包延迟时会被误判为不可寻道流，导致点击进度条被强行拉回 0 秒。
+        await platform.setProperty('force-seekable', 'yes');
+        await platform.setProperty('hr-seek', 'default');
 
         // 6. 自适应分级解复用缓冲与起播阈值防抖：
         // 预读 30 秒、配置 cache-pause-wait=1 秒起播，杜绝起播或 Seek 漫长转圈。
@@ -155,9 +156,35 @@ class ZakoniPlaybackController {
         await platform.setProperty('volume-max', '100');
         await platform.setProperty('user-agent', _kDefaultUserAgent);
 
+        // 7. 特殊处理说明：
+        // 必须配置 prefer-ipv4=yes。在移动端与双栈网络下，部分国内云盘/CDN 节点（如沃家云盘
+        // bjdownload.pan.wo.cn:30443）的 IPv6 SSL 握手存在黑洞（直接超时或拒绝连接）。
+        // libmpv 默认优先尝试 IPv6 会导致起播时卡死数秒等待握手超时；强制 IPv4 优先可彻底规避该瓶颈。
+        await platform.setProperty('prefer-ipv4', 'yes');
+
+        // 8. 特殊处理说明：
+        // 放行过期或未受信任的自签名证书。第三方聚合源/边缘 CDN 节点经常存在证书过期或
+        // 自签名情况，关闭媒体流 TLS 校验可大幅提升外链播放成功率（仅作用于底层 mpv 音视频拉流）。
+        await platform.setProperty('tls-verify', 'no');
+
+        // 9. 特殊处理说明：
+        // 开启全格式硬解码；Android 下使用 auto-safe 防止部分低端芯片遇到非常规编码直接导致 Surface 崩溃。
+        await platform.setProperty('hwdec-codecs', 'all');
         if (Platform.isAndroid) {
+          await platform.setProperty('hwdec', 'auto-safe');
           // Android 平台默认音频输出
           await platform.setProperty('ao', 'opensles');
+        } else {
+          await platform.setProperty('hwdec', 'auto');
+        }
+
+        // 10. 桌面端（Windows）动漫线条与渲染优化：
+        // 采用 Spline36 与 Sigmoid 插值，消除动漫色块边缘锯齿与光晕，计算量轻量杜绝掉帧
+        if (Platform.isWindows) {
+          await platform.setProperty('scale', 'spline36');
+          await platform.setProperty('cscale', 'spline36');
+          await platform.setProperty('sigmoid-upscaling', 'yes');
+          await platform.setProperty('correct-downscaling', 'yes');
         }
       }
     } catch (e) {
@@ -296,17 +323,10 @@ class ZakoniPlaybackController {
 
     final player = _player;
     if (player != null) {
-      final wasPlaying = core.value.playing;
       // 特殊处理说明：
-      // 采用成熟播放器的 Pause -> Seek -> Play 安全时序，
-      // 避免在音视频渲染器全速消费下载时并发寻道导致 Socket 管道撕裂抛出 TLS 异常与假 EOF。
-      if (wasPlaying) {
-        await player.pause();
-      }
+      // 直接委托底层 media_kit 原生 seek 处理，杜绝上层多余的 pause() -> seek() -> play() 异步交错。
+      // 外层反复 pause/play 会破坏底层解复用线程与解码器缓冲区的状态机同步，诱发 Packet corrupt。
       await player.seek(targetPosition);
-      if (wasPlaying) {
-        await player.play();
-      }
     }
     danmakuController?.syncTime(targetPosition);
   }
@@ -400,20 +420,15 @@ class ZakoniPlaybackController {
       // 特殊处理说明：
       // 当底层网络断流或解码瞬态异常抛出 EOF code: 4 (ERROR) 时，
       // media_kit 会将 eof-reached 误认为 completed = true。
-      // 若当前播放位置明显远离总时长（差距超过 3 秒），判定为底层网络抖动引发的伪 EOF 误报，
-      // 绝不将状态置为 completed 终止播放，而是清除错误并平滑触发自动重试/续播。
+      // 只有当当前播放位置真正接近视频总时长（剩余不足 2 秒）时，才确认为自然播放结束。
+      // 严禁在中途非正常 EOF 时调用 player.play()，因为 EOF 态下调用 play() 会被 mpv 默认当做从 00:00 重播。
       final currentPos = timeline.value.position;
       final totalDur = timeline.value.duration;
       if (totalDur > const Duration(seconds: 5) &&
-          currentPos < totalDur - const Duration(seconds: 3)) {
+          currentPos < totalDur - const Duration(seconds: 2)) {
         debugPrint(
-          '[ZakoniPlayback] 拦截底层伪 EOF 异常 (当前: ${currentPos.inSeconds}s, 总长: ${totalDur.inSeconds}s)，自动续播',
+          '[ZakoniPlayback] 忽略中途非正常 EOF 信号 (当前: ${currentPos.inSeconds}s, 总长: ${totalDur.inSeconds}s)',
         );
-        core.value = core.value.copyWith(
-          completed: false,
-          buffering: true,
-        );
-        _player?.play();
         return;
       }
     }

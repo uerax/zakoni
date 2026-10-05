@@ -34,5 +34,18 @@ void main() {
     final resRoad2 = await source.resolve(roads[2].episodes.first.url);
     expect(resRoad2.url, contains('dl.playxf.top'));
     expect(resRoad2.format, 'hls');
+
+    // 5. 验证内存缓存生效：再次获取分集与解析，耗时应趋近 0ms
+    final swCacheChapters = Stopwatch()..start();
+    final cachedRoads = await source.chapters('https://next.xifanacg.com/anime/3403');
+    swCacheChapters.stop();
+    expect(cachedRoads.length, 3);
+    expect(swCacheChapters.elapsedMilliseconds, lessThan(20));
+
+    final swCacheResolve = Stopwatch()..start();
+    final cachedRes = await source.resolve('https://next.xifanacg.com/anime/3403/play/121397');
+    swCacheResolve.stop();
+    expect(cachedRes.url, contains('moedot.net'));
+    expect(swCacheResolve.elapsedMilliseconds, lessThan(20));
   });
 }

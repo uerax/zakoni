@@ -304,6 +304,9 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
           if (autoPlayFirst && _currentEpisodes.isNotEmpty) {
             _selectEpisode(_activeEpisode ?? 1);
+          } else if (_currentEpisodes.isNotEmpty) {
+            // 静默预热第 1 集直链，用户点击选集时直接从内存缓存 0ms 瞬间起播
+            runtime.resolve(_selectedSourceId, _currentEpisodes.first.url).ignore();
           }
           return;
         }
@@ -503,6 +506,11 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         httpHeaders: result.headers,
       );
       if (mounted) setState(() => _isResolvingMedia = false);
+
+      // 后台静默预热下一集播放直链（存入直链 LRU 缓存，实现切集秒开）
+      if (epIndex + 1 < episodes.length) {
+        runtime.resolve(_selectedSourceId, episodes[epIndex + 1].url).ignore();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

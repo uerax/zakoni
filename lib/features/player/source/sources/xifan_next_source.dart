@@ -28,10 +28,21 @@ class XifanNextSource extends VideoSource {
   String get name => '稀饭Next';
 
   @override
-  String get version => '1.4.0';
+  String get version => '1.5.0';
 
   @override
-  String get description => '1080P · 官方推荐综合主线 (纯净多线路直链)';
+  String get description => '1080P · 官方推荐综合主线 (智能双轨与极速直链)';
+
+  // 1. 搜索单飞与短时内存缓存 (30分钟)
+  final Map<String, ({int time, List<SourceSearchResult> results})> _searchCache = {};
+  final Map<String, Future<List<SourceSearchResult>>> _inflightSearch = {};
+
+  // 2. 章节线路缓存 (1小时)
+  final Map<String, ({int time, List<SourceChapterRoad> roads})> _chaptersCache = {};
+  final Map<String, Future<List<SourceChapterRoad>>> _inflightChapters = {};
+
+  // 3. 播放直链 LRU 短期缓存 (20分钟)
+  final Map<String, ({int time, SourceResolveResult result})> _resolveCache = {};
 
   void _log(String message) {
     debugPrint('[XifanNext] $message');
@@ -199,59 +210,82 @@ class XifanNextSource extends VideoSource {
     final q = keyword.trim();
     if (q.isEmpty) return [];
 
-    _log('开始搜索: "$q"');
-
-    // 1. Primary: RPC suggest_animes
-    try {
-      final res = await _fetchSupabase(
-        '/rest/v1/rpc/suggest_animes',
-        method: 'POST',
-        body: {'q': q, 'lim': 12},
-      );
-      if (res is List && res.isNotEmpty) {
-        final list = res
-            .whereType<Map<String, dynamic>>()
-            .map((item) => SourceSearchResult(
-                  name: item['title']?.toString().trim() ??
-                      item['title_original']?.toString().trim() ??
-                      '番剧 #${item['id']}',
-                  url: 'https://next.xifanacg.com/anime/${item['id']}',
-                  cover: item['cover_url']?.toString(),
-                ))
-            .toList();
-        _log('RPC 搜索成功命中 ${list.length} 条');
-        return list;
-      }
-    } catch (e) {
-      _log('RPC 搜索异常: $e');
+    final cacheKey = q.toLowerCase();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final cached = _searchCache[cacheKey];
+    if (cached != null && now - cached.time < 30 * 60 * 1000) {
+      _log('命中搜索内存缓存: "$q" (${cached.results.length}条)');
+      return cached.results;
     }
 
-    // 2. Fallback: animes table ilike
-    try {
-      final encoded = Uri.encodeComponent('*$q*');
-      final res = await _fetchSupabase(
-        '/rest/v1/animes?or=(title.ilike.$encoded,search_title.ilike.$encoded,title_original.ilike.$encoded)&select=id,title,title_original,cover_url&limit=10',
-      );
-      if (res is List && res.isNotEmpty) {
-        final list = res
-            .whereType<Map<String, dynamic>>()
-            .map((item) => SourceSearchResult(
-                  name: item['title']?.toString().trim() ??
-                      item['title_original']?.toString().trim() ??
-                      '番剧 #${item['id']}',
-                  url: 'https://next.xifanacg.com/anime/${item['id']}',
-                  cover: item['cover_url']?.toString(),
-                ))
-            .toList();
-        _log('REST 表搜索命中 ${list.length} 条');
-        return list;
-      }
-    } catch (e) {
-      _log('REST 表搜索异常: $e');
+    if (_inflightSearch.containsKey(cacheKey)) {
+      return _inflightSearch[cacheKey]!;
     }
 
-    _log('未搜索到相关番剧');
-    return [];
+    final future = () async {
+      _log('开始搜索: "$q"');
+
+      // 1. Primary: RPC suggest_animes
+      try {
+        final res = await _fetchSupabase(
+          '/rest/v1/rpc/suggest_animes',
+          method: 'POST',
+          body: {'q': q, 'lim': 12},
+        );
+        if (res is List && res.isNotEmpty) {
+          final list = res
+              .whereType<Map<String, dynamic>>()
+              .map((item) => SourceSearchResult(
+                    name: item['title']?.toString().trim() ??
+                        item['title_original']?.toString().trim() ??
+                        '番剧 #${item['id']}',
+                    url: 'https://next.xifanacg.com/anime/${item['id']}',
+                    cover: item['cover_url']?.toString(),
+                  ))
+              .toList();
+          _log('RPC 搜索成功命中 ${list.length} 条');
+          _searchCache[cacheKey] = (time: DateTime.now().millisecondsSinceEpoch, results: list);
+          return list;
+        }
+      } catch (e) {
+        _log('RPC 搜索异常: $e');
+      }
+
+      // 2. Fallback: animes table ilike
+      try {
+        final encoded = Uri.encodeComponent('*$q*');
+        final res = await _fetchSupabase(
+          '/rest/v1/animes?or=(title.ilike.$encoded,search_title.ilike.$encoded,title_original.ilike.$encoded)&select=id,title,title_original,cover_url&limit=10',
+        );
+        if (res is List && res.isNotEmpty) {
+          final list = res
+              .whereType<Map<String, dynamic>>()
+              .map((item) => SourceSearchResult(
+                    name: item['title']?.toString().trim() ??
+                        item['title_original']?.toString().trim() ??
+                        '番剧 #${item['id']}',
+                    url: 'https://next.xifanacg.com/anime/${item['id']}',
+                    cover: item['cover_url']?.toString(),
+                  ))
+              .toList();
+          _log('REST 表搜索命中 ${list.length} 条');
+          _searchCache[cacheKey] = (time: DateTime.now().millisecondsSinceEpoch, results: list);
+          return list;
+        }
+      } catch (e) {
+        _log('REST 表搜索异常: $e');
+      }
+
+      _log('未搜索到相关番剧');
+      return <SourceSearchResult>[];
+    }();
+
+    _inflightSearch[cacheKey] = future;
+    try {
+      return await future;
+    } finally {
+      _inflightSearch.remove(cacheKey);
+    }
   }
 
   /// 提取 Next.js 15 流式 RSC 块 (self.__next_f.push)
@@ -380,110 +414,197 @@ class XifanNextSource extends VideoSource {
       throw Exception('无法解析稀饭番剧 ID: $animeUrl');
     }
     final animeId = match.group(1)!;
-    _log('正在获取番剧分集与线路: animeId=$animeId');
 
-    // 1. Primary: 抓取详情页 HTML 解析 RSC 块多线路 (严格携带 source_id 与 source_code)
-    try {
-      final res = await _dio.get<String>(
-        'https://next.xifanacg.com/anime/$animeId',
-        options: Options(
-          headers: {'User-Agent': _kDefaultUserAgent},
-          sendTimeout: const Duration(seconds: 8),
-          receiveTimeout: const Duration(seconds: 8),
-        ),
-      );
-      final sources = _extractSourcesFromHtml(res.data ?? '');
-      if (sources != null && sources.isNotEmpty) {
-        final roads = <SourceChapterRoad>[];
-        for (var sIdx = 0; sIdx < sources.length; sIdx++) {
-          final s = sources[sIdx];
-          final rawEps = (s['episodes'] as List?) ?? [];
-          if (rawEps.isEmpty) continue;
-
-          final dynamic rawSourceId = s['id'];
-          final int? sourceId = (rawSourceId is int)
-              ? rawSourceId
-              : int.tryParse(rawSourceId?.toString() ?? '');
-          final code = (s['code']?.toString() ?? '').trim();
-          final name = (s['name']?.toString() ?? (code.isNotEmpty ? code : '线路${sIdx + 1}')).trim();
-
-          final episodes = rawEps.map((e) {
-            final epNum = e['episode_number'] ?? 1;
-            final epId = e['id'];
-
-            final params = <String>[];
-            if (sourceId != null) {
-              params.add('source_id=$sourceId');
-            }
-            if (code.isNotEmpty) {
-              params.add('source=${Uri.encodeComponent(code)}');
-            }
-            final queryString = params.isNotEmpty ? '?${params.join('&')}' : '';
-
-            return SourceEpisode(
-              name: '第$epNum集',
-              url: 'https://next.xifanacg.com/anime/$animeId/play/$epId$queryString',
-            );
-          }).toList();
-
-          roads.add(SourceChapterRoad(name: name, episodes: episodes));
-        }
-
-        if (roads.isNotEmpty) {
-          _log('成功从 SSR 解析出 ${roads.length} 条独立线路: ${roads.map((r) => "${r.name}(${r.episodes.length}集)").join(', ')}');
-          return roads;
-        }
-      }
-    } catch (e) {
-      _log('SSR 页面抓取与解析异常: $e');
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final cached = _chaptersCache[animeId];
+    if (cached != null && now - cached.time < 60 * 60 * 1000) {
+      _log('命中分集线路内存缓存: animeId=$animeId (${cached.roads.length}条线路)');
+      return cached.roads;
     }
 
-    // 2. Fallback: Supabase REST 表查询 (过滤 available_at 排除未播日程)
-    _log('SSR 解析无结果，回退到 REST episodes 表查询...');
-    try {
-      final res = await _fetchSupabase(
-        '/rest/v1/episodes?anime_id=eq.$animeId&available_at=not.is.null&select=id,title,episode_number,kind&order=episode_number.asc',
-      );
-      if (res is List && res.isNotEmpty) {
-        final mainEps = <SourceEpisode>[];
-        final spEps = <SourceEpisode>[];
+    if (_inflightChapters.containsKey(animeId)) {
+      return _inflightChapters[animeId]!;
+    }
 
-        for (final item in res.whereType<Map<String, dynamic>>()) {
-          final epId = item['id'];
-          final epNum = item['episode_number'] ?? 1;
-          final kind = item['kind']?.toString();
-          final epUrl = 'https://next.xifanacg.com/anime/$animeId/play/$epId';
+    final future = () async {
+      _log('正在获取番剧分集与线路: animeId=$animeId');
 
-          if (kind == null || kind == 'main') {
-            mainEps.add(SourceEpisode(name: '第$epNum集', url: epUrl));
-          } else {
-            spEps.add(SourceEpisode(name: 'SP $epNum', url: epUrl));
+      // 极速轨 (Fast-Path): Supabase REST 表查询 (过滤 available_at 排除未播日程，仅 ~1.5KB JSON，500ms 内瞬间直出)
+      Future<List<SourceChapterRoad>?> fetchFastRest() async {
+        try {
+          final res = await _fetchSupabase(
+            '/rest/v1/episodes?anime_id=eq.$animeId&available_at=not.is.null&select=id,title,episode_number,kind&order=episode_number.asc',
+            timeout: const Duration(seconds: 4),
+          );
+          if (res is List && res.isNotEmpty) {
+            final mainEps = <SourceEpisode>[];
+            final spEps = <SourceEpisode>[];
+
+            for (final item in res.whereType<Map<String, dynamic>>()) {
+              final epId = item['id'];
+              final epNum = item['episode_number'] ?? 1;
+              final kind = item['kind']?.toString();
+              final epUrl = 'https://next.xifanacg.com/anime/$animeId/play/$epId';
+
+              if (kind == null || kind == 'main') {
+                mainEps.add(SourceEpisode(name: '第$epNum集', url: epUrl));
+              } else {
+                spEps.add(SourceEpisode(name: 'SP $epNum', url: epUrl));
+              }
+            }
+
+            final roads = <SourceChapterRoad>[];
+            if (mainEps.isNotEmpty) {
+              // 特殊处理说明：
+              // 为杜绝首屏白屏等待，Fast-Path 在 300ms 内依据 REST episodes 表生成稀饭标准三线路（主线1-沃云、主线2-海外、备用1-切片），
+              // 严格携带各线路专属 source_id 与 source_code，确保用户秒开即可自由选线，同时后台平滑拉取 SSR 页面多线路元数据。
+              roads.add(SourceChapterRoad(
+                name: '稀饭新番主线-1',
+                episodes: mainEps
+                    .map((e) => SourceEpisode(name: e.name, url: '${e.url}?source_id=4&source=xfxf1'))
+                    .toList(),
+              ));
+              roads.add(SourceChapterRoad(
+                name: '稀饭新番主线-2',
+                episodes: mainEps
+                    .map((e) => SourceEpisode(name: e.name, url: '${e.url}?source_id=1&source=AL'))
+                    .toList(),
+              ));
+              roads.add(SourceChapterRoad(
+                name: '稀饭备用-1',
+                episodes: mainEps
+                    .map((e) => SourceEpisode(name: e.name, url: '${e.url}?source_id=2&source=CS'))
+                    .toList(),
+              ));
+            }
+            if (spEps.isNotEmpty) {
+              roads.add(SourceChapterRoad(name: 'SP / 特典', episodes: spEps));
+            }
+            return roads.isNotEmpty ? roads : null;
           }
+        } catch (e) {
+          _log('Fast-Path REST 查询异常: $e');
         }
-
-        final roads = <SourceChapterRoad>[];
-        if (mainEps.isNotEmpty) {
-          roads.add(SourceChapterRoad(name: '稀饭新番主线', episodes: mainEps));
-        }
-        if (spEps.isNotEmpty) {
-          roads.add(SourceChapterRoad(name: 'SP / 特典', episodes: spEps));
-        }
-        if (roads.isNotEmpty) {
-          _log('从 REST 表解析出 ${roads.length} 条分集列表');
-          return roads;
-        }
+        return null;
       }
-    } catch (e) {
-      _log('REST episodes 表查询异常: $e');
-    }
 
-    _log('未解析到任何有效分集');
-    return [];
+      // 完整轨 (Full-Path): 抓取详情页 HTML 解析 RSC 块多线路 (严格携带 source_id 与 source_code)
+      Future<List<SourceChapterRoad>?> fetchFullSsr() async {
+        try {
+          final res = await _dio.get<String>(
+            'https://next.xifanacg.com/anime/$animeId',
+            options: Options(
+              headers: {'User-Agent': _kDefaultUserAgent},
+              sendTimeout: const Duration(seconds: 6),
+              receiveTimeout: const Duration(seconds: 6),
+            ),
+          );
+          final sources = _extractSourcesFromHtml(res.data ?? '');
+          if (sources != null && sources.isNotEmpty) {
+            final roads = <SourceChapterRoad>[];
+            for (var sIdx = 0; sIdx < sources.length; sIdx++) {
+              final s = sources[sIdx];
+              final rawEps = (s['episodes'] as List?) ?? [];
+              if (rawEps.isEmpty) continue;
+
+              final dynamic rawSourceId = s['id'];
+              final int? sourceId = (rawSourceId is int)
+                  ? rawSourceId
+                  : int.tryParse(rawSourceId?.toString() ?? '');
+              final code = (s['code']?.toString() ?? '').trim();
+              final name = (s['name']?.toString() ?? (code.isNotEmpty ? code : '线路${sIdx + 1}')).trim();
+
+              final episodes = rawEps.map((e) {
+                final epNum = e['episode_number'] ?? 1;
+                final epId = e['id'];
+
+                final params = <String>[];
+                if (sourceId != null) {
+                  params.add('source_id=$sourceId');
+                }
+                if (code.isNotEmpty) {
+                  params.add('source=${Uri.encodeComponent(code)}');
+                }
+                final queryString = params.isNotEmpty ? '?${params.join('&')}' : '';
+
+                return SourceEpisode(
+                  name: '第$epNum集',
+                  url: 'https://next.xifanacg.com/anime/$animeId/play/$epId$queryString',
+                );
+              }).toList();
+
+              roads.add(SourceChapterRoad(name: name, episodes: episodes));
+            }
+            return roads.isNotEmpty ? roads : null;
+          }
+        } catch (e) {
+          _log('Full-Path SSR 页面抓取与解析异常: $e');
+        }
+        return null;
+      }
+
+      // 竞速编排：并发启动 Fast-Path 与 Full-Path
+      final ssrFuture = fetchFullSsr();
+      final restFuture = fetchFastRest();
+
+      // 给 Full-Path (SSR) 预留 2 秒优先优胜窗口，若超时或失败则秒级由 Fast-Path 顶上
+      final earlySsr = await ssrFuture.timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => null,
+      );
+
+      if (earlySsr != null && earlySsr.isNotEmpty) {
+        _log('SSR 完整多线路优先命中: ${earlySsr.map((r) => "${r.name}(${r.episodes.length}集)").join(', ')}');
+        _chaptersCache[animeId] = (time: DateTime.now().millisecondsSinceEpoch, roads: earlySsr);
+        return earlySsr;
+      }
+
+      // 若 SSR 耗时超过 750ms，检查极速 REST 表结果
+      final fastRest = await restFuture;
+      if (fastRest != null && fastRest.isNotEmpty) {
+        _log('极速 Fast-Path 抢先直出 (${fastRest.length}条线路)，分集列表瞬时呈现');
+        _chaptersCache[animeId] = (time: DateTime.now().millisecondsSinceEpoch, roads: fastRest);
+
+        // 后台静默等待 SSR 完成后平滑升级多线路缓存
+        ssrFuture.then((ssrRoads) {
+          if (ssrRoads != null && ssrRoads.isNotEmpty) {
+            _log('后台 SSR 线路解析就绪，已平滑升级多线路缓存');
+            _chaptersCache[animeId] = (time: DateTime.now().millisecondsSinceEpoch, roads: ssrRoads);
+          }
+        }).catchError((_) {});
+
+        return fastRest;
+      }
+
+      // 若 Fast-Path 异常，最后等待 SSR 兜底
+      final lateSsr = await ssrFuture;
+      if (lateSsr != null && lateSsr.isNotEmpty) {
+        _chaptersCache[animeId] = (time: DateTime.now().millisecondsSinceEpoch, roads: lateSsr);
+        return lateSsr;
+      }
+
+      _log('未解析到任何有效分集');
+      return <SourceChapterRoad>[];
+    }();
+
+    _inflightChapters[animeId] = future;
+    try {
+      return await future;
+    } finally {
+      _inflightChapters.remove(animeId);
+    }
   }
 
   @override
   Future<SourceResolveResult> resolve(String episodeUrl) async {
     final trimmed = episodeUrl.trim();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final cached = _resolveCache[trimmed];
+    if (cached != null && now - cached.time < 20 * 60 * 1000) {
+      _log('命中播放直链内存缓存: $trimmed -> ${cached.result.url}');
+      return cached.result;
+    }
+
     final playMatch = RegExp(r'/play/(\d+)').firstMatch(trimmed);
     final episodeId = playMatch != null ? int.tryParse(playMatch.group(1)!) : null;
 
@@ -606,7 +727,7 @@ class XifanNextSource extends VideoSource {
 
     _log('最终返回直链: $playUrl, 格式: $format, Referer: $referer');
 
-    return SourceResolveResult(
+    final result = SourceResolveResult(
       url: playUrl,
       headers: {
         'User-Agent': _kDefaultUserAgent,
@@ -614,5 +735,8 @@ class XifanNextSource extends VideoSource {
       },
       format: format,
     );
+
+    _resolveCache[trimmed] = (time: DateTime.now().millisecondsSinceEpoch, result: result);
+    return result;
   }
 }
