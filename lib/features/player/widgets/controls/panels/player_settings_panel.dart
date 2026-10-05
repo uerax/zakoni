@@ -4,13 +4,14 @@ import 'package:zakoni/features/player/controller/playback_controller.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'player_panel_widgets.dart';
 
-/// 播放器设置面板主体（片头片尾、超分辨率 Anime4K、画幅比例）
+/// 播放器设置面板主体（片头片尾、超分辨率 Anime4K、画幅比例、屏幕亮度）
 class PlayerSettingsPanelBody extends StatelessWidget {
   const PlayerSettingsPanelBody({
     super.key,
     required this.controller,
     required this.primaryColor,
     required this.autoSkipOpedNotifier,
+    this.brightnessNotifier,
     this.opedSegment,
     this.isCurrentlyInOp = false,
     this.isCurrentlyInEd = false,
@@ -22,6 +23,7 @@ class PlayerSettingsPanelBody extends StatelessWidget {
   final ZakoniPlaybackController controller;
   final Color primaryColor;
   final ValueNotifier<bool> autoSkipOpedNotifier;
+  final ValueNotifier<double>? brightnessNotifier;
   final EpisodeOpedSegment? opedSegment;
   final bool isCurrentlyInOp;
   final bool isCurrentlyInEd;
@@ -180,6 +182,62 @@ class PlayerSettingsPanelBody extends StatelessWidget {
               );
             },
           ),
+
+          // 4. 屏幕亮度调节
+          if (brightnessNotifier != null) ...[
+            const SizedBox(height: 10),
+            const PanelSectionHeader(title: '屏幕亮度'),
+            ValueListenableBuilder<double>(
+              valueListenable: brightnessNotifier!,
+              builder: (context, brightness, _) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PanelSliderRow(
+                      title: '亮度调节',
+                      valText: '${(brightness * 100).round()}%',
+                      value: brightness,
+                      min: 0.05,
+                      max: 1.0,
+                      primaryColor: primaryColor,
+                      onChanged: (val) => brightnessNotifier!.value = val,
+                    ),
+                    const SizedBox(height: 2),
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: 2),
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          PanelOptionChip(
+                            label: '暗室 (30%)',
+                            selected: (brightness - 0.3).abs() < 0.05,
+                            primaryColor: primaryColor,
+                            onTap: () => brightnessNotifier!.value = 0.3,
+                          ),
+                          PanelOptionChip(
+                            label: '柔和 (70%)',
+                            selected: (brightness - 0.7).abs() < 0.05,
+                            primaryColor: primaryColor,
+                            onTap: () => brightnessNotifier!.value = 0.7,
+                          ),
+                          PanelOptionChip(
+                            label: '标准 (100%)',
+                            selected: brightness >= 0.98,
+                            primaryColor: primaryColor,
+                            onTap: () => brightnessNotifier!.value = 1.0,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
         ],
       ),
     );

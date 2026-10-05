@@ -283,6 +283,8 @@ void main() {
       expect(find.text('片头片尾智能跳过'), findsOneWidget);
       expect(find.text('动漫超分辨率 (Anime4K)'), findsOneWidget);
       expect(find.text('画面填充比例'), findsOneWidget);
+      expect(find.text('屏幕亮度'), findsOneWidget);
+      expect(find.text('亮度调节'), findsOneWidget);
 
       // 点击切换超分辨率至效率档
       await tester.tap(find.text('效率档'));
@@ -293,6 +295,11 @@ void main() {
       await tester.tap(find.text('全屏拉伸'));
       await tester.pumpAndSettle();
       expect(controller.core.value.videoFit, equals(BoxFit.fill));
+
+      // 点击亮度暗室快捷档位
+      await tester.tap(find.text('暗室 (30%)'));
+      await tester.pumpAndSettle();
+      expect(find.text('30%'), findsOneWidget);
     });
 
     testWidgets('6. 弹幕面板呼出与配置测试（非全屏直接打开弹幕面板）', (tester) async {
