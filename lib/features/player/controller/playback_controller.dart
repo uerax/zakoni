@@ -8,6 +8,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:zakoni/core/services/network_connectivity_service.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
+import 'package:zakoni/features/player/services/player_preferences_service.dart';
 
 const String _kDefaultUserAgent =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
@@ -104,6 +105,25 @@ class ZakoniPlaybackController {
 
     // 注入底层 mpv 增强属性
     await _configureNativeMpvProperties();
+
+    // 加载用户上次持久化的播放倍速与音量记忆
+    await PlayerPreferencesService.instance.initialize();
+    final savedRate = PlayerPreferencesService.instance.playbackRate;
+    final savedVolume = PlayerPreferencesService.instance.volume;
+
+    core.value = core.value.copyWith(
+      playbackRate: savedRate,
+      volume: savedVolume,
+      muted: savedVolume <= 0.001,
+    );
+
+    if (savedRate != 1.0) {
+      await player.setRate(savedRate);
+      danmakuController?.setPlaybackRate(savedRate);
+    }
+    if (savedVolume != 1.0) {
+      await player.setVolume(savedVolume * 100.0);
+    }
   }
 
   /// 配置底层 mpv 属性（变速变调不变音、协议层断流自动重连、确保网络流快速定位、自适应分级缓冲）
@@ -382,6 +402,7 @@ class ZakoniPlaybackController {
       await player.setRate(clampedRate);
     }
     danmakuController?.setPlaybackRate(clampedRate);
+    PlayerPreferencesService.instance.savePlaybackRate(clampedRate).ignore();
   }
 
   /// 设置音量 (0.0 ~ 1.0)
@@ -396,6 +417,7 @@ class ZakoniPlaybackController {
       // media_kit volume 范围为 0 ~ 100
       await player.setVolume(clamped * 100.0);
     }
+    PlayerPreferencesService.instance.saveVolume(clamped).ignore();
   }
 
   /// 切换静音

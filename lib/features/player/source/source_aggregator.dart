@@ -443,7 +443,7 @@ class SourceAggregator extends ChangeNotifier {
       }
 
       final runtime = SourceBundleManager.instance.runtime;
-      final rawHits = await runtime.search(sourceId, kw);
+      final rawHits = await runtime.search(sourceId, kw, bypassCache: isCustomKw);
       _timeoutTimers.remove(sourceId)?.cancel();
 
       // 请求成功，记录熔断器成功状态
@@ -473,7 +473,7 @@ class SourceAggregator extends ChangeNotifier {
           // 深度验活：调用 chapters 验证分集是否真实可用，杜绝“假绿灯”
           List<SourceChapterRoad> validatedRoads = const [];
           try {
-            validatedRoads = await runtime.chapters(sourceId, top.url);
+            validatedRoads = await runtime.chapters(sourceId, top.url, bypassCache: isCustomKw);
           } catch (_) {}
 
           if (validatedRoads.isNotEmpty &&

@@ -68,6 +68,37 @@ class DanmakuItem {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'text': text,
+        'timeMs': timeMs,
+        'mode': mode.name,
+        'color': color.toARGB32(),
+        'isSelf': isSelf,
+        if (source != null) 'source': source,
+        if (senderHash != null) 'senderHash': senderHash,
+      };
+
+  factory DanmakuItem.fromJson(Map<String, dynamic> json) {
+    final modeName = json['mode']?.toString();
+    final mode = switch (modeName) {
+      'top' => DanmakuMode.top,
+      'bottom' => DanmakuMode.bottom,
+      _ => DanmakuMode.scroll,
+    };
+
+    final colorVal = json['color'] as int? ?? 0xFFFFFFFF;
+
+    return DanmakuItem(
+      text: json['text']?.toString() ?? '',
+      timeMs: json['timeMs'] as int? ?? 0,
+      mode: mode,
+      color: Color(colorVal),
+      isSelf: json['isSelf'] as bool? ?? false,
+      source: json['source']?.toString(),
+      senderHash: json['senderHash']?.toString(),
+    );
+  }
+
   @override
   String toString() =>
       'DanmakuItem(text: $text, timeMs: $timeMs, mode: $mode, color: $color, source: $source)';
@@ -153,6 +184,38 @@ class DanmakuSettings {
       hideBottom: hideBottom ?? this.hideBottom,
       hideColor: hideColor ?? this.hideColor,
       filters: filters ?? this.filters,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'enabled': enabled,
+        'opacity': opacity,
+        'fontSizeScale': fontSizeScale,
+        'speed': speed,
+        'area': area,
+        'strokeWidth': strokeWidth,
+        'simplify': simplify,
+        'hideScroll': hideScroll,
+        'hideTop': hideTop,
+        'hideBottom': hideBottom,
+        'hideColor': hideColor,
+        'filters': filters,
+      };
+
+  factory DanmakuSettings.fromJson(Map<String, dynamic> json) {
+    return DanmakuSettings(
+      enabled: json['enabled'] as bool? ?? true,
+      opacity: (json['opacity'] as num?)?.toDouble() ?? 0.85,
+      fontSizeScale: (json['fontSizeScale'] as num?)?.toDouble() ?? 1.0,
+      speed: (json['speed'] as num?)?.toDouble() ?? 1.0,
+      area: (json['area'] as num?)?.toDouble() ?? 0.75,
+      strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 2.0,
+      simplify: json['simplify'] as bool? ?? false,
+      hideScroll: json['hideScroll'] as bool? ?? false,
+      hideTop: json['hideTop'] as bool? ?? false,
+      hideBottom: json['hideBottom'] as bool? ?? false,
+      hideColor: json['hideColor'] as bool? ?? false,
+      filters: (json['filters'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
     );
   }
 }

@@ -18,6 +18,12 @@ class SourceSearchResult {
       cover: json['cover']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'url': url,
+    if (cover != null) 'cover': cover,
+  };
 }
 
 class SourceEpisode {
@@ -98,6 +104,12 @@ class SourceResolveResult {
       format: format,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'url': url,
+    'headers': headers,
+    'format': format,
+  };
 }
 
 class SourceMeta {

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:zakoni/core/network/player_media_disk_cache_manager.dart';
+import 'package:zakoni/core/utils/timed_cache.dart';
 import '../models/danmaku_item.dart';
 import 'bangumi_bilibili_mapping_service.dart';
 import 'bilibili_input_parser.dart';
@@ -32,6 +34,14 @@ class BilibiliPageInfo {
       bvid: json['bvid']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'page': page,
+        'cid': cid,
+        'part': part,
+        if (epId != null) 'epId': epId,
+        if (bvid != null) 'bvid': bvid,
+      };
 }
 
 /// B 站弹幕拉取结果
@@ -57,13 +67,61 @@ class BilibiliDanmakuResult {
   final int? epId;
   final int? seasonId;
   final List<BilibiliPageInfo> pages;
+
+  Map<String, dynamic> toJson() => {
+        'comments': comments.map((c) => c.toJson()).toList(),
+        'cid': cid,
+        'page': page,
+        if (title != null) 'title': title,
+        if (part != null) 'part': part,
+        if (bvid != null) 'bvid': bvid,
+        if (epId != null) 'epId': epId,
+        if (seasonId != null) 'seasonId': seasonId,
+        'pages': pages.map((p) => p.toJson()).toList(),
+      };
+
+  factory BilibiliDanmakuResult.fromJson(Map<String, dynamic> json) {
+    final rawComments = json['comments'] as List? ?? [];
+    final comments = rawComments
+        .whereType<Map<String, dynamic>>()
+        .map(DanmakuItem.fromJson)
+        .toList();
+    final rawPages = json['pages'] as List? ?? [];
+    final pages = rawPages
+        .whereType<Map<String, dynamic>>()
+        .map(BilibiliPageInfo.fromJson)
+        .toList();
+
+    return BilibiliDanmakuResult(
+      comments: comments,
+      cid: json['cid'] as int? ?? 0,
+      page: json['page'] as int? ?? 1,
+      title: json['title']?.toString(),
+      part: json['part']?.toString(),
+      bvid: json['bvid']?.toString(),
+      epId: json['epId'] as int?,
+      seasonId: json['seasonId'] as int?,
+      pages: pages,
+    );
+  }
 }
 
 /// 原生 Bilibili 弹幕客户端 (1:1 对齐 animaku bilibili-danmaku.ts)
+/// 具备 L1 内存 + L2 硬盘双层缓存与请求单飞去重
 class BilibiliDanmakuClient {
   BilibiliDanmakuClient({Dio? dio}) : _dio = dio ?? Dio();
 
   final Dio _dio;
+
+  // L1 内存缓存 (30 分钟)
+  final TimedKeyedCache<String, BilibiliDanmakuResult> _memoryCache =
+      TimedKeyedCache(maxAge: const Duration(minutes: 30), maxEntries: 100);
+
+  // 单飞请求锁
+  final Map<String, Future<BilibiliDanmakuResult>> _inflight = {};
+
+  int get memoryCacheSizeBytes => _memoryCache.totalBytes;
+  void clearMemoryCache() => _memoryCache.clear();
 
   static const String _kDefaultUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -76,8 +134,60 @@ class BilibiliDanmakuClient {
     };
   }
 
-  /// 拉取 B 站弹幕的主入口 (支持 BV/AV/ep/ss/md/b23短链及带 ?p= 分页的链接)
+  /// 拉取 B 站弹幕的主入口 (支持 BV/AV/ep/ss/md/b23短链及带 ?p= 分页的链接，带双层 30min 缓存)
   Future<BilibiliDanmakuResult> fetchDanmaku(
+    String rawInput, {
+    int? pageOverride,
+    bool bypassCache = false,
+  }) async {
+    final cacheKey = '$rawInput:${pageOverride ?? 1}';
+    final diskCacheKey = 'bili_dm_${cacheKey.hashCode.abs()}';
+
+    if (!bypassCache) {
+      // 1. 查内存
+      final memHit = _memoryCache.get(cacheKey);
+      if (memHit != null) return memHit;
+
+      // 2. 查硬盘
+      final disk = PlayerMediaDiskCacheManager.instance;
+      if (disk != null) {
+        try {
+          final diskJson = await disk.getJson(diskCacheKey);
+          if (diskJson is Map<String, dynamic>) {
+            final res = BilibiliDanmakuResult.fromJson(diskJson);
+            _memoryCache.set(cacheKey, res, res.comments.length * 128 + 256);
+            return res;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (_inflight.containsKey(cacheKey)) {
+      return _inflight[cacheKey]!;
+    }
+
+    final future = () async {
+      final result = await _fetchDanmakuInternal(rawInput, pageOverride: pageOverride);
+      if (result.comments.isNotEmpty || result.cid > 0) {
+        _memoryCache.set(cacheKey, result, result.comments.length * 128 + 256);
+        PlayerMediaDiskCacheManager.instance?.putJson(
+          diskCacheKey,
+          result.toJson(),
+          maxAge: const Duration(minutes: 30),
+        ).ignore();
+      }
+      return result;
+    }();
+
+    _inflight[cacheKey] = future;
+    try {
+      return await future;
+    } finally {
+      _inflight.remove(cacheKey);
+    }
+  }
+
+  Future<BilibiliDanmakuResult> _fetchDanmakuInternal(
     String rawInput, {
     int? pageOverride,
   }) async {

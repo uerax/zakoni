@@ -3,7 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../../../core/network/anime_image_cache_manager.dart';
 import '../../../core/network/bangumi_client.dart';
+import '../../../core/network/player_media_disk_cache_manager.dart';
 import '../../../core/utils/font_manager.dart';
+import '../../player/danmaku/source/bilibili_danmaku_client.dart';
+import '../../player/danmaku/source/dandan_client.dart';
+import '../../player/source/source_bundle_manager.dart';
 import 'ios_settings_card.dart';
 
 class CacheSettingsCard extends StatefulWidget {
@@ -45,6 +49,17 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
       dataBytes += await widget.client.getDiskDataCacheSizeBytes();
     } catch (_) {}
 
+    try {
+      final playerDisk = PlayerMediaDiskCacheManager.instance;
+      if (playerDisk != null) {
+        dataBytes += await playerDisk.getDiskSizeBytes();
+      }
+    } catch (_) {}
+
+    dataBytes += SourceBundleManager.instance.runtime.memoryCacheSizeBytes;
+    dataBytes += DandanClient.instance.memoryCacheSizeBytes;
+    dataBytes += BilibiliDanmakuClient().memoryCacheSizeBytes;
+
     if (!mounted) return;
     setState(() {
       _imageCacheSizeStr = _formatBytes(imgBytes);
@@ -84,11 +99,15 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
   Future<void> _performClearDataCache() async {
     try {
       widget.client.clearCache();
+      await PlayerMediaDiskCacheManager.instance?.clearAll();
+      SourceBundleManager.instance.runtime.clearMemoryCache();
+      DandanClient.instance.clearMemoryCache();
+      BilibiliDanmakuClient().clearMemoryCache();
       await _updateCacheSizes();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('已清空数据缓存'),
+          content: Text('已清空数据与媒体缓存'),
           duration: Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),

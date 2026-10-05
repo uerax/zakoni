@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:zakoni/features/player/danmaku/models/danmaku_item.dart';
 import 'package:zakoni/features/player/danmaku/utils/danmaku_filter_engine.dart';
+import 'package:zakoni/features/player/services/player_preferences_service.dart';
 
 /// 弹幕事件监听接口，由视图层 DanmakuView 实现并绑定
 abstract interface class DanmakuListener {
@@ -34,7 +35,10 @@ abstract interface class DanmakuListener {
 class DanmakuController extends ChangeNotifier {
   DanmakuController({
     DanmakuSettings? initialSettings,
-  }) : _settings = initialSettings ?? const DanmakuSettings() {
+  }) : _settings = initialSettings ??
+            (PlayerPreferencesService.instance.isInitialized
+                ? PlayerPreferencesService.instance.danmakuSettings
+                : const DanmakuSettings()) {
     _recompileFilters();
   }
 
@@ -92,6 +96,7 @@ class DanmakuController extends ChangeNotifier {
     _recompileFilters();
     _listener?.onDanmakuSettingsChanged(_settings, previous);
     notifyListeners();
+    PlayerPreferencesService.instance.saveDanmakuSettings(newSettings).ignore();
   }
 
   /// 同步视频时间轴

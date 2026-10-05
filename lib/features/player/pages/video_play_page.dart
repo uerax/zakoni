@@ -7,6 +7,7 @@ import '../../../core/network/bangumi_client.dart';
 import '../../../core/services/bangumi_oped_service.dart';
 import '../controller/playback_controller.dart';
 import '../danmaku/danmaku.dart';
+import '../services/player_preferences_service.dart';
 import '../source/auto_source_pick_coordinator.dart';
 import '../source/models/source_models.dart';
 import '../source/services/source_binding_service.dart';
@@ -173,6 +174,13 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     _playbackController = ZakoniPlaybackController(
       danmakuController: _danmakuController,
     );
+
+    // 预热并同步用户上次持久化的弹幕外观设置
+    PlayerPreferencesService.instance.initialize().then((_) {
+      if (mounted) {
+        _danmakuController.updateSettings(PlayerPreferencesService.instance.danmakuSettings);
+      }
+    });
 
     // 初始化并发源探测器
     _aggregator = SourceAggregator();
