@@ -72,8 +72,14 @@ class VideoPlayerDesktopLayout extends StatelessWidget {
                       ),
                     ],
                   ),
+                  // 特殊处理说明：
+                  // 必须显式指定 Clip.antiAliasWithSaveLayer，严禁使用默认的 Clip.antiAlias。
+                  // 播放器在暂停或呼出控制条时，内部浮层（如居中暂停卡片、顶栏按钮等）包含 BackdropFilter 毛玻璃，
+                  // 默认剪裁在遇到子级 BackdropFilter 时会被渲染管线击穿导致圆角退化为直角；
+                  // 开启 antiAliasWithSaveLayer 强制分配独立离屏合成层，确保全生命周期严格保持 16px 圆角约束。
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
+                    clipBehavior: Clip.antiAliasWithSaveLayer,
                     child: playerWidget,
                   ),
                 ),

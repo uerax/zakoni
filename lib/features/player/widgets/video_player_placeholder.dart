@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:zakoni/features/common/widgets/bouncing_scale_card.dart';
 import 'package:zakoni/features/common/widgets/cached_anime_image.dart';
 
-/// 播放器未起播海报占位组件 (iOS Ambient & Frosted Play Button)
+/// 播放器未起播海报占位组件 (iOS Ambient Placeholder)
 class VideoPlayerInitialPlaceholder extends StatelessWidget {
   const VideoPlayerInitialPlaceholder({
     super.key,
@@ -14,7 +14,6 @@ class VideoPlayerInitialPlaceholder extends StatelessWidget {
     required this.selectedSourceName,
     required this.hasEpisodes,
     required this.onBackPressed,
-    required this.onPlayPressed,
   });
 
   final String coverUrl;
@@ -23,7 +22,6 @@ class VideoPlayerInitialPlaceholder extends StatelessWidget {
   final String selectedSourceName;
   final bool hasEpisodes;
   final VoidCallback onBackPressed;
-  final VoidCallback onPlayPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -113,37 +111,6 @@ class VideoPlayerInitialPlaceholder extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-        ),
-
-        // 中央磨砂播放按钮
-        Center(
-          child: BouncingScaleCard(
-            scaleDown: 0.92,
-            onTap: onPlayPressed,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(36),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      width: 1,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                ),
               ),
             ),
           ),

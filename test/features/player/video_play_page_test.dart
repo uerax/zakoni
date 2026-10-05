@@ -22,8 +22,8 @@ void main() {
 
       // 验证未起播提示条存在
       expect(find.text('分集已就绪 · 请在下方选择集数开始播放'), findsOneWidget);
-      // 验证存在中央大播放按钮
-      expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+      // 验证未起播时绝不存在中央大播放按钮（引导用户点击下方集数选择起播）
+      expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
     });
 
     testWidgets('2. 页面包含 3 个 Tab，且默认聚焦第 3 个「选集」Tab', (tester) async {
