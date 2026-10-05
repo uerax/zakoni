@@ -105,7 +105,7 @@ class ZakoniPlaybackController {
     await _configureNativeMpvProperties();
   }
 
-  /// 配置底层 mpv 属性（变速变调不变音、断流自动重连、确保网络流可拖拽定位、自适应分级缓冲）
+  /// 配置底层 mpv 属性（变速变调不变音、协议层断流自动重连、确保网络流快速定位、自适应分级缓冲）
   Future<void> _configureNativeMpvProperties() async {
     final player = _player;
     if (player == null) return;
@@ -117,23 +117,41 @@ class ZakoniPlaybackController {
         await platform.setProperty('af', 'scaletempo2=max-speed=8');
 
         // 2. 特殊处理说明：
-        // 严禁在此处给 demuxer-lavf-o 覆盖注入 ignidx / igndts 等忽略索引参数。
-        // ignidx 会导致 FFmpeg 丢弃 MP4/切片索引表，当用户点击或拖拽进度条时，底层找不到对应
-        // 时间戳直接抛出 AVERROR_EOF，导致 mpv 误判为播放结束 (completed=true) 异常终止。
-        // 维持 media_kit 原生协议白名单与重试策略，并显式声明网络流可 Seek 与启用默认精确定位。
-        await platform.setProperty('force-seekable', 'yes');
-        await platform.setProperty('hr-seek', 'default');
+        // 必须通过 stream-lavf-o 给 FFmpeg 底层网络协议层 (AVIO/HTTP) 传递重连与容错参数。
+        // 过去传入 demuxer-lavf-o 会被 FFmpeg 忽略（报 Could not set AVOption reconnect），
+        // 导致网络波动、Range 请求断开时直接触发 EOF 误判为播放结束。
+        await platform.setProperty(
+          'stream-lavf-o',
+          'reconnect=1,reconnect_at_eof=1,reconnect_streamed=1,reconnect_delay_max=5,reconnect_on_network_error=1',
+        );
 
-        // 3. 自适应分级解复用缓冲：
-        // Wi-Fi 环境下预读 150MB + 后退 50MB，大幅减少拉条卡顿；
-        // 移动网络下自适应降级为 16MB + 4MB，节约手机流量。
+        // 3. 特殊处理说明：
+        // media_kit 默认写死 cache-on-disk=yes，但在 Windows/Android 平台上未配置缓存目录，
+        // 会抛出 "Failed to create file cache" 导致缓存子系统损坏。显式关闭磁盘缓存，改用全内存缓冲。
+        await platform.setProperty('cache-on-disk', 'no');
+
+        // 4. 特殊处理说明：
+        // 开启 demuxer-seekable-cache，使用内存缓存实现已读区间的秒级拖拽/快进，避免重复发起 HTTP 请求。
+        await platform.setProperty('demuxer-seekable-cache', 'yes');
+
+        // 5. 特殊处理说明：
+        // 严禁设置 force-seekable=yes，防止不支持 Range 的网络流被暴力寻道抛出 AVERROR_EOF；
+        // 将 hr-seek 设为 no，使用关键帧快速定位，杜绝跨分片高精度逐帧解码失败引发的流断开跳到结尾。
+        await platform.setProperty('force-seekable', 'no');
+        await platform.setProperty('hr-seek', 'no');
+
+        // 6. 自适应分级解复用缓冲与起播阈值防抖：
+        // 预读 30 秒、配置 cache-pause-wait=1 秒起播，杜绝起播或 Seek 漫长转圈。
         final isMetered = NetworkConnectivityService.instance.isMetered;
         final maxBytes = isMetered ? _kMobileMaxBytes : _kWifiMaxBytes;
         final maxBackBytes = isMetered ? _kMobileMaxBackBytes : _kWifiMaxBackBytes;
 
+        await platform.setProperty('demuxer-readahead-secs', '30');
+        await platform.setProperty('cache-secs', '60');
+        await platform.setProperty('cache-pause-wait', '1');
         await platform.setProperty('demuxer-max-bytes', maxBytes.toString());
         await platform.setProperty('demuxer-max-back-bytes', maxBackBytes.toString());
-        await platform.setProperty('network-timeout', '30');
+        await platform.setProperty('network-timeout', '15');
         await platform.setProperty('volume-max', '100');
         await platform.setProperty('user-agent', _kDefaultUserAgent);
 
@@ -250,7 +268,19 @@ class ZakoniPlaybackController {
 
   /// 跳转至指定播放进度
   Future<void> seek(Duration target) async {
-    final targetPosition = target < Duration.zero ? Duration.zero : target;
+    final dur = timeline.value.duration;
+    var targetPosition = target < Duration.zero ? Duration.zero : target;
+
+    // 特殊处理说明：
+    // 若目标时间戳非常接近或等于/超过视频总时长 (dur)，libmpv 会直接触发 eof-reached 将 completed 置为 true。
+    // 因此在时长有效时，对 Seek 终点做 500ms 安全余量截断保护。
+    if (dur > const Duration(seconds: 1) && targetPosition >= dur) {
+      targetPosition = dur - const Duration(milliseconds: 500);
+      if (targetPosition < Duration.zero) {
+        targetPosition = Duration.zero;
+      }
+    }
+
     timeline.value = timeline.value.copyWith(
       position: targetPosition,
       clearPreview: true,
@@ -266,7 +296,17 @@ class ZakoniPlaybackController {
 
     final player = _player;
     if (player != null) {
+      final wasPlaying = core.value.playing;
+      // 特殊处理说明：
+      // 采用成熟播放器的 Pause -> Seek -> Play 安全时序，
+      // 避免在音视频渲染器全速消费下载时并发寻道导致 Socket 管道撕裂抛出 TLS 异常与假 EOF。
+      if (wasPlaying) {
+        await player.pause();
+      }
       await player.seek(targetPosition);
+      if (wasPlaying) {
+        await player.play();
+      }
     }
     danmakuController?.syncTime(targetPosition);
   }
@@ -356,6 +396,28 @@ class ZakoniPlaybackController {
   }
 
   void _onCompletedChanged(bool isCompleted) {
+    if (isCompleted) {
+      // 特殊处理说明：
+      // 当底层网络断流或解码瞬态异常抛出 EOF code: 4 (ERROR) 时，
+      // media_kit 会将 eof-reached 误认为 completed = true。
+      // 若当前播放位置明显远离总时长（差距超过 3 秒），判定为底层网络抖动引发的伪 EOF 误报，
+      // 绝不将状态置为 completed 终止播放，而是清除错误并平滑触发自动重试/续播。
+      final currentPos = timeline.value.position;
+      final totalDur = timeline.value.duration;
+      if (totalDur > const Duration(seconds: 5) &&
+          currentPos < totalDur - const Duration(seconds: 3)) {
+        debugPrint(
+          '[ZakoniPlayback] 拦截底层伪 EOF 异常 (当前: ${currentPos.inSeconds}s, 总长: ${totalDur.inSeconds}s)，自动续播',
+        );
+        core.value = core.value.copyWith(
+          completed: false,
+          buffering: true,
+        );
+        _player?.play();
+        return;
+      }
+    }
+
     if (core.value.completed != isCompleted) {
       core.value = core.value.copyWith(completed: isCompleted);
     }

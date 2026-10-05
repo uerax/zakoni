@@ -106,5 +106,21 @@ void main() {
       );
       expect(controller.core.value.isMeteredNetwork, isFalse);
     });
+
+    test('Seek 越界边界保护截断测试', () async {
+      // 模拟视频总时长为 100 秒
+      controller.timeline.value = controller.timeline.value.copyWith(
+        duration: const Duration(seconds: 100),
+      );
+
+      // 用户拖到最右边 100 秒处
+      await controller.seek(const Duration(seconds: 100));
+
+      // 验证自动预留 500ms 截断保护，防止命中 EOF
+      expect(
+        controller.timeline.value.position,
+        equals(const Duration(milliseconds: 99500)),
+      );
+    });
   });
 }
