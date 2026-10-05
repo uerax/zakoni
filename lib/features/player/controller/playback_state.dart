@@ -12,6 +12,7 @@ class PlaybackCoreState {
     this.volume = 1.0,
     this.muted = false,
     this.videoFit = BoxFit.contain,
+    this.isMeteredNetwork = false,
     this.errorMessage,
   });
 
@@ -39,6 +40,9 @@ class PlaybackCoreState {
   /// 画面缩放模式
   final BoxFit videoFit;
 
+  /// 当前是否处于移动蜂窝计费网络（对应 16MB 省流缓冲）
+  final bool isMeteredNetwork;
+
   /// 错误提示信息
   final String? errorMessage;
 
@@ -53,6 +57,7 @@ class PlaybackCoreState {
     double? volume,
     bool? muted,
     BoxFit? videoFit,
+    bool? isMeteredNetwork,
     String? errorMessage,
     bool clearError = false,
   }) {
@@ -65,6 +70,7 @@ class PlaybackCoreState {
       volume: volume ?? this.volume,
       muted: muted ?? this.muted,
       videoFit: videoFit ?? this.videoFit,
+      isMeteredNetwork: isMeteredNetwork ?? this.isMeteredNetwork,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }

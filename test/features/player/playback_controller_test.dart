@@ -92,5 +92,19 @@ void main() {
       expect(controller.core.value.hasError, isFalse);
       expect(controller.core.value.errorMessage, isNull);
     });
+
+    test('自适应分级网络状态字段与拷贝流转测试', () {
+      expect(controller.core.value.isMeteredNetwork, isFalse);
+
+      controller.core.value = controller.core.value.copyWith(
+        isMeteredNetwork: true,
+      );
+      expect(controller.core.value.isMeteredNetwork, isTrue);
+
+      controller.core.value = controller.core.value.copyWith(
+        isMeteredNetwork: false,
+      );
+      expect(controller.core.value.isMeteredNetwork, isFalse);
+    });
   });
 }

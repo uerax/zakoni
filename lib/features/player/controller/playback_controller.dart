@@ -4,15 +4,25 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:zakoni/core/services/network_connectivity_service.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
 
 const String _kDefaultUserAgent =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
-const String _kNetworkDemuxerLavfOptions =
-    'reconnect=1,multiple_requests=1,retry_open=3,hls_wrap=0,hls_allow_cache=1,'
-    'fflags=+igndts+ignidx,tls_verify=0';
+/// 自适应网络分级缓存策略：
+/// 1. Wi-Fi / 有线宽带环境：开启 150MB 解复用缓冲与 50MB 回退缓存。
+///    一集 1080p 动画(约 250~450MB)在起播数分钟内即可预载 35%~60% 以上，前后拖拽免重新建连，秒切即播。
+/// 2. 移动蜂窝网络环境：降级为 16MB 解复用缓冲与 4MB 回退缓存。
+///    提供 1~2 分钟平滑防抖窗口的同时，防止点开即退时偷跑数十乃至上百兆宝贵的流量。
+const int _kWifiBufferSize = 150 * 1024 * 1024; // 150MB
+const int _kWifiMaxBytes = 150 * 1024 * 1024; // 150MB
+const int _kWifiMaxBackBytes = 50 * 1024 * 1024; // 50MB
+
+const int _kMobileBufferSize = 16 * 1024 * 1024; // 16MB
+const int _kMobileMaxBytes = 16 * 1024 * 1024; // 16MB
+const int _kMobileMaxBackBytes = 4 * 1024 * 1024; // 4MB
 
 /// zakoni 视频播放引擎控制器
 /// 封装 media_kit (libmpv) 底层驱动，支持 250ms 节流解耦、倍速变调修正、切片断流自动重试与弹幕联动
@@ -58,9 +68,13 @@ class ZakoniPlaybackController {
   Future<void> initialize() async {
     if (_player != null || _disposed) return;
 
+    final isMetered = NetworkConnectivityService.instance.isMetered;
+    core.value = core.value.copyWith(isMeteredNetwork: isMetered);
+    final initialBufferSize = isMetered ? _kMobileBufferSize : _kWifiBufferSize;
+
     final player = Player(
-      configuration: const PlayerConfiguration(
-        bufferSize: 16 * 1024 * 1024, // 16MB 内存缓冲
+      configuration: PlayerConfiguration(
+        bufferSize: initialBufferSize,
         title: 'zakoni Player',
       ),
     );
@@ -74,7 +88,7 @@ class ZakoniPlaybackController {
     );
     videoControllerNotifier.value = _videoController;
 
-    // 绑定底层播放器流事件
+    // 绑定底层播放器流事件与网络环境动态监听
     _subscriptions.addAll([
       player.stream.playing.listen(_onPlayingChanged),
       player.stream.buffering.listen(_onBufferingChanged),
@@ -84,13 +98,14 @@ class ZakoniPlaybackController {
       player.stream.buffer.listen(_onBufferChanged),
       player.stream.rate.listen(_onRateChanged),
       player.stream.error.listen(_onErrorChanged),
+      NetworkConnectivityService.instance.onMeteredChanged.listen(_onNetworkMeteredChanged),
     ]);
 
     // 注入底层 mpv 增强属性
     await _configureNativeMpvProperties();
   }
 
-  /// 配置底层 mpv 属性（变速变调不变音、断流自动重连、忽略坏时间戳）
+  /// 配置底层 mpv 属性（变速变调不变音、断流自动重连、确保网络流可拖拽定位、自适应分级缓冲）
   Future<void> _configureNativeMpvProperties() async {
     final player = _player;
     if (player == null) return;
@@ -101,12 +116,23 @@ class ZakoniPlaybackController {
         // 1. scaletempo2 滤镜：倍速播放（1.25x~3.0x）时自动修正音高，人声音质不失真
         await platform.setProperty('af', 'scaletempo2=max-speed=8');
 
-        // 2. 切片断流自动重连与坏时间戳自愈：针对第三方 m3u8 切片源的核心容错
-        await platform.setProperty('demuxer-lavf-o', _kNetworkDemuxerLavfOptions);
+        // 2. 特殊处理说明：
+        // 严禁在此处给 demuxer-lavf-o 覆盖注入 ignidx / igndts 等忽略索引参数。
+        // ignidx 会导致 FFmpeg 丢弃 MP4/切片索引表，当用户点击或拖拽进度条时，底层找不到对应
+        // 时间戳直接抛出 AVERROR_EOF，导致 mpv 误判为播放结束 (completed=true) 异常终止。
+        // 维持 media_kit 原生协议白名单与重试策略，并显式声明网络流可 Seek 与启用默认精确定位。
+        await platform.setProperty('force-seekable', 'yes');
+        await platform.setProperty('hr-seek', 'default');
 
-        // 3. 解复用缓冲与超时
-        await platform.setProperty('demuxer-max-bytes', '16777216'); // 16MB
-        await platform.setProperty('demuxer-max-back-bytes', '4194304'); // 4MB
+        // 3. 自适应分级解复用缓冲：
+        // Wi-Fi 环境下预读 150MB + 后退 50MB，大幅减少拉条卡顿；
+        // 移动网络下自适应降级为 16MB + 4MB，节约手机流量。
+        final isMetered = NetworkConnectivityService.instance.isMetered;
+        final maxBytes = isMetered ? _kMobileMaxBytes : _kWifiMaxBytes;
+        final maxBackBytes = isMetered ? _kMobileMaxBackBytes : _kWifiMaxBackBytes;
+
+        await platform.setProperty('demuxer-max-bytes', maxBytes.toString());
+        await platform.setProperty('demuxer-max-back-bytes', maxBackBytes.toString());
         await platform.setProperty('network-timeout', '30');
         await platform.setProperty('volume-max', '100');
         await platform.setProperty('user-agent', _kDefaultUserAgent);
@@ -118,6 +144,31 @@ class ZakoniPlaybackController {
       }
     } catch (e) {
       debugPrint('[ZakoniPlayback] 配置 mpv 属性失败: $e');
+    }
+  }
+
+  /// 网络环境动态变更（如播放中从 Wi-Fi 切换至 4G/5G 蜂窝数据或反之）：在线热更新 mpv 缓冲水线
+  Future<void> _onNetworkMeteredChanged(bool isMetered) async {
+    if (_disposed) return;
+    core.value = core.value.copyWith(isMeteredNetwork: isMetered);
+
+    final player = _player;
+    if (player == null) return;
+
+    try {
+      final platform = player.platform;
+      if (platform is NativePlayer) {
+        final maxBytes = isMetered ? _kMobileMaxBytes : _kWifiMaxBytes;
+        final maxBackBytes = isMetered ? _kMobileMaxBackBytes : _kWifiMaxBackBytes;
+        await platform.setProperty('demuxer-max-bytes', maxBytes.toString());
+        await platform.setProperty('demuxer-max-back-bytes', maxBackBytes.toString());
+        debugPrint(
+          '[ZakoniPlayback] 网络类型动态变更，已热更新解复用缓冲: '
+          '${isMetered ? "移动蜂窝数据模式(16MB)" : "高速Wi-Fi/有线模式(150MB)"}',
+        );
+      }
+    } catch (e) {
+      debugPrint('[ZakoniPlayback] 动态热更新解复用缓冲失败: $e');
     }
   }
 
@@ -205,9 +256,12 @@ class ZakoniPlaybackController {
       clearPreview: true,
     );
 
-    // Seek 时主动清除前序偶发错误状态，确保拖拽平滑恢复
-    if (core.value.hasError) {
-      core.value = core.value.copyWith(clearError: true);
+    // Seek 时主动清除前序偶发错误与 completed 状态，确保平滑恢复与继续播放
+    if (core.value.hasError || core.value.completed) {
+      core.value = core.value.copyWith(
+        clearError: true,
+        completed: false,
+      );
     }
 
     final player = _player;
