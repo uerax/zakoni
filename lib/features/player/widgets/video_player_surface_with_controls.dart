@@ -14,6 +14,7 @@ class VideoPlayerSurfaceWithControls extends StatelessWidget {
     required this.controller,
     required this.title,
     this.danmakuController,
+    this.danmakuCoordinator,
     this.isFullscreen = false,
     required this.onToggleFullscreen,
     required this.onBackPressed,
@@ -32,6 +33,7 @@ class VideoPlayerSurfaceWithControls extends StatelessWidget {
   final ZakoniPlaybackController controller;
   final String title;
   final DanmakuController? danmakuController;
+  final DanmakuSessionCoordinator? danmakuCoordinator;
   final bool isFullscreen;
   final VoidCallback onToggleFullscreen;
   final VoidCallback onBackPressed;
@@ -57,6 +59,7 @@ class VideoPlayerSurfaceWithControls extends StatelessWidget {
             controller: controller,
             title: title,
             danmakuController: danmakuController,
+            danmakuCoordinator: danmakuCoordinator,
             isFullscreen: isFullscreen,
             onToggleFullscreen: onToggleFullscreen,
             onBackPressed: onBackPressed,

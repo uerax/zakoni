@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:zakoni/features/player/danmaku/models/danmaku_item.dart';
+import 'package:zakoni/features/player/danmaku/utils/danmaku_filter_engine.dart';
 
 /// 弹幕事件监听接口，由视图层 DanmakuView 实现并绑定
 abstract interface class DanmakuListener {
@@ -29,25 +30,6 @@ abstract interface class DanmakuListener {
   void onDanmakuReset();
 }
 
-/// 预编译的过滤规则
-class _CompiledFilter {
-  _CompiledFilter.regex(this.regex) : text = null;
-  _CompiledFilter.substring(this.text) : regex = null;
-
-  final RegExp? regex;
-  final String? text;
-
-  bool matches(String target) {
-    if (regex != null) {
-      return regex!.hasMatch(target);
-    }
-    if (text != null && text!.isNotEmpty) {
-      return target.contains(text!);
-    }
-    return false;
-  }
-}
-
 /// 弹幕业务调度控制器
 class DanmakuController extends ChangeNotifier {
   DanmakuController({
@@ -62,7 +44,7 @@ class DanmakuController extends ChangeNotifier {
 
   bool _playing = false;
   double _playbackRate = 1.0;
-  List<_CompiledFilter> _compiledFilters = const [];
+  List<DanmakuCompiledRule> _compiledFilters = const [];
 
   /// 当前所有已就绪并排序的弹幕列表
   List<DanmakuItem> get items => List.unmodifiable(_items);
@@ -160,35 +142,6 @@ class DanmakuController extends ChangeNotifier {
   }
 
   void _recompileFilters() {
-    final filters = _settings.filters;
-    if (filters.isEmpty) {
-      _compiledFilters = const [];
-      return;
-    }
-
-    final list = <_CompiledFilter>[];
-    for (final rule in filters) {
-      if (rule.isEmpty) continue;
-      // 检查是否为 /pattern/flags 正则格式
-      if (rule.startsWith('/') && rule.lastIndexOf('/') > 0) {
-        try {
-          final lastSlash = rule.lastIndexOf('/');
-          final pattern = rule.substring(1, lastSlash);
-          final flags = rule.substring(lastSlash + 1);
-          final caseSensitive = !flags.contains('i');
-          final isMultiLine = flags.contains('m');
-          list.add(_CompiledFilter.regex(RegExp(
-            pattern,
-            caseSensitive: caseSensitive,
-            multiLine: isMultiLine,
-          )));
-          continue;
-        } catch (_) {
-          // 正则解析失败则回退为普通子串匹配
-        }
-      }
-      list.add(_CompiledFilter.substring(rule));
-    }
-    _compiledFilters = list;
+    _compiledFilters = DanmakuFilterEngine.compileRules(_settings.filters);
   }
 }

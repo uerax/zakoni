@@ -20,6 +20,8 @@ class DanmakuItem {
     this.mode = DanmakuMode.scroll,
     this.color = Colors.white,
     this.isSelf = false,
+    this.source,
+    this.senderHash,
   });
 
   /// 弹幕文本
@@ -37,9 +39,38 @@ class DanmakuItem {
   /// 是否是当前用户自己发射的弹幕
   final bool isSelf;
 
+  /// 弹幕来源标识 (如 dandan, bilibili, upload 等)
+  final String? source;
+
+  /// 发送者哈希特征 (用于多源跨站 O(1) 增量指纹去重)
+  final String? senderHash;
+
+  /// 时间轴秒数 (辅助转换)
+  double get timeSeconds => timeMs / 1000.0;
+
+  DanmakuItem copyWith({
+    String? text,
+    int? timeMs,
+    DanmakuMode? mode,
+    Color? color,
+    bool? isSelf,
+    String? source,
+    String? senderHash,
+  }) {
+    return DanmakuItem(
+      text: text ?? this.text,
+      timeMs: timeMs ?? this.timeMs,
+      mode: mode ?? this.mode,
+      color: color ?? this.color,
+      isSelf: isSelf ?? this.isSelf,
+      source: source ?? this.source,
+      senderHash: senderHash ?? this.senderHash,
+    );
+  }
+
   @override
   String toString() =>
-      'DanmakuItem(text: $text, timeMs: $timeMs, mode: $mode, color: $color)';
+      'DanmakuItem(text: $text, timeMs: $timeMs, mode: $mode, color: $color, source: $source)';
 }
 
 /// 弹幕配置参数

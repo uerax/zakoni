@@ -75,6 +75,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     with SingleTickerProviderStateMixin {
   late final ZakoniPlaybackController _playbackController;
   late final DanmakuController _danmakuController;
+  late final DanmakuSessionCoordinator _danmakuCoordinator;
   late final TabController _tabController;
   late final SourceAggregator _aggregator;
   late final AutoSourcePickCoordinator _autoPicker;
@@ -166,6 +167,9 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     super.initState();
     _activeEpisode = widget.currentEpisode;
     _danmakuController = DanmakuController();
+    _danmakuCoordinator = DanmakuSessionCoordinator(
+      danmakuController: _danmakuController,
+    );
     _playbackController = ZakoniPlaybackController(
       danmakuController: _danmakuController,
     );
@@ -265,12 +269,28 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
   Future<void> _initPlayback() async {
     if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
+      _loadDanmakuForCurrentEpisode();
       await _playbackController.open(
         widget.videoUrl!,
         httpHeaders: widget.httpHeaders,
         start: widget.initialPosition,
       );
     }
+  }
+
+  void _loadDanmakuForCurrentEpisode() {
+    final ep = _activeEpisode ?? 1;
+    final effectiveTitle = (_effectiveBangumiItem?.nameCn.isNotEmpty ?? false)
+        ? _effectiveBangumiItem!.nameCn
+        : (_effectiveBangumiItem?.name ?? widget.title);
+
+    _danmakuCoordinator.autoMatchAndLoad(
+      bangumiId: _effectiveBangumiId,
+      episode: ep,
+      title: effectiveTitle,
+      pluginName: _selectedSourceId,
+      titleAliases: _titleRefs,
+    ).ignore();
   }
 
   /// 异步补全 Bangumi 官方数据 (用于弹幕检索与选集映射)
@@ -633,6 +653,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     });
 
     widget.onEpisodeSelected?.call(slot.canonicalEp);
+    _loadDanmakuForCurrentEpisode();
 
     // 1. 若有预置直接流地址 (或单测环境测试流)
     if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
@@ -760,6 +781,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     }
     _tabController.dispose();
     _playbackController.dispose();
+    _danmakuCoordinator.dispose();
     _danmakuController.dispose();
     _aggregator.removeListener(_onAggregatorUpdated);
     _aggregator.dispose();
@@ -864,6 +886,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       controller: _playbackController,
       title: '${widget.title}$epTitle',
       danmakuController: _danmakuController,
+      danmakuCoordinator: _danmakuCoordinator,
       isFullscreen: isFullscreen,
       onToggleFullscreen: _toggleFullscreen,
       onBackPressed: _handleBackPressed,

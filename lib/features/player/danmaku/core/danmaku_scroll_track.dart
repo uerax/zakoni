@@ -6,6 +6,9 @@ class DanmakuScrollTrack {
   double _lastEndMs = -double.infinity;
   double _lastSpeed = double.infinity;
 
+  /// 前一条弹幕尾部腾出入场间隙的时刻 (ms)
+  double get tailFreeMs => _tailFreeMs;
+
   /// 重置轨道状态
   void reset() {
     _lastStartMs = -double.infinity;

@@ -238,6 +238,10 @@ class ZakoniPlaybackController {
     _currentUri = uri;
     _pendingStart = start ?? Duration.zero;
 
+    // 切集或加载媒体时，立即暂停冻结弹幕并预置时间轴
+    danmakuController?.pause();
+    danmakuController?.syncTime(_pendingStart);
+
     // 特殊处理说明：
     // 切集或初次打开媒体流时，必须将 firstFrameRendered 立即置为 false 并保持 loading=true。
     // 这会在 UI 层激活纯黑防闪遮罩，彻底遮蔽底层 GPU Texture 中残留的上一集最后一帧画面。
@@ -293,20 +297,22 @@ class ZakoniPlaybackController {
     final player = _player;
     if (player == null) {
       core.value = core.value.copyWith(playing: true);
+      _syncDanmakuState();
       return;
     }
     await player.play();
-    danmakuController?.resume();
+    _syncDanmakuState();
   }
 
   Future<void> pause() async {
     final player = _player;
     if (player == null) {
       core.value = core.value.copyWith(playing: false);
+      _syncDanmakuState();
       return;
     }
     await player.pause();
-    danmakuController?.pause();
+    _syncDanmakuState();
   }
 
   /// 跳转至指定播放进度
@@ -433,6 +439,23 @@ class ZakoniPlaybackController {
     }
   }
 
+  /// 弹幕时钟与运行状态同步门禁：
+  /// 只有当视频【真正播放中】且【首帧已渲染出画】且【不在缓冲转圈中】且【不在加载中】且【未播放结束】时才允许弹幕滑行；
+  /// 其余任何状态（如加载中、卡顿缓冲中、暂停中、切集中、播放结束）一律将弹幕严格冻结暂停。
+  void _syncDanmakuState() {
+    final shouldRun = core.value.playing &&
+        core.value.firstFrameRendered &&
+        !core.value.loading &&
+        !core.value.buffering &&
+        !core.value.completed;
+
+    if (shouldRun) {
+      danmakuController?.resume();
+    } else {
+      danmakuController?.pause();
+    }
+  }
+
   // ==========================
   // 底层事件流响应与 250ms 节流
   // ==========================
@@ -443,12 +466,8 @@ class ZakoniPlaybackController {
         playing: isPlaying,
         clearError: isPlaying,
       );
-      if (isPlaying) {
-        danmakuController?.resume();
-      } else {
-        danmakuController?.pause();
-      }
       _checkFirstFrameRendered();
+      _syncDanmakuState();
     }
   }
 
@@ -458,6 +477,7 @@ class ZakoniPlaybackController {
       if (!isBuffering) {
         _checkFirstFrameRendered();
       }
+      _syncDanmakuState();
     }
   }
 
@@ -481,6 +501,7 @@ class ZakoniPlaybackController {
 
     if (core.value.completed != isCompleted) {
       core.value = core.value.copyWith(completed: isCompleted);
+      _syncDanmakuState();
     }
   }
 
@@ -550,6 +571,9 @@ class ZakoniPlaybackController {
           firstFrameRendered: true,
           loading: false,
         );
+        // 首帧真正解码出画瞬间：将弹幕时钟强制精准对齐当前视频帧进度，杜绝偷跑时差
+        danmakuController?.syncTime(_lastPosition);
+        _syncDanmakuState();
       }
     }
   }

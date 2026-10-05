@@ -28,6 +28,7 @@ class PlayerControls extends StatefulWidget {
     required this.controller,
     this.title = '',
     this.danmakuController,
+    this.danmakuCoordinator,
     this.isFullscreen = false,
     this.onToggleFullscreen,
     this.onBackPressed,
@@ -42,6 +43,7 @@ class PlayerControls extends StatefulWidget {
   final ZakoniPlaybackController controller;
   final String title;
   final DanmakuController? danmakuController;
+  final DanmakuSessionCoordinator? danmakuCoordinator;
   final bool isFullscreen;
   final VoidCallback? onToggleFullscreen;
   final VoidCallback? onBackPressed;
@@ -397,12 +399,31 @@ class _PlayerControlsState extends State<PlayerControls> {
       } else if (key == LogicalKeyboardKey.keyC) {
         _handleScreenshot();
         return KeyEventResult.handled;
+      } else if (key == LogicalKeyboardKey.keyD) {
+        _cycleDanmakuMode();
+        return KeyEventResult.handled;
       } else if (key == LogicalKeyboardKey.escape && widget.isFullscreen) {
         widget.onToggleFullscreen?.call();
         return KeyEventResult.handled;
       }
     }
     return KeyEventResult.ignored;
+  }
+
+  void _cycleDanmakuMode() {
+    final controller = widget.danmakuController ?? widget.danmakuCoordinator?.danmakuController;
+    if (controller == null) return;
+    final cfg = controller.settings;
+    if (!cfg.enabled) {
+      controller.updateSettings(cfg.copyWith(enabled: true, simplify: false));
+      _triggerSkipToast('弹幕：全量开启');
+    } else if (!cfg.simplify) {
+      controller.updateSettings(cfg.copyWith(enabled: true, simplify: true));
+      _triggerSkipToast('弹幕：智能精简');
+    } else {
+      controller.updateSettings(cfg.copyWith(enabled: false));
+      _triggerSkipToast('弹幕：已关闭');
+    }
   }
 
   void _openPanel(BuildContext context, Color primaryColor, _ActiveControlPanel panel) {
@@ -497,6 +518,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                               )
                             : PlayerDanmakuPanelBody(
                                 danmakuController: widget.danmakuController,
+                                coordinator: widget.danmakuCoordinator,
                                 primaryColor: primaryColor,
                               ),
                       ),
@@ -956,6 +978,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                         )
                       : PlayerDanmakuPanelBody(
                           danmakuController: widget.danmakuController,
+                          coordinator: widget.danmakuCoordinator,
                           primaryColor: primaryColor,
                         ),
                 ),

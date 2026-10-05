@@ -9,8 +9,8 @@ import 'package:zakoni/features/player/danmaku/models/danmaku_item.dart';
 import 'package:zakoni/features/player/danmaku/utils/danmaku_text_normalizer.dart';
 import 'package:zakoni/features/player/danmaku/view/danmaku_text_layout.dart';
 
-const double _kBaseDanmakuPx = 20.0;
-const double _kTrackSpacing = 1.15;
+const double _kBaseDanmakuPx = 18.0;
+const double _kTrackSpacing = 1.25;
 const double _kTopDurationMs = 5000.0;
 const double _kBottomDurationMs = 5000.0;
 const double _kScrollBaseDurationMs = 8500.0;
@@ -268,50 +268,71 @@ class _DanmakuViewState extends State<DanmakuView>
     final durationMs = math.max(1000.0, _kScrollBaseDurationMs / settings.speed);
     final fontPx = _calculateCalculatedFontSize();
 
-    DanmakuTextLayout? layout;
+    final layout = DanmakuTextLayout(
+      text: item.text,
+      color: settings.hideColor ? Colors.white : item.color,
+      fontSize: fontPx,
+      strokeWidth: settings.strokeWidth,
+      fontFamily: widget.fontFamily,
+    );
 
-    // 尝试在所有可用轨道中找到不发生追尾的轨道
+    final speed = (_viewWidth + layout.size.width) / durationMs;
+
+    // 寻找最佳空闲轨道（优先满足安全间距，加权避开顶部固定弹幕）
+    int bestTrack = -1;
+    double bestScore = -double.infinity;
+
     for (var i = 0; i < _scrollTracks.length; i++) {
       final track = _scrollTracks[i];
-      layout ??= DanmakuTextLayout(
-        text: item.text,
-        color: settings.hideColor ? Colors.white : item.color,
-        fontSize: fontPx,
-        strokeWidth: settings.strokeWidth,
-        fontFamily: widget.fontFamily,
-      );
+      final hasTopDanmaku = i < _topBusyUntil.length && _clockMs < _topBusyUntil[i];
 
-      final speed = (_viewWidth + layout.size.width) / durationMs;
-      if (!track.canAccept(_clockMs, speed, _viewWidth)) {
-        continue;
+      if (track.canAccept(_clockMs, speed, _viewWidth)) {
+        // 空闲时长评分：越久没发弹幕的轨道越优先填充
+        final idleMs = _clockMs - track.tailFreeMs;
+        final score = idleMs - (hasTopDanmaku ? 10000.0 : 0.0);
+        if (score > bestScore) {
+          bestScore = score;
+          bestTrack = i;
+        }
       }
-
-      final entry = DanmakuEntry(
-        item: item,
-        track: i,
-        startMs: _clockMs,
-        durationMs: durationMs,
-        speed: speed,
-        x: _viewWidth,
-        y: i * _lineHeight * _kTrackSpacing,
-        baseText: item.text,
-        layout: layout,
-      );
-
-      _activeEntries.add(entry);
-      _scrollingCount++;
-      _nextExpiryMs = math.min(_nextExpiryMs, entry.endMs);
-      track.register(
-        startMs: entry.startMs,
-        width: layout.size.width,
-        speed: speed,
-        viewWidth: _viewWidth,
-      );
-      return;
     }
 
-    // 所有轨道均饱和，释放未发射的排版对象
-    layout?.dispose();
+    // 若所有轨道都在使用中，退而求其次选择最早腾出空间的轨道填充，不丢弃弹幕
+    if (bestTrack < 0) {
+      double minBusyTime = double.infinity;
+      for (var i = 0; i < _scrollTracks.length; i++) {
+        final track = _scrollTracks[i];
+        final busyUntil = track.tailFreeMs;
+        if (busyUntil < minBusyTime) {
+          minBusyTime = busyUntil;
+          bestTrack = i;
+        }
+      }
+    }
+
+    if (bestTrack < 0) bestTrack = 0;
+
+    final entry = DanmakuEntry(
+      item: item,
+      track: bestTrack,
+      startMs: _clockMs,
+      durationMs: durationMs,
+      speed: speed,
+      x: _viewWidth,
+      y: bestTrack * _lineHeight * _kTrackSpacing,
+      baseText: item.text,
+      layout: layout,
+    );
+
+    _activeEntries.add(entry);
+    _scrollingCount++;
+    _nextExpiryMs = math.min(_nextExpiryMs, entry.endMs);
+    _scrollTracks[bestTrack].register(
+      startMs: entry.startMs,
+      width: layout.size.width,
+      speed: speed,
+      viewWidth: _viewWidth,
+    );
   }
 
   void _emitFixed(DanmakuItem item, {required bool isTop}) {
@@ -401,13 +422,13 @@ class _DanmakuViewState extends State<DanmakuView>
 
     // 当处于横屏（宽大于高）且高度小于 600px 时（典型手机横屏全屏模式）
     if (_viewWidth > _viewHeight && _viewHeight < 600.0) {
-      // animaku 黄金法则：targetPx 在 [11.0, 14.5] 之间，由物理高度严格约束
-      final targetBase = math.min(14.5, math.max(11.0, _viewHeight * 0.032));
+      // animaku 黄金法则：targetPx 在 [11.0, 14.0] 之间，由物理高度严格约束
+      final targetBase = math.min(14.0, math.max(11.0, _viewHeight * 0.032));
       return targetBase * baseScale;
     }
 
-    // 桌面端或竖屏模式：基于 20px 基准做平滑比例缩放
-    final scale = math.min(1.2, math.max(0.65, _viewWidth / 720.0));
+    // 桌面端或竖屏模式：基于 18px 基准平滑缩放，上限严格约束为 1.05 (约 18~19px)，杜绝大字糊屏
+    final scale = math.min(1.05, math.max(0.70, _viewWidth / 720.0));
     return _kBaseDanmakuPx * scale * baseScale;
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:zakoni/core/utils/font_manager.dart';
 import 'package:zakoni/features/player/controller/playback_controller.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
@@ -95,6 +96,7 @@ class VideoSurface extends StatelessWidget {
             Positioned.fill(
               child: DanmakuView(
                 controller: danmakuController!,
+                fontFamily: FontManager.instance.activeFontFamily ?? 'MiSans',
               ),
             ),
 
