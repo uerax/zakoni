@@ -227,12 +227,13 @@ class VideoSourceView extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Text(
+                Text(
                   '可用视频源列表',
                   style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.3,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 if (aggregator?.isProbing == true) ...[

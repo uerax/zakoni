@@ -56,13 +56,9 @@ class PlayerGestureLayer extends StatefulWidget {
 class _PlayerGestureLayerState extends State<PlayerGestureLayer> {
   _ActiveVerticalGesture _verticalGesture = _ActiveVerticalGesture.none;
   Timer? _verticalHideTimer;
-  Timer? _doubleTapSeekDebounceTimer;
 
   // 垂直调节基底值
   double _initialVerticalValue = 0.0;
-
-  // 双击快进快退累积秒数
-  int _accumulatedDoubleTapSeconds = 0;
 
   // 水平滑动 Seek 状态
   Duration _horizontalSeekStartPos = Duration.zero;
@@ -86,7 +82,6 @@ class _PlayerGestureLayerState extends State<PlayerGestureLayer> {
   @override
   void dispose() {
     _verticalHideTimer?.cancel();
-    _doubleTapSeekDebounceTimer?.cancel();
     super.dispose();
   }
 
@@ -97,7 +92,7 @@ class _PlayerGestureLayerState extends State<PlayerGestureLayer> {
   }
 
   // -------------------------
-  // 1. 点击与三等分双击处理
+  // 1. 点击与双击全屏播放/暂停处理
   // -------------------------
 
   void _handleTap() {
@@ -108,62 +103,13 @@ class _PlayerGestureLayerState extends State<PlayerGestureLayer> {
     }
   }
 
-  void _handleDoubleTapDown(TapDownDetails details, double screenWidth) {
+  void _handleDoubleTap() {
     if (widget.isLocked) {
       widget.onShowLockedNotice();
       return;
     }
-
-    final x = details.localPosition.dx;
-    final sectionWidth = screenWidth / 3;
-
-    if (x >= sectionWidth && x < sectionWidth * 2) {
-      // 中间 1/3：切换播放 / 暂停
-      _triggerHaptic();
-      widget.controller.togglePlay();
-      return;
-    }
-
-    // 左右 1/3：步进快退 (-10s) 或快进 (+10s)
-    final isForward = x >= sectionWidth * 2;
-    final step = isForward ? 10 : -10;
-
     _triggerHaptic();
-
-    if (_accumulatedDoubleTapSeconds.sign == step.sign) {
-      _accumulatedDoubleTapSeconds += step;
-    } else {
-      _accumulatedDoubleTapSeconds = step;
-    }
-
-    final timeline = widget.controller.timeline.value;
-    final currentPos = timeline.position;
-    final totalDur = timeline.duration;
-    final targetPos = _clampDuration(
-      currentPos + Duration(seconds: _accumulatedDoubleTapSeconds),
-      Duration.zero,
-      totalDur,
-    );
-
-    widget.onSeekIndicatorUpdate(
-      targetPos,
-      totalDur,
-      _accumulatedDoubleTapSeconds,
-      true,
-    );
-
-    _doubleTapSeekDebounceTimer?.cancel();
-    _doubleTapSeekDebounceTimer = Timer(const Duration(milliseconds: 650), () {
-      if (!mounted) return;
-      widget.controller.seek(targetPos);
-      widget.onSeekIndicatorUpdate(
-        targetPos,
-        totalDur,
-        _accumulatedDoubleTapSeconds,
-        false,
-      );
-      _accumulatedDoubleTapSeconds = 0;
-    });
+    widget.controller.togglePlay();
   }
 
   // -------------------------
@@ -341,8 +287,7 @@ class _PlayerGestureLayerState extends State<PlayerGestureLayer> {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: _handleTap,
-          onDoubleTapDown: (details) =>
-              _handleDoubleTapDown(details, screenWidth),
+          onDoubleTap: _handleDoubleTap,
           onVerticalDragStart: (details) =>
               _handleVerticalDragStart(details, screenWidth),
           onVerticalDragUpdate: (details) =>

@@ -779,7 +779,6 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   /// 未起播海报占位组件 (iOS Ambient & Frosted Play Button)
   Widget _buildInitialPlaceholder() {
     final cover = _resolvedCoverUrl;
-    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Stack(
       fit: StackFit.expand,
@@ -867,50 +866,6 @@ class _VideoPlayPageState extends State<VideoPlayPage>
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-        ),
-
-        // 居中大号 iOS 磨砂播放按钮 (带 Bouncing 弹性回弹)
-        Center(
-          child: BouncingScaleCard(
-            scaleDown: 0.92,
-            onTap: () {
-              if (_currentEpisodes.isNotEmpty) {
-                _selectEpisode(1);
-              } else {
-                _startDefaultSourceSearch(autoPlayFirst: true);
-              }
-            },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(34),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: Container(
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    color: primaryColor.withValues(alpha: 0.88),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.35),
-                      width: 1.0,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withValues(alpha: 0.4),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 42,
-                  ),
-                ),
               ),
             ),
           ),

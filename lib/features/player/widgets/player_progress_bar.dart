@@ -156,18 +156,18 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
             widget.onChangeEnd(target);
           },
           child: SizedBox(
-            height: 38,
+            height: 22,
             child: Stack(
               clipBehavior: Clip.none,
-              alignment: Alignment.centerLeft,
+              alignment: Alignment.bottomLeft,
               children: [
                 // 1. 弹幕高能波形图 (Danmaku Heatmap Wave)
                 if (_cachedHeatmap != null)
                   Positioned(
                     left: 0,
                     right: 0,
-                    top: 2,
-                    height: 18,
+                    top: 0,
+                    height: 14,
                     child: CustomPaint(
                       painter: _DanmakuHeatmapPainter(
                         heatmap: _cachedHeatmap!,
@@ -180,11 +180,12 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
                 Positioned(
                   left: 0,
                   right: 0,
+                  bottom: 2,
                   child: Container(
-                    height: _isDragging ? 6.0 : 4.0,
+                    height: _isDragging ? 5.5 : 3.5,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(3),
+                      borderRadius: BorderRadius.circular(2.5),
                     ),
                   ),
                 ),
@@ -193,12 +194,13 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
                 if (bufferRatio > 0)
                   Positioned(
                     left: 0,
+                    bottom: 2,
                     width: totalWidth * bufferRatio,
                     child: Container(
-                      height: _isDragging ? 6.0 : 4.0,
+                      height: _isDragging ? 5.5 : 3.5,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.38),
-                        borderRadius: BorderRadius.circular(3),
+                        borderRadius: BorderRadius.circular(2.5),
                       ),
                     ),
                   ),
@@ -210,12 +212,13 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
                 // 5. 当前播放进度轨
                 Positioned(
                   left: 0,
+                  bottom: 2,
                   width: totalWidth * currentRatio,
                   child: Container(
-                    height: _isDragging ? 6.0 : 4.0,
+                    height: _isDragging ? 5.5 : 3.5,
                     decoration: BoxDecoration(
                       color: primary,
-                      borderRadius: BorderRadius.circular(3),
+                      borderRadius: BorderRadius.circular(2.5),
                       boxShadow: [
                         BoxShadow(
                           color: primary.withValues(alpha: 0.45),
@@ -229,14 +232,15 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
 
                 // 6. 可拖动滑块 Thumb
                 Positioned(
-                  left: (totalWidth * currentRatio - (_isDragging ? 8.5 : 6.0)).clamp(
+                  bottom: _isDragging ? -3.0 : -2.0,
+                  left: (totalWidth * currentRatio - (_isDragging ? 7.5 : 5.0)).clamp(
                     0.0,
-                    math.max(0.0, totalWidth - (_isDragging ? 17.0 : 12.0)),
+                    math.max(0.0, totalWidth - (_isDragging ? 15.0 : 10.0)),
                   ),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 120),
-                    width: _isDragging ? 17.0 : 12.0,
-                    height: _isDragging ? 17.0 : 12.0,
+                    width: _isDragging ? 15.0 : 10.0,
+                    height: _isDragging ? 15.0 : 10.0,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
@@ -273,12 +277,13 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
       widgets.add(
         Positioned(
           left: left,
+          bottom: 2,
           width: width,
           child: Container(
-            height: _isDragging ? 6.0 : 4.0,
+            height: _isDragging ? 5.5 : 3.5,
             decoration: BoxDecoration(
-              color: const Color(0xFF65D1C5).withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(2),
+              color: const Color(0xFF65D1C5).withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(2.5),
             ),
           ),
         ),
@@ -295,12 +300,13 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
       widgets.add(
         Positioned(
           left: left,
+          bottom: 2,
           width: width,
           child: Container(
-            height: _isDragging ? 6.0 : 4.0,
+            height: _isDragging ? 5.5 : 3.5,
             decoration: BoxDecoration(
-              color: const Color(0xFFF2BA72).withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(2),
+              color: const Color(0xFFF2BA72).withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(2.5),
             ),
           ),
         ),

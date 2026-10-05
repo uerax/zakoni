@@ -167,12 +167,13 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
-              const Text(
+              Text(
                 '选集',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.3,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(width: 8),

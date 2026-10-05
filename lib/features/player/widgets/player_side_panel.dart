@@ -145,27 +145,45 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
                       ),
                     ],
                   ),
-                  child: SafeArea(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 顶部导航与 Tab 切换头
-                        _buildHeader(primaryColor),
+                  child: Theme(
+                    data: ThemeData.dark().copyWith(
+                      scaffoldBackgroundColor: Colors.transparent,
+                      colorScheme: ColorScheme.dark(
+                        primary: primaryColor,
+                        surface: const Color(0xFF1E1E24),
+                        onSurface: Colors.white,
+                        onSurfaceVariant: Colors.white.withValues(alpha: 0.7),
+                      ),
+                      textTheme: const TextTheme(
+                        bodyLarge: TextStyle(color: Colors.white),
+                        bodyMedium: TextStyle(color: Colors.white),
+                        bodySmall: TextStyle(color: Colors.white70),
+                        titleMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                        titleSmall: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 顶部导航与 Tab 切换头
+                          _buildHeader(primaryColor),
 
-                        const Divider(
-                          color: Color(0x22FFFFFF),
-                          height: 1,
-                          thickness: 0.5,
-                        ),
-
-                        // 内容主体
-                        Expanded(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: _buildTabBody(primaryColor),
+                          const Divider(
+                            color: Color(0x22FFFFFF),
+                            height: 1,
+                            thickness: 0.5,
                           ),
-                        ),
-                      ],
+
+                          // 内容主体
+                          Expanded(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: _buildTabBody(primaryColor),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

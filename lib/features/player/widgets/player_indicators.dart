@@ -324,17 +324,17 @@ class PlayerLockFloatingButton extends StatelessWidget {
       child: IgnorePointer(
         ignoring: !visible,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(17),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Material(
               color: Colors.transparent,
               child: InkWell(
                 onTap: onTap,
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(17),
                 child: Container(
-                  width: 44,
-                  height: 44,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: isLocked
                         ? primaryColor.withValues(alpha: 0.35)
@@ -362,7 +362,7 @@ class PlayerLockFloatingButton extends StatelessWidget {
                             : Icons.lock_open_rounded,
                         key: ValueKey(isLocked),
                         color: isLocked ? primaryColor : Colors.white,
-                        size: 20,
+                        size: 16,
                       ),
                     ),
                   ),

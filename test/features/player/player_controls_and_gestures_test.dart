@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zakoni/features/player/controller/playback_controller.dart';
+import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
 import 'package:zakoni/features/player/widgets/player_controls.dart';
 import 'package:zakoni/features/player/widgets/player_indicators.dart';
@@ -52,20 +53,20 @@ void main() {
       // 验证标题呈现
       expect(find.text('测试动画第01话'), findsOneWidget);
 
-      // 验证快退 10 秒与快进 10 秒图标
-      expect(find.byIcon(Icons.replay_10_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.forward_10_rounded), findsOneWidget);
+      // 验证设置按钮与弹幕面板设置按钮
+      expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
 
-      // 验证存在播放按钮
-      expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+      // 验证存在播放按钮与中央暂停标识
+      expect(find.byIcon(Icons.play_arrow_rounded), findsNWidgets(2));
 
       // 验证倍速按钮存在
-      expect(find.text('1.0x'), findsOneWidget);
+      expect(find.text('1x'), findsOneWidget);
 
       // 验证选集按钮存在
       expect(find.text('选集'), findsOneWidget);
 
-      // 验证存在屏幕锁定浮动按钮
+      // 验证全屏下存在屏幕锁定浮动按钮
       expect(find.byType(PlayerLockFloatingButton), findsOneWidget);
       expect(find.byIcon(Icons.lock_open_rounded), findsOneWidget);
 
@@ -81,7 +82,27 @@ void main() {
       expect(fullscreenToggled, isTrue);
     });
 
-    testWidgets('2. 屏幕锁定交互测试（锁定后隐藏控制栏并屏蔽手势，解锁恢复）', (tester) async {
+    testWidgets('2. 屏幕锁定交互测试（全屏显示锁定按钮，非全屏不显示；锁定后隐藏控制栏并屏蔽手势，解锁恢复）', (tester) async {
+      // 1. 非全屏状态下验证锁按钮不显示
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 450,
+              child: PlayerControls(
+                controller: controller,
+                title: '非全屏锁测试',
+                isFullscreen: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(PlayerLockFloatingButton), findsNothing);
+
+      // 2. 全屏状态下验证锁按钮显示并可正常加锁/解锁
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -91,6 +112,7 @@ void main() {
               child: PlayerControls(
                 controller: controller,
                 title: '锁屏测试',
+                isFullscreen: true,
               ),
             ),
           ),
@@ -205,6 +227,77 @@ void main() {
       expect(find.text('05:20'), findsOneWidget);
       // 验证倍速提示
       expect(find.text('2.0x 极速播放中'), findsOneWidget);
+    });
+
+    testWidgets('5. 播放设置面板呼出与选项联动测试（画幅比例、超分辨率、片头片尾跳过）', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 450,
+              child: PlayerControls(
+                controller: controller,
+                title: '设置面板测试',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 点击控制栏设置图标 (Icons.settings_outlined)
+      expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.settings_outlined));
+      await tester.pumpAndSettle();
+
+      // 验证设置面板展示
+      expect(find.text('播放设置'), findsOneWidget);
+      expect(find.text('片头片尾智能跳过'), findsOneWidget);
+      expect(find.text('动漫超分辨率 (Anime4K)'), findsOneWidget);
+      expect(find.text('画面填充比例'), findsOneWidget);
+
+      // 点击切换超分辨率至效率档
+      await tester.tap(find.text('效率档'));
+      await tester.pumpAndSettle();
+      expect(controller.core.value.superResolution, equals(SuperResolutionMode.efficiency));
+
+      // 点击切换画幅比例至全屏拉伸
+      await tester.tap(find.text('全屏拉伸'));
+      await tester.pumpAndSettle();
+      expect(controller.core.value.videoFit, equals(BoxFit.fill));
+    });
+
+    testWidgets('6. 弹幕面板呼出与配置测试（非全屏直接打开弹幕面板）', (tester) async {
+      final danmaku = DanmakuController();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 450,
+              child: PlayerControls(
+                controller: controller,
+                danmakuController: danmaku,
+                isFullscreen: false,
+                title: '弹幕面板测试',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 点击弹幕设置图标 (Icons.tune_rounded)
+      expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.tune_rounded));
+      await tester.pumpAndSettle();
+
+      // 验证弹幕面板内容展现
+      expect(find.text('弹幕设置'), findsOneWidget);
+      expect(find.text('智能精简'), findsOneWidget);
+      expect(find.text('屏蔽彩色弹幕'), findsOneWidget);
+      expect(find.text('显示范围'), findsOneWidget);
     });
   });
 }
