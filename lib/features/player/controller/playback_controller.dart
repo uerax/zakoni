@@ -12,13 +12,13 @@ const String _kDefaultUserAgent =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
 /// 自适应网络分级缓存策略：
-/// 1. Wi-Fi / 有线宽带环境：开启 150MB 解复用缓冲与 50MB 回退缓存。
-///    一集 1080p 动画(约 250~450MB)在起播数分钟内即可预载 35%~60% 以上，前后拖拽免重新建连，秒切即播。
+/// 1. Wi-Fi / 有线宽带环境：开启 32MB 解复用缓冲与 16MB 回退缓存。
+///    符合 media_kit 官方标准推荐水线，既保证平滑预读，又防止过度抢占网络通道造成 Seek Range 请求拥塞。
 /// 2. 移动蜂窝网络环境：降级为 16MB 解复用缓冲与 4MB 回退缓存。
-///    提供 1~2 分钟平滑防抖窗口的同时，防止点开即退时偷跑数十乃至上百兆宝贵的流量。
-const int _kWifiBufferSize = 150 * 1024 * 1024; // 150MB
-const int _kWifiMaxBytes = 150 * 1024 * 1024; // 150MB
-const int _kWifiMaxBackBytes = 50 * 1024 * 1024; // 50MB
+///    提供 1~2 分钟平滑防抖窗口的同时，防止点开即退时偷跑宝贵流量。
+const int _kWifiBufferSize = 32 * 1024 * 1024; // 32MB
+const int _kWifiMaxBytes = 32 * 1024 * 1024; // 32MB
+const int _kWifiMaxBackBytes = 16 * 1024 * 1024; // 16MB
 
 const int _kMobileBufferSize = 16 * 1024 * 1024; // 16MB
 const int _kMobileMaxBytes = 16 * 1024 * 1024; // 16MB
@@ -137,32 +137,34 @@ class ZakoniPlaybackController {
 
         // 5. 特殊处理说明：
         // 必须配置 force-seekable=yes，确保网络 MP4 始终被 libmpv 标记为可寻道流；
-        // 禁止设为 no，否则在网络流发生重定向或首包延迟时会被误判为不可寻道流，导致点击进度条被强行拉回 0 秒。
+        // 点播网络视频（尤其是 1080P 高码率 MP4）必须将 hr-seek 设置为 no。
+        // 设为 default/yes 会强制从前序关键帧逐帧解码至目标时间，在网络环境下产生严重的解码延迟与转圈冻结；
+        // 设为 no 时，底层直接跳至最近关键帧秒级呈现画面，实现丝滑瞬间拖拽。
         await platform.setProperty('force-seekable', 'yes');
-        await platform.setProperty('hr-seek', 'default');
+        await platform.setProperty('hr-seek', 'no');
 
-        // 6. 自适应分级解复用缓冲与起播阈值防抖：
-        // 预读 30 秒、配置 cache-pause-wait=1 秒起播，杜绝起播或 Seek 漫长转圈。
+        // 6. 特殊处理说明：
+        // 严禁设置 cache-pause-initial=yes！mpv 官方手册明确注明该选项在每次 Seek 拖动进度条后都会
+        // 强制重新 pause 并进入 buffering 状态，死等缓冲水线人为制造 1~2 秒转圈。
+        // 将其设为 no，并将 cache-pause-wait 降至 0.2 秒轻量防抖，起播与拖拽瞬间出帧。
+        await platform.setProperty('cache', 'yes');
+        await platform.setProperty('cache-pause', 'yes');
+        await platform.setProperty('cache-pause-initial', 'no');
+        await platform.setProperty('cache-pause-wait', '0.2');
+        await platform.setProperty('demuxer-readahead-secs', '15');
+        await platform.setProperty('cache-secs', '30');
+
         final isMetered = NetworkConnectivityService.instance.isMetered;
         final maxBytes = isMetered ? _kMobileMaxBytes : _kWifiMaxBytes;
         final maxBackBytes = isMetered ? _kMobileMaxBackBytes : _kWifiMaxBackBytes;
 
-        await platform.setProperty('demuxer-readahead-secs', '30');
-        await platform.setProperty('cache-secs', '60');
-        await platform.setProperty('cache-pause-wait', '1');
         await platform.setProperty('demuxer-max-bytes', maxBytes.toString());
         await platform.setProperty('demuxer-max-back-bytes', maxBackBytes.toString());
-        await platform.setProperty('network-timeout', '15');
+        await platform.setProperty('network-timeout', '10');
         await platform.setProperty('volume-max', '100');
         await platform.setProperty('user-agent', _kDefaultUserAgent);
 
         // 7. 特殊处理说明：
-        // 必须配置 prefer-ipv4=yes。在移动端与双栈网络下，部分国内云盘/CDN 节点（如沃家云盘
-        // bjdownload.pan.wo.cn:30443）的 IPv6 SSL 握手存在黑洞（直接超时或拒绝连接）。
-        // libmpv 默认优先尝试 IPv6 会导致起播时卡死数秒等待握手超时；强制 IPv4 优先可彻底规避该瓶颈。
-        await platform.setProperty('prefer-ipv4', 'yes');
-
-        // 8. 特殊处理说明：
         // 放行过期或未受信任的自签名证书。第三方聚合源/边缘 CDN 节点经常存在证书过期或
         // 自签名情况，关闭媒体流 TLS 校验可大幅提升外链播放成功率（仅作用于底层 mpv 音视频拉流）。
         await platform.setProperty('tls-verify', 'no');
@@ -235,8 +237,13 @@ class ZakoniPlaybackController {
     _currentUri = uri;
     _pendingStart = start ?? Duration.zero;
 
+    // 特殊处理说明：
+    // 切集或初次打开媒体流时，必须将 firstFrameRendered 立即置为 false 并保持 loading=true。
+    // 这会在 UI 层激活纯黑防闪遮罩，彻底遮蔽底层 GPU Texture 中残留的上一集最后一帧画面。
+    // 直到底层真正解码出首帧（position/duration 就绪）才解除遮罩。
     core.value = core.value.copyWith(
       loading: true,
+      firstFrameRendered: false,
       buffering: false,
       completed: false,
       clearError: true,
@@ -257,11 +264,10 @@ class ZakoniPlaybackController {
         ),
         play: autoplay,
       );
-
-      core.value = core.value.copyWith(loading: false);
     } catch (e) {
       core.value = core.value.copyWith(
         loading: false,
+        firstFrameRendered: true,
         buffering: false,
         errorMessage: '视频播放失败: $e',
       );
@@ -406,12 +412,16 @@ class ZakoniPlaybackController {
       } else {
         danmakuController?.pause();
       }
+      _checkFirstFrameRendered();
     }
   }
 
   void _onBufferingChanged(bool isBuffering) {
     if (core.value.buffering != isBuffering) {
       core.value = core.value.copyWith(buffering: isBuffering);
+      if (!isBuffering) {
+        _checkFirstFrameRendered();
+      }
     }
   }
 
@@ -457,7 +467,11 @@ class ZakoniPlaybackController {
       return;
     }
 
-    core.value = core.value.copyWith(errorMessage: error);
+    core.value = core.value.copyWith(
+      errorMessage: error,
+      loading: false,
+      firstFrameRendered: true,
+    );
   }
 
   void _onPositionChanged(Duration pos) {
@@ -475,12 +489,33 @@ class ZakoniPlaybackController {
     }
 
     _lastPosition = pos;
+    _checkFirstFrameRendered();
     _scheduleTimelineEmit();
   }
 
   void _onDurationChanged(Duration dur) {
     _lastDuration = dur;
+    _checkFirstFrameRendered();
     _scheduleTimelineEmit();
+  }
+
+  /// 检查新视频首帧是否已经真正解码渲染上屏
+  /// 特殊处理说明：
+  /// 严禁要求 `_lastPosition > Duration.zero`！视频起播首帧必然处于 00:00，
+  /// 若等待 position 前进大于 0 秒会白白多出 500~1000ms 的无谓黑屏等待。
+  /// 只要新流时长元数据就绪且缓冲完成（!buffering）或已处于播放中，立即判定首帧就绪，0 延迟解除黑屏。
+  void _checkFirstFrameRendered() {
+    if (!core.value.firstFrameRendered) {
+      final hasDur = _lastDuration > Duration.zero;
+      final isPlaying = core.value.playing;
+      final notBuffering = !core.value.buffering;
+      if (hasDur && (isPlaying || notBuffering)) {
+        core.value = core.value.copyWith(
+          firstFrameRendered: true,
+          loading: false,
+        );
+      }
+    }
   }
 
   void _onBufferChanged(Duration buf) {

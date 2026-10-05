@@ -8,6 +8,7 @@ class PlaybackCoreState {
     this.loading = true,
     this.buffering = false,
     this.completed = false,
+    this.firstFrameRendered = false,
     this.playbackRate = 1.0,
     this.volume = 1.0,
     this.muted = false,
@@ -27,6 +28,9 @@ class PlaybackCoreState {
 
   /// 视频是否已播放完毕
   final bool completed;
+
+  /// 新视频首帧是否已渲染就绪（用于切集时遮蔽前一集最后一帧画面，杜绝残影闪烁）
+  final bool firstFrameRendered;
 
   /// 播放倍速 (0.5 ~ 3.0)
   final double playbackRate;
@@ -53,6 +57,7 @@ class PlaybackCoreState {
     bool? loading,
     bool? buffering,
     bool? completed,
+    bool? firstFrameRendered,
     double? playbackRate,
     double? volume,
     bool? muted,
@@ -66,6 +71,7 @@ class PlaybackCoreState {
       loading: loading ?? this.loading,
       buffering: buffering ?? this.buffering,
       completed: completed ?? this.completed,
+      firstFrameRendered: firstFrameRendered ?? this.firstFrameRendered,
       playbackRate: playbackRate ?? this.playbackRate,
       volume: volume ?? this.volume,
       muted: muted ?? this.muted,

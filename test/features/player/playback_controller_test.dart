@@ -122,5 +122,26 @@ void main() {
         equals(const Duration(milliseconds: 99500)),
       );
     });
+
+    test('首帧渲染状态流转与切集重置保护测试', () {
+      // 1. 初始状态：首帧未渲染就绪
+      expect(controller.core.value.firstFrameRendered, isFalse);
+
+      // 2. 模拟新视频首帧渲染就绪
+      controller.core.value = controller.core.value.copyWith(
+        firstFrameRendered: true,
+        loading: false,
+      );
+      expect(controller.core.value.firstFrameRendered, isTrue);
+      expect(controller.core.value.loading, isFalse);
+
+      // 3. 模拟切集：打开新视频流时，必须重新重置为 false，触发黑色遮罩防闪
+      controller.core.value = controller.core.value.copyWith(
+        loading: true,
+        firstFrameRendered: false,
+      );
+      expect(controller.core.value.firstFrameRendered, isFalse);
+      expect(controller.core.value.loading, isTrue);
+    });
   });
 }

@@ -93,7 +93,6 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   late final List<VideoSourceItem> _sources = getDefaultSourceItems();
 
   bool _isLoadingChapters = false;
-  bool _isResolvingMedia = false;
   String? _resolveError;
   String? _sourceNotice;
 
@@ -470,7 +469,6 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     setState(() {
       _activeEpisode = ep;
       _hasStartedPlayback = true;
-      _isResolvingMedia = true;
       _resolveError = null;
     });
 
@@ -482,13 +480,11 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         widget.videoUrl!,
         httpHeaders: widget.httpHeaders,
       );
-      if (mounted) setState(() => _isResolvingMedia = false);
       return;
     }
 
     if (Platform.environment.containsKey('FLUTTER_TEST')) {
       await _playbackController.open(targetEp.url);
-      if (mounted) setState(() => _isResolvingMedia = false);
       return;
     }
 
@@ -505,7 +501,6 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         result.url,
         httpHeaders: result.headers,
       );
-      if (mounted) setState(() => _isResolvingMedia = false);
 
       // 后台静默预热下一集播放直链（存入直链 LRU 缓存，实现切集秒开）
       if (epIndex + 1 < episodes.length) {
@@ -514,7 +509,6 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _isResolvingMedia = false;
         _resolveError = '播放解析失败: ${e.toString().replaceFirst("Exception: ", "")}';
       });
     }
@@ -636,48 +630,8 @@ class _VideoPlayPageState extends State<VideoPlayPage>
           ),
         ),
 
-        // iOS 风格解析中磨砂浮层
-        if (_isResolvingMedia)
-          Container(
-            color: Colors.black.withValues(alpha: 0.45),
-            alignment: Alignment.center,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const CupertinoActivityIndicator(color: Colors.white, radius: 13),
-                      const SizedBox(height: 12),
-                      Text(
-                        '正在通过「$_selectedSourceName」解析直链...',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
         // iOS 风格解析失败提示磨砂卡片
-        if (_resolveError != null && !_isResolvingMedia)
+        if (_resolveError != null)
           Container(
             color: Colors.black.withValues(alpha: 0.55),
             padding: const EdgeInsets.symmetric(horizontal: 24),

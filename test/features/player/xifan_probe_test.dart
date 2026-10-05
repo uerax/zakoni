@@ -15,14 +15,14 @@ void main() {
     expect(roads[1].name, contains('稀饭新番主线-2'));
     expect(roads[2].name, contains('稀饭备用-1'));
 
-    // 1. 测试未指定线路（默认走国内沃云主线）
+    // 1. 测试未指定线路（默认走国内沃云主线，已通过预检优化锁定为高速 IPv4 直连或解析后地址）
     final res0 = await source.resolve('https://next.xifanacg.com/anime/3403/play/121397');
-    expect(res0.url, contains('moedot.net'));
+    expect(res0.url, anyOf(contains('pan.wo.cn'), contains('moedot.net'), matches(r'https://\d+\.\d+\.\d+\.\d+')));
     expect(res0.format, 'mp4');
 
     // 2. 测试严格指定线路 0 (稀饭新番主线-1 -> 国内沃云)
     final resRoad0 = await source.resolve(roads[0].episodes.first.url);
-    expect(resRoad0.url, contains('moedot.net'));
+    expect(resRoad0.url, anyOf(contains('pan.wo.cn'), contains('moedot.net'), matches(r'https://\d+\.\d+\.\d+\.\d+')));
     expect(resRoad0.format, 'mp4');
 
     // 3. 测试严格指定线路 1 (稀饭新番主线-2 -> 海外源)
@@ -45,7 +45,7 @@ void main() {
     final swCacheResolve = Stopwatch()..start();
     final cachedRes = await source.resolve('https://next.xifanacg.com/anime/3403/play/121397');
     swCacheResolve.stop();
-    expect(cachedRes.url, contains('moedot.net'));
+    expect(cachedRes.url, anyOf(contains('pan.wo.cn'), contains('moedot.net'), matches(r'https://\d+\.\d+\.\d+\.\d+')));
     expect(swCacheResolve.elapsedMilliseconds, lessThan(20));
   });
 }

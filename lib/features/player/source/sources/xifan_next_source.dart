@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../models/source_models.dart';
@@ -725,18 +726,112 @@ class XifanNextSource extends VideoSource {
     final referer = isWoPan ? 'https://pan.wo.cn/' : 'https://next.xifanacg.com/';
     final format = playUrl.contains('.m3u8') ? 'hls' : 'mp4';
 
-    _log('最终返回直链: $playUrl, 格式: $format, Referer: $referer');
+    // 特殊处理说明：
+    // 国内沃家云盘 CDN (如 bjdownload.pan.wo.cn:30443) 存在严重的 IPv6 TLS 握手黑洞，
+    // 在 Windows 及具有双栈 IPv6 的网络下，底层 FFmpeg 会优先尝试 IPv6 并死等超时 2~5 秒或直接连接失败。
+    // 此处在应用层进行轻量预检，解析出纯净 IPv4 直连节点并携带 Host 请求头，彻底解决起播卡死与 Seek 慢问题。
+    final optimized = await _optimizeMediaUrl(playUrl, referer);
+
+    _log('最终返回直链: ${optimized.url}, 格式: $format, Referer: $referer');
 
     final result = SourceResolveResult(
-      url: playUrl,
-      headers: {
-        'User-Agent': _kDefaultUserAgent,
-        'Referer': referer,
-      },
+      url: optimized.url,
+      headers: optimized.headers,
       format: format,
     );
 
     _resolveCache[trimmed] = (time: DateTime.now().millisecondsSinceEpoch, result: result);
     return result;
+  }
+
+  /// 沃家云盘/双栈 CDN 预检与纯净 IPv4 锁定
+  /// 解决 Windows 与双栈网络下 bjdownload.pan.wo.cn:30443 的 IPv6 SSL 握手超时问题
+  Future<({String url, Map<String, String> headers})> _optimizeMediaUrl(
+    String rawUrl,
+    String referer,
+  ) async {
+    final isWoPan = rawUrl.contains('pan.wo.cn') ||
+        rawUrl.contains('moedot.net') ||
+        rawUrl.contains('apn.moedot.net');
+    if (!isWoPan || rawUrl.contains('.m3u8')) {
+      return (
+        url: rawUrl,
+        headers: {
+          'User-Agent': _kDefaultUserAgent,
+          'Referer': referer,
+        },
+      );
+    }
+
+    try {
+      // 1. 通过轻量 HEAD 预检提前跟随 302 探测最终真实直链，耗时仅几十毫秒
+      final headRes = await _dio.get<void>(
+        rawUrl,
+        options: Options(
+          method: 'HEAD',
+          followRedirects: false,
+          validateStatus: (s) => s != null && (s == 301 || s == 302 || s < 400),
+          headers: {
+            'User-Agent': _kDefaultUserAgent,
+            'Referer': referer,
+          },
+          sendTimeout: const Duration(seconds: 2),
+          receiveTimeout: const Duration(seconds: 2),
+        ),
+      );
+
+      var finalUrl = rawUrl;
+      final location = headRes.headers.value('location');
+      if (location != null && location.isNotEmpty) {
+        finalUrl = location.startsWith('http')
+            ? location
+            : Uri.parse(rawUrl).resolve(location).toString();
+        _log('HEAD 预检解析出 302 真实下载直链: $finalUrl');
+      }
+
+      final uri = Uri.parse(finalUrl);
+      final host = uri.host;
+
+      // 2. 针对存在 IPv6 握手黑洞的 pan.wo.cn 节点，主动解析并绑定纯净 IPv4 地址
+      if (host.contains('pan.wo.cn')) {
+        final ipv4s = await InternetAddress.lookup(
+          host,
+          type: InternetAddressType.IPv4,
+        ).timeout(const Duration(milliseconds: 1500), onTimeout: () => []);
+
+        if (ipv4s.isNotEmpty) {
+          final targetIp = ipv4s.first.address;
+          final hostHeader = uri.hasPort ? '$host:${uri.port}' : host;
+          final optimizedUri = uri.replace(host: targetIp);
+          _log('成功将沃云双栈域名 $host 锁定为 IPv4 节点 $targetIp: $optimizedUri');
+
+          return (
+            url: optimizedUri.toString(),
+            headers: {
+              'User-Agent': _kDefaultUserAgent,
+              'Referer': referer,
+              'Host': hostHeader,
+            },
+          );
+        }
+      }
+
+      return (
+        url: finalUrl,
+        headers: {
+          'User-Agent': _kDefaultUserAgent,
+          'Referer': referer,
+        },
+      );
+    } catch (e) {
+      _log('直链 IPv4 预检优化异常，平滑降级使用原地址: $e');
+      return (
+        url: rawUrl,
+        headers: {
+          'User-Agent': _kDefaultUserAgent,
+          'Referer': referer,
+        },
+      );
+    }
   }
 }

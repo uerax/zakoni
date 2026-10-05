@@ -59,6 +59,37 @@ class VideoSurface extends StatelessWidget {
             },
           ),
 
+          // 1.5 首帧感知防闪遮罩：在起播或切集新视频首帧未就绪前，以纯黑底色覆盖底层残留的旧视频帧
+          // 特殊处理说明：
+          // 切集时底层 GPU Texture 仍保留前一集最后一帧，若无遮罩会在新视频加载中暴露旧画面；
+          // 当 firstFrameRendered 为 false 时瞬间以 0 延迟纯黑覆盖并在中央显示加载转圈；
+          // 首帧解码出画后两者同步在 150ms 内平滑淡出，彻底杜绝“转圈停了却莫名黑屏冷场一小会”的视觉割裂。
+          ValueListenableBuilder<PlaybackCoreState>(
+            valueListenable: controller.core,
+            builder: (context, coreState, _) {
+              final showCover = !coreState.firstFrameRendered && !coreState.hasError;
+              return IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: showCover ? 1.0 : 0.0,
+                  duration: showCover ? Duration.zero : const Duration(milliseconds: 150),
+                  child: const ColoredBox(
+                    color: Colors.black,
+                    child: Center(
+                      child: SizedBox(
+                        width: 38,
+                        height: 38,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.8,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+
           // 2. 中层：纯 Flutter 原生高性能 Canvas 弹幕层
           if (danmakuController != null)
             Positioned.fill(
@@ -67,11 +98,11 @@ class VideoSurface extends StatelessWidget {
               ),
             ),
 
-          // 3. 缓冲中指示器
+          // 3. 播放中途常规卡顿缓冲指示器（仅在首帧已就绪、正常播放中途遭遇网络抖动时呈现）
           ValueListenableBuilder<PlaybackCoreState>(
             valueListenable: controller.core,
             builder: (context, coreState, _) {
-              if (coreState.buffering && !coreState.loading) {
+              if (coreState.buffering && coreState.firstFrameRendered && !coreState.loading) {
                 return const Center(
                   child: SizedBox(
                     width: 40,
