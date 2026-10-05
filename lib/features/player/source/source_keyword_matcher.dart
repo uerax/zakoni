@@ -14,6 +14,72 @@ class SourceKeywordMatcher {
     r'\s*[\(\[（【][^\)\]）】]+[\)\]）】]\s*$',
   );
 
+  static final RegExp _modifierPattern = RegExp(
+    r'第\s*[一二三四五六七八九十\d]+\s*[季期部]|season\s*\d+|s\d+|part\s*\d+|剧场版|劇場版|特别篇|特別編|ova|oad|movie|映画',
+    caseSensitive: false,
+  );
+
+  static const Map<String, int> _chineseDigits = {
+    '零': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4,
+    '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+  };
+
+  static const Map<String, int> _romanNumerals = {
+    'Ⅰ': 1, 'Ⅱ': 2, 'Ⅲ': 3, 'Ⅳ': 4, 'Ⅴ': 5, 'Ⅵ': 6, 'Ⅶ': 7, 'Ⅷ': 8, 'Ⅸ': 9, 'Ⅹ': 10,
+    'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 'vi': 6,
+  };
+
+  static final RegExp _seasonNumPattern = RegExp(
+    r'第\s*([一二三四五六七八九十\d]+)\s*[季期部]|season\s*(\d+)|\bs(\d+)\b|part\s*(\d+)|([ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ])|\b(II|III|IV|V|VI)\b',
+    caseSensitive: false,
+  );
+
+  /// 解析中文数字 (1~99)
+  static int? parseChineseNumber(String raw) {
+    if (raw.isEmpty) return null;
+    final direct = int.tryParse(raw);
+    if (direct != null) return direct;
+    final tenIndex = raw.indexOf('十');
+    if (tenIndex == -1) return _chineseDigits[raw];
+    final tens = tenIndex == 0 ? 1 : (_chineseDigits[raw[0]] ?? 1);
+    final onesPart = raw.substring(tenIndex + 1);
+    final ones = onesPart.isNotEmpty ? (_chineseDigits[onesPart] ?? 0) : 0;
+    return tens * 10 + ones;
+  }
+
+  /// 提取标准化的季数序号 (1:1 对齐 animaku extractSeason 规范)
+  static int? extractSeason(String? title) {
+    if (title == null || title.isEmpty) return null;
+    final m = _seasonNumPattern.firstMatch(title);
+    if (m == null) return null;
+    if (m.group(1) != null) return parseChineseNumber(m.group(1)!);
+    final numStr = m.group(2) ?? m.group(3) ?? m.group(4);
+    if (numStr != null) return int.tryParse(numStr);
+    if (m.group(5) != null) return _romanNumerals[m.group(5)!];
+    if (m.group(6) != null) return _romanNumerals[m.group(6)!.toLowerCase()];
+    return null;
+  }
+
+  /// 依据视频源语言偏好解析最优单关键词 (1:1 严格对齐 animaku resolvePluginDefaultKeyword 规范)
+  static String resolveDefaultKeyword({
+    required String defaultTitle,
+    BangumiItem? item,
+    String? sourceId,
+  }) {
+    final name = (item?.name ?? '').trim();
+    final nameCn = (item?.nameCn ?? '').trim();
+    final fb = defaultTitle.trim();
+
+    // 针对偏好日语原名的源 (如 xifan-next, anime1, moonci)
+    final preferOriginal = sourceId == 'xifan-next' || sourceId == 'anime1' || sourceId == 'moonci';
+    if (preferOriginal && name.isNotEmpty) {
+      return name;
+    }
+
+    final chineseTitle = nameCn.isNotEmpty ? nameCn : (name.isNotEmpty ? name : fb);
+    return chineseTitle;
+  }
+
   /// 递归剥离章篇与季数后缀 (对齐 animaku extractBaseTitle)
   static String extractBaseTitle(String fullTitle) {
     if (fullTitle.isEmpty) return '';
@@ -112,16 +178,32 @@ class SourceKeywordMatcher {
     return variants;
   }
 
-  /// 计算两个标题的相似度 (1:1 严格对齐 animaku titleSimilarity 算法)
+  /// 计算两个标题的相似度 (1:1 严格对齐 animaku titleSimilarity 算法，含季数强校验 Season Guard)
   static double calculateSimilarity(String a, String b) {
     final s1 = a.replaceAll(RegExp(r'\s+'), '').toLowerCase();
     final s2 = b.replaceAll(RegExp(r'\s+'), '').toLowerCase();
     if (s1 == s2) return 1.0;
     if (s1.isEmpty || s2.isEmpty) return 0.0;
 
-    // 包含匹配：包含关系直接给予 0.85 ~ 0.95 高基准分（彻底解决因正片带副标题/季数被误杀的问题）
+    // 1. 季数强冲突守卫 (Hard Season Conflict): 若两边均明确声明了季数且不一致 (如 S3 vs S2)，直接降权至 0.15 杜绝误匹配
+    final seasonA = extractSeason(a);
+    final seasonB = extractSeason(b);
+    if (seasonA != null && seasonB != null && seasonA != seasonB) {
+      return 0.15;
+    }
+
+    final aHasMod = _modifierPattern.hasMatch(a);
+    final bHasMod = _modifierPattern.hasMatch(b);
+    final modMismatch = aHasMod != bHasMod;
+
+    // 2. 包含匹配
     if (s1.contains(s2) || s2.contains(s1)) {
       final ratio = math.min(s1.length, s2.length) / math.max(s1.length, s2.length);
+      if (modMismatch) {
+        // 一方有季数/修饰词而另一方无 (如 S3 vs S1 裸主名)，压制分数低于自动选源门槛 (0.55)
+        final penalized = (0.65 + ratio * 0.25) * 0.6;
+        return math.min(penalized, 0.45);
+      }
       return 0.85 + 0.1 * ratio;
     }
 
@@ -149,7 +231,8 @@ class SourceKeywordMatcher {
     }
     final biScore = b1.isNotEmpty ? bi / b1.length : 0.0;
 
-    return math.max(jaccard * 0.6 + biScore * 0.4, jaccard);
+    final combined = math.max(jaccard * 0.6 + biScore * 0.4, jaccard);
+    return modMismatch ? combined * 0.7 : combined;
   }
 
   /// 在候选命中列表中计算与番剧标题库的最佳相似度

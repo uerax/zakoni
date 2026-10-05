@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../common/widgets/cached_anime_image.dart';
+import '../../common/widgets/bouncing_scale_card.dart';
 
-/// 参考 animaku WatchMeta 打造的番剧详情 Tab 组件
+/// iOS 现代风格番剧详情 Tab 组件 (Apple Card & Typography Style)
 class WatchMetaView extends StatefulWidget {
   const WatchMetaView({
     super.key,
@@ -31,6 +33,7 @@ class _WatchMetaViewState extends State<WatchMetaView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.colorScheme.primary;
     final item = widget.bangumiItem;
 
     final displayName = item?.preferredName ?? widget.title;
@@ -47,26 +50,38 @@ class _WatchMetaViewState extends State<WatchMetaView> {
         : '暂无番剧详细剧情简介。';
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        // 1. 顶部基础信息（封面 + 标题 + 评分 + 放送信息）
+        // 1. 顶部基础信息（iOS Inset Card: 封面 + 标题 + 评分与排名）
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 90,
-                height: 125,
-                child: cover.isNotEmpty
-                    ? CachedAnimeImage(
-                        imageUrl: cover,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        color: isDark ? Colors.white10 : Colors.black12,
-                        child: const Icon(Icons.movie_outlined, size: 36),
-                      ),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 96,
+                  height: 134,
+                  child: cover.isNotEmpty
+                      ? CachedAnimeImage(
+                          imageUrl: cover,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          color: isDark ? Colors.white10 : Colors.black12,
+                          child: const Icon(Icons.movie_outlined, size: 36),
+                        ),
+                ),
               ),
             ),
             const SizedBox(width: 14),
@@ -78,7 +93,8 @@ class _WatchMetaViewState extends State<WatchMetaView> {
                     displayName,
                     style: const TextStyle(
                       fontSize: 17,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.4,
                       height: 1.25,
                     ),
                     maxLines: 2,
@@ -91,23 +107,28 @@ class _WatchMetaViewState extends State<WatchMetaView> {
                       style: TextStyle(
                         fontSize: 12,
                         color: theme.textTheme.bodySmall?.color,
+                        letterSpacing: -0.1,
                         height: 1.2,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                  const SizedBox(height: 8),
-                  // 评分与排名标签
+                  const SizedBox(height: 10),
+                  // 评分与排名胶囊
                   Row(
                     children: [
                       if (item != null && item.ratingScore > 0) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                              horizontal: 7, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(4),
+                            color: Colors.amber.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.amber.withValues(alpha: 0.3),
+                              width: 0.5,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -120,7 +141,7 @@ class _WatchMetaViewState extends State<WatchMetaView> {
                                 style: const TextStyle(
                                   color: Colors.amber,
                                   fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
@@ -131,17 +152,21 @@ class _WatchMetaViewState extends State<WatchMetaView> {
                       if (item != null && item.rank > 0) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                              horizontal: 7, vertical: 3),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(4),
+                            color: primaryColor.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: primaryColor.withValues(alpha: 0.3),
+                              width: 0.5,
+                            ),
                           ),
                           child: Text(
                             '#${item.rank}',
                             style: TextStyle(
-                              color: theme.colorScheme.primary,
+                              color: primaryColor,
                               fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -152,17 +177,19 @@ class _WatchMetaViewState extends State<WatchMetaView> {
                         style: TextStyle(
                           fontSize: 12,
                           color: theme.textTheme.bodySmall?.color,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                   if (item != null && item.airDate.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Text(
                       '放送日期: ${item.airDate}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: theme.textTheme.bodySmall?.color,
+                        color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -172,44 +199,57 @@ class _WatchMetaViewState extends State<WatchMetaView> {
           ],
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
 
-        // 2. 收藏状态切换栏（想看 / 在看 / 看过 / 搁置 / 抛弃）
+        // 2. iOS 风格追番状态分段控制器 (Segmented Collection Status)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1E22) : const Color(0xFFF4F5F7),
-            borderRadius: BorderRadius.circular(10),
+            color: isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? Colors.white.withAlpha(18) : Colors.black.withAlpha(12),
+              width: 0.5,
+            ),
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: _collectOptions.map((opt) {
               final isSelected = _collectStatus == opt;
-              return InkWell(
-                borderRadius: BorderRadius.circular(6),
-                onTap: () {
-                  setState(() => _collectStatus = opt);
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('已标记为: $opt'),
-                      duration: const Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  child: Text(
-                    opt,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
+              return Expanded(
+                child: BouncingScaleCard(
+                  scaleDown: 0.94,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _collectStatus = opt);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
                       color: isSelected
-                          ? theme.colorScheme.primary
-                          : theme.textTheme.bodyMedium?.color,
+                          ? (isDark ? Colors.white.withAlpha(36) : Colors.white)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      opt,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected
+                            ? (isDark ? Colors.white : primaryColor)
+                            : theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                      ),
                     ),
                   ),
                 ),
@@ -218,7 +258,7 @@ class _WatchMetaViewState extends State<WatchMetaView> {
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
 
         // 3. 标签列表（Tags）
         if (item != null && item.tags.isNotEmpty) ...[
@@ -227,65 +267,107 @@ class _WatchMetaViewState extends State<WatchMetaView> {
             runSpacing: 6,
             children: item.tags.take(12).map((t) {
               return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(6),
+                  color: isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(6),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10),
+                    width: 0.5,
+                  ),
                 ),
                 child: Text(
                   t.name,
                   style: TextStyle(
-                    fontSize: 11,
-                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.85),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
                   ),
                 ),
               );
             }).toList(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
         ],
 
-        // 4. 剧情简介（支持展开/收起）
-        const Text(
-          '剧情简介',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
+        // 4. 剧情简介（iOS 风格卡片 + 展开/收起）
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(6),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10),
+              width: 0.5,
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
-        InkWell(
-          onTap: () => setState(() => _isSummaryExpanded = !_isSummaryExpanded),
-          borderRadius: BorderRadius.circular(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                summary,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.6,
-                  color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.9),
-                ),
-                maxLines: _isSummaryExpanded ? null : 3,
-                overflow: _isSummaryExpanded
-                    ? TextOverflow.visible
-                    : TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    _isSummaryExpanded ? '收起 ⌃' : '展开详情 ⌄',
+                  const Text(
+                    '剧情简介',
                     style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => setState(() => _isSummaryExpanded = !_isSummaryExpanded),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _isSummaryExpanded ? '收起' : '展开',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: primaryColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Icon(
+                            _isSummaryExpanded
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: primaryColor,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              AnimatedCrossFade(
+                firstChild: Text(
+                  summary,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.55,
+                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.88),
+                  ),
+                ),
+                secondChild: Text(
+                  summary,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.55,
+                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.88),
+                  ),
+                ),
+                crossFadeState: _isSummaryExpanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 200),
               ),
             ],
           ),

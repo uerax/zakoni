@@ -29,7 +29,10 @@ class _SourceSettingsCardState extends State<SourceSettingsCard> {
   }
 
   void _onManagerChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _handleCheckUpdate() async {

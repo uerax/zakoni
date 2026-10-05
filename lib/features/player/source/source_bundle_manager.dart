@@ -39,9 +39,12 @@ class SourceBundleManager extends ChangeNotifier {
   SourceBundleMeta? get meta => _runtime.bundleMeta;
   List<SourceMeta> get sources => _runtime.availableSources;
 
-  /// 原生初始化 (瞬时就绪)
+  bool _initialized = false;
+
+  /// 原生初始化 (瞬时就绪，无需重复无意义广播)
   Future<void> initialize() async {
-    notifyListeners();
+    if (_initialized) return;
+    _initialized = true;
   }
 
   /// 检查原生解析器版本

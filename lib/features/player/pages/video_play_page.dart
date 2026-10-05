@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'dart:ui';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/models/bangumi/bangumi_episode.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/network/bangumi_client.dart';
+import '../../common/widgets/bouncing_scale_card.dart';
 import '../../common/widgets/cached_anime_image.dart';
 import '../controller/playback_controller.dart';
 import '../danmaku/danmaku.dart';
@@ -171,16 +174,20 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     // 异步拉取 Bangumi 权威详情与分集
     _fetchBangumiAuthorityData();
 
-    // 若有显式传入的固定 URL 则直接起播
-    if (_activeEpisode != null &&
-        widget.videoUrl != null &&
-        widget.videoUrl!.isNotEmpty) {
-      _hasStartedPlayback = true;
-      _initPlayback();
-    } else {
-      // 否则启动默认视频源检索流程
-      _startDefaultSourceSearch(autoPlayFirst: _activeEpisode != null);
-    }
+    // 待首帧构建完成后安全启动起播或检索
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // 若有显式传入的固定 URL 则直接起播
+      if (_activeEpisode != null &&
+          widget.videoUrl != null &&
+          widget.videoUrl!.isNotEmpty) {
+        _hasStartedPlayback = true;
+        _initPlayback();
+      } else {
+        // 否则启动默认视频源检索流程
+        _startDefaultSourceSearch(autoPlayFirst: _activeEpisode != null);
+      }
+    });
   }
 
   Future<void> _initPlayback() async {
@@ -241,25 +248,46 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       await SourceBundleManager.instance.initialize();
       final runtime = SourceBundleManager.instance.runtime;
 
-      // 提取有序候选词池
-      final keywords = SourceKeywordMatcher.buildCandidates(
+      final titleRefs = <String>[
+        if (_effectiveBangumiItem?.nameCn.isNotEmpty ?? false) _effectiveBangumiItem!.nameCn,
+        if (_effectiveBangumiItem?.name.isNotEmpty ?? false) _effectiveBangumiItem!.name,
+        widget.title,
+        ...(_effectiveBangumiItem?.alias ?? const <String>[]),
+      ];
+
+      // 1. 首选单关键词极速精准直搜 (对齐 animaku resolvePluginDefaultKeyword 机制，杜绝多轮串行网络阻塞)
+      final primaryKw = SourceKeywordMatcher.resolveDefaultKeyword(
         defaultTitle: widget.title,
         item: _effectiveBangumiItem,
         sourceId: _selectedSourceId,
       );
 
       SourceSearchResult? bestHit;
-      for (final kw in keywords) {
-        final hits = await runtime.search(_selectedSourceId, kw);
-        if (hits.isNotEmpty) {
+      if (primaryKw.isNotEmpty) {
+        final hits = await runtime.search(_selectedSourceId, primaryKw);
+        for (final h in hits) {
+          final sim = SourceKeywordMatcher.bestSimilarity(h.name, titleRefs);
+          if (sim >= 0.55) {
+            bestHit = h;
+            break;
+          }
+        }
+      }
+
+      // 2. 若首选关键词未命中，使用中文备用名尝试 1 次快速回退检索
+      if (bestHit == null) {
+        final fallbackKw = (_effectiveBangumiItem?.nameCn.isNotEmpty ?? false)
+            ? _effectiveBangumiItem!.nameCn
+            : widget.title;
+        if (fallbackKw.isNotEmpty && fallbackKw != primaryKw) {
+          final hits = await runtime.search(_selectedSourceId, fallbackKw);
           for (final h in hits) {
-            final sim = SourceKeywordMatcher.bestSimilarity(h.name, keywords);
+            final sim = SourceKeywordMatcher.bestSimilarity(h.name, titleRefs);
             if (sim >= 0.55) {
               bestHit = h;
               break;
             }
           }
-          if (bestHit != null) break;
         }
       }
 
@@ -349,23 +377,43 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       String? targetUrl = probeHit?.url;
 
       if (targetUrl == null) {
-        final keywords = SourceKeywordMatcher.buildCandidates(
+        final titleRefs = <String>[
+          if (_effectiveBangumiItem?.nameCn.isNotEmpty ?? false) _effectiveBangumiItem!.nameCn,
+          if (_effectiveBangumiItem?.name.isNotEmpty ?? false) _effectiveBangumiItem!.name,
+          widget.title,
+          ...(_effectiveBangumiItem?.alias ?? const <String>[]),
+        ];
+
+        final primaryKw = SourceKeywordMatcher.resolveDefaultKeyword(
           defaultTitle: widget.title,
           item: _effectiveBangumiItem,
           sourceId: src.id,
         );
 
-        for (final kw in keywords) {
-          final hits = await runtime.search(src.id, kw);
-          if (hits.isNotEmpty) {
-            for (final h in hits) {
-              final sim = SourceKeywordMatcher.bestSimilarity(h.name, keywords);
+        if (primaryKw.isNotEmpty) {
+          final hits = await runtime.search(src.id, primaryKw);
+          for (final h in hits) {
+            final sim = SourceKeywordMatcher.bestSimilarity(h.name, titleRefs);
+            if (sim >= 0.55) {
+              targetUrl = h.url;
+              break;
+            }
+          }
+        }
+
+        if (targetUrl == null) {
+          final fallbackKw = (_effectiveBangumiItem?.nameCn.isNotEmpty ?? false)
+              ? _effectiveBangumiItem!.nameCn
+              : widget.title;
+          if (fallbackKw.isNotEmpty && fallbackKw != primaryKw) {
+            final fallbackHits = await runtime.search(src.id, fallbackKw);
+            for (final h in fallbackHits) {
+              final sim = SourceKeywordMatcher.bestSimilarity(h.name, titleRefs);
               if (sim >= 0.55) {
                 targetUrl = h.url;
                 break;
               }
             }
-            if (targetUrl != null) break;
           }
         }
       }
@@ -560,6 +608,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     }
 
     final epTitle = _activeEpisode != null ? ' - 第 $_activeEpisode 话' : '';
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Stack(
       children: [
@@ -579,77 +628,164 @@ class _VideoPlayPageState extends State<VideoPlayPage>
           ),
         ),
 
-        // 解析中遮罩层
+        // iOS 风格解析中磨砂浮层
         if (_isResolvingMedia)
           Container(
-            color: Colors.black.withValues(alpha: 0.7),
+            color: Colors.black.withValues(alpha: 0.45),
             alignment: Alignment.center,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(color: Colors.white),
-                const SizedBox(height: 12),
-                Text(
-                  '正在通过「$_selectedSourceName」解析直链...',
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CupertinoActivityIndicator(color: Colors.white, radius: 13),
+                      const SizedBox(height: 12),
+                      Text(
+                        '正在通过「$_selectedSourceName」解析直链...',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
           ),
 
-        // 解析失败提示层
+        // iOS 风格解析失败提示磨砂卡片
         if (_resolveError != null && !_isResolvingMedia)
           Container(
-            color: Colors.black.withValues(alpha: 0.85),
+            color: Colors.black.withValues(alpha: 0.55),
             padding: const EdgeInsets.symmetric(horizontal: 24),
             alignment: Alignment.center,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline_rounded, color: Colors.amber, size: 40),
-                const SizedBox(height: 8),
-                Text(
-                  _resolveError!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white54),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 36),
+                      const SizedBox(height: 10),
+                      Text(
+                        _resolveError!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: -0.2,
+                        ),
                       ),
-                      icon: const Icon(Icons.refresh_rounded, size: 16),
-                      label: const Text('重试'),
-                      onPressed: () {
-                        if (_activeEpisode != null) {
-                          _selectEpisode(_activeEpisode!);
-                        } else {
-                          _startDefaultSourceSearch(autoPlayFirst: true);
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton.icon(
-                      icon: const Icon(Icons.swap_horiz_rounded, size: 16),
-                      label: const Text('切换视频源'),
-                      onPressed: () => _tabController.animateTo(1),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          BouncingScaleCard(
+                            scaleDown: 0.94,
+                            onTap: () {
+                              if (_activeEpisode != null) {
+                                _selectEpisode(_activeEpisode!);
+                              } else {
+                                _startDefaultSourceSearch(autoPlayFirst: true);
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.25),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.refresh_rounded, color: Colors.white, size: 15),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '重试',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          BouncingScaleCard(
+                            scaleDown: 0.94,
+                            onTap: () => _tabController.animateTo(1),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: primaryColor,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 16),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '切换视频源',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
           ),
       ],
     );
   }
 
-  /// 未起播海报占位组件
+  /// 未起播海报占位组件 (iOS Ambient & Frosted Play Button)
   Widget _buildInitialPlaceholder() {
     final cover = _resolvedCoverUrl;
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Stack(
       fit: StackFit.expand,
@@ -662,50 +798,90 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         else
           Container(color: Colors.black87),
 
+        // 柔和暗角与氛围蒙层
         Container(
-          color: Colors.black.withValues(alpha: 0.55),
-        ),
-
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.black87, Colors.transparent],
-              ),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white, size: 20),
-                  onPressed: _handleBackPressed,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    widget.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.6),
+                Colors.black.withValues(alpha: 0.45),
+                Colors.black.withValues(alpha: 0.72),
               ],
             ),
           ),
         ),
 
+        // 顶部返回与标题
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.16),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          onPressed: _handleBackPressed,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.2,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black54,
+                            blurRadius: 6,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // 居中大号 iOS 磨砂播放按钮 (带 Bouncing 弹性回弹)
         Center(
-          child: InkWell(
+          child: BouncingScaleCard(
+            scaleDown: 0.92,
             onTap: () {
               if (_currentEpisodes.isNotEmpty) {
                 _selectEpisode(1);
@@ -713,56 +889,98 @@ class _VideoPlayPageState extends State<VideoPlayPage>
                 _startDefaultSourceSearch(autoPlayFirst: true);
               }
             },
-            borderRadius: BorderRadius.circular(36),
-            child: Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.85),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(34),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.88),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withValues(alpha: 0.4),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: const Icon(
-                Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: 42,
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 42,
+                  ),
+                ),
               ),
             ),
           ),
         ),
 
+        // 底部 iOS 磨砂提示胶囊条
         Positioned(
           bottom: 12,
           left: 16,
           right: 16,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.touch_app_outlined, color: Colors.white70, size: 15),
-                const SizedBox(width: 6),
-                Text(
-                  _isLoadingChapters
-                      ? '正在同步「$_selectedSourceName」选集...'
-                      : (_currentEpisodes.isNotEmpty ? '分集已就绪 · 请在下方选择集数开始播放' : '请在下方选择播放源或选集'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+          child: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isLoadingChapters)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 6),
+                          child: CupertinoActivityIndicator(
+                            color: Colors.white70,
+                            radius: 6,
+                          ),
+                        )
+                      else
+                        const Icon(
+                          Icons.touch_app_outlined,
+                          color: Colors.white70,
+                          size: 14,
+                        ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          _isLoadingChapters
+                              ? '正在同步「$_selectedSourceName」选集...'
+                              : (_currentEpisodes.isNotEmpty
+                                  ? '分集已就绪 · 请在下方选择集数开始播放'
+                                  : '请在下方选择播放源或选集'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -0.1,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -777,11 +995,15 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(),
+            const CupertinoActivityIndicator(radius: 12),
             const SizedBox(height: 12),
             Text(
               '正在从「$_selectedSourceName」加载分集...',
-              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                letterSpacing: -0.2,
+              ),
             ),
           ],
         ),
@@ -800,7 +1022,11 @@ class _VideoPlayPageState extends State<VideoPlayPage>
               Text(
                 '「$_selectedSourceName」暂未检索到该番剧分集',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.2,
+                ),
               ),
               const SizedBox(height: 6),
               const Text(
@@ -808,10 +1034,31 @@ class _VideoPlayPageState extends State<VideoPlayPage>
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 16),
-              FilledButton.icon(
-                icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-                label: const Text('前往「视频源」选择'),
-                onPressed: () => _tabController.animateTo(1),
+              BouncingScaleCard(
+                scaleDown: 0.95,
+                onTap: () => _tabController.animateTo(1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.swap_horiz_rounded, size: 17, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text(
+                        '前往「视频源」选择',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -831,7 +1078,72 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     );
   }
 
-  /// 1. 全屏横屏布局
+  /// iOS 风格极简精致滑动胶囊分段控制器 (Slender iOS Segmented Control)
+  Widget _buildSegmentedTabBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.colorScheme.primary;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.all(2.5),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? Colors.white.withAlpha(18) : Colors.black.withAlpha(12),
+                width: 0.5,
+              ),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              splashFactory: NoSplash.splashFactory,
+              overlayColor: WidgetStateProperty.all(Colors.transparent),
+              dividerColor: Colors.transparent,
+              padding: EdgeInsets.zero,
+              labelPadding: EdgeInsets.zero,
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicator: BoxDecoration(
+                color: isDark ? Colors.white.withAlpha(36) : Colors.white,
+                borderRadius: BorderRadius.circular(13.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1.5),
+                  ),
+                ],
+              ),
+              labelColor: isDark ? Colors.white : primaryColor,
+              unselectedLabelColor: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.65),
+              labelStyle: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                letterSpacing: -0.2,
+              ),
+              tabs: const [
+                Tab(height: 27, text: '番剧详情'),
+                Tab(height: 27, text: '视频源'),
+                Tab(height: 27, text: '选集'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 1. 全屏横屏布局 (带 iOS 磨砂悬浮抽屉)
   Widget _buildFullscreenLayout() {
     return Stack(
       children: [
@@ -844,27 +1156,70 @@ class _VideoPlayPageState extends State<VideoPlayPage>
             bottom: 0,
             right: 0,
             width: 320,
-            child: Material(
-              color: Colors.black.withValues(alpha: 0.85),
-              child: SafeArea(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('快速选集', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                          IconButton(
-                            icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                            onPressed: () => setState(() => _isSidePanelOpen = false),
-                          ),
-                        ],
+            child: ClipRRect(
+              borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.78),
+                    border: Border(
+                      left: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.16),
+                        width: 0.5,
                       ),
                     ),
-                    const Divider(color: Colors.white24, height: 1),
-                    Expanded(child: _buildEpisodeSectionBody()),
-                  ],
+                  ),
+                  child: SafeArea(
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                '快速选集',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    onPressed: () =>
+                                        setState(() => _isSidePanelOpen = false),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Divider(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          height: 1,
+                          thickness: 0.5,
+                        ),
+                        Expanded(child: _buildEpisodeSectionBody()),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -877,9 +1232,12 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   Widget _buildDesktopLayout() {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text(
+          widget.title,
+          style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.3),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: _handleBackPressed,
         ),
       ),
@@ -892,9 +1250,21 @@ class _VideoPlayPageState extends State<VideoPlayPage>
               padding: const EdgeInsets.all(16.0),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: _buildPlayerOrPlaceholder(isFullscreen: false),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: _buildPlayerOrPlaceholder(isFullscreen: false),
+                  ),
                 ),
               ),
             ),
@@ -903,14 +1273,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
             flex: 2,
             child: Column(
               children: [
-                TabBar(
-                  controller: _tabController,
-                  tabs: const [
-                    Tab(text: '番剧详情'),
-                    Tab(text: '视频源'),
-                    Tab(text: '选集'),
-                  ],
-                ),
+                _buildSegmentedTabBar(context),
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
@@ -919,7 +1282,9 @@ class _VideoPlayPageState extends State<VideoPlayPage>
                         title: widget.title,
                         bangumiItem: _effectiveBangumiItem,
                         coverUrl: _resolvedCoverUrl,
-                        episodeCount: _currentEpisodes.isNotEmpty ? _currentEpisodes.length : widget.episodeCount,
+                        episodeCount: _currentEpisodes.isNotEmpty
+                            ? _currentEpisodes.length
+                            : widget.episodeCount,
                       ),
                       VideoSourceView(
                         sources: _sources,
@@ -940,7 +1305,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     );
   }
 
-  /// 3. 移动端竖屏布局 (上方 16:9 + 下方 3 Tab)
+  /// 3. 移动端竖屏布局 (上方 16:9 + 下方 iOS 风格 3 Tab)
   Widget _buildMobileLayout() {
     return SafeArea(
       top: true,
@@ -951,14 +1316,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
             aspectRatio: 16 / 9,
             child: _buildPlayerOrPlaceholder(isFullscreen: false),
           ),
-          TabBar(
-            controller: _tabController,
-            tabs: const [
-              Tab(text: '番剧详情'),
-              Tab(text: '视频源'),
-              Tab(text: '选集'),
-            ],
-          ),
+          _buildSegmentedTabBar(context),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -967,7 +1325,9 @@ class _VideoPlayPageState extends State<VideoPlayPage>
                   title: widget.title,
                   bangumiItem: _effectiveBangumiItem,
                   coverUrl: _resolvedCoverUrl,
-                  episodeCount: _currentEpisodes.isNotEmpty ? _currentEpisodes.length : widget.episodeCount,
+                  episodeCount: _currentEpisodes.isNotEmpty
+                      ? _currentEpisodes.length
+                      : widget.episodeCount,
                 ),
                 VideoSourceView(
                   sources: _sources,

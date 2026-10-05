@@ -1,6 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:zakoni/features/player/source/source_aggregator.dart';
 import 'package:zakoni/features/player/source/source_bundle_manager.dart';
+import '../../common/widgets/bouncing_scale_card.dart';
 
 /// 视频源实体项
 class VideoSourceItem {
@@ -75,7 +77,7 @@ List<VideoSourceItem> getDefaultSourceItems() {
   }).toList();
 }
 
-/// 参考 animaku SourceBoard 的视频源选择 Tab 组件
+/// iOS 现代化视频源选择看板 (Apple Inset Grouped & Vibrancy Style)
 class VideoSourceView extends StatelessWidget {
   const VideoSourceView({
     super.key,
@@ -96,6 +98,7 @@ class VideoSourceView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.colorScheme.primary;
     final bundleMeta = SourceBundleManager.instance.meta;
 
     final effectiveSources = sources.isEmpty ? getDefaultSourceItems() : sources;
@@ -108,46 +111,63 @@ class VideoSourceView extends StatelessWidget {
     final probeStates = aggregator?.items ?? const <AggregatedSourceState>[];
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        // 顶部提示条 (当默认源未命中时给出醒目提示)
+        // 1. 顶部提示条 (当默认源未命中时给出优雅的 iOS 磨砂胶囊提示)
         if (hintMessage != null)
           Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+              color: Colors.amber.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Colors.amber.withValues(alpha: 0.28),
+                width: 0.5,
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
-                const SizedBox(width: 8),
+                const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 18),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     hintMessage!,
-                    style: const TextStyle(fontSize: 12, color: Colors.amber, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: Colors.amber,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: -0.2,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-        // 顶部当前源高亮卡片
+        // 2. 当前正在生效的视频源高亮卡片 (iOS Highlighted Card)
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+            color: primaryColor.withValues(alpha: isDark ? 0.16 : 0.08),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: theme.colorScheme.primary.withValues(alpha: 0.25),
+              color: primaryColor.withValues(alpha: 0.35),
+              width: 0.5,
             ),
           ),
           child: Row(
             children: [
-              Icon(Icons.live_tv_rounded, color: theme.colorScheme.primary, size: 22),
-              const SizedBox(width: 10),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.live_tv_rounded, color: primaryColor, size: 20),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,85 +175,98 @@ class VideoSourceView extends StatelessWidget {
                     Text(
                       '当前视频源：${currentSource.name}',
                       style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                        color: primaryColor,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       currentSource.description,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 11.5,
                         color: theme.textTheme.bodySmall?.color,
+                        letterSpacing: -0.1,
                       ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
+                  color: Colors.green.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
-                  '当前生效',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.green,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: Colors.green, size: 12),
+                    SizedBox(width: 4),
+                    Text(
+                      '当前生效',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.green,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
 
+        // 3. 标题与状态栏
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Row(
-                children: [
-                  const Text(
-                    '可用视频源列表',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                const Text(
+                  '可用视频源列表',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
                   ),
-                  if (aggregator?.isProbing == true) ...[
-                    const SizedBox(width: 8),
-                    const SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                if (aggregator?.isProbing == true) ...[
+                  const SizedBox(width: 8),
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CupertinoActivityIndicator(radius: 6),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '并发探测中...',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: primaryColor,
+                      fontWeight: FontWeight.w500,
                     ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        '并发探测中...',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 11, color: theme.colorScheme.primary),
-                      ),
-                    ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
             if (bundleMeta != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(4),
+                  color: isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(6),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   'v${bundleMeta.version}',
                   style: TextStyle(
-                    fontSize: 10,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurfaceVariant.withAlpha(180),
                   ),
                 ),
               ),
@@ -241,6 +274,7 @@ class VideoSourceView extends StatelessWidget {
         ),
         const SizedBox(height: 10),
 
+        // 4. iOS Inset Grouped 视频源列表
         ...effectiveSources.map((src) {
           final isSelected = src.id == selectedSourceId;
 
@@ -255,32 +289,52 @@ class VideoSourceView extends StatelessWidget {
             switch (probe.status) {
               case SourceProbeStatus.probing:
                 statusBadge = Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.blue.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text('探测中', style: TextStyle(fontSize: 10, color: Colors.blue)),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(width: 8, height: 8, child: CupertinoActivityIndicator(radius: 4)),
+                      SizedBox(width: 4),
+                      Text('探测中', style: TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
                 );
                 break;
               case SourceProbeStatus.ready:
                 statusBadge = Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.green.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text('🟢 已命中', style: TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold)),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.bolt_rounded, color: Colors.green, size: 12),
+                      SizedBox(width: 2),
+                      Text('已命中', style: TextStyle(fontSize: 10.5, color: Colors.green, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
                 );
                 break;
               case SourceProbeStatus.empty:
                 statusBadge = Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
+                    color: isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(6),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text('未收录', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                  child: Text(
+                    '未收录',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: theme.textTheme.bodySmall?.color,
+                    ),
+                  ),
                 );
                 break;
               case SourceProbeStatus.error:
@@ -288,9 +342,9 @@ class VideoSourceView extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.red.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Text('超时/异常', style: TextStyle(fontSize: 10, color: Colors.red)),
+                  child: const Text('异常', style: TextStyle(fontSize: 10.5, color: Colors.red)),
                 );
                 break;
               case SourceProbeStatus.idle:
@@ -307,29 +361,40 @@ class VideoSourceView extends StatelessWidget {
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
+            child: BouncingScaleCard(
+              scaleDown: 0.97,
               onTap: () => onSourceSelected(src),
-              child: Container(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? theme.colorScheme.primary.withValues(alpha: 0.08)
-                      : (isDark ? const Color(0xFF1E1E22) : const Color(0xFFF7F8FA)),
-                  borderRadius: BorderRadius.circular(10),
+                      ? primaryColor.withValues(alpha: isDark ? 0.18 : 0.1)
+                      : (isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(7)),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                     color: isSelected
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.outline.withValues(alpha: 0.12),
-                    width: isSelected ? 1.5 : 1.0,
+                        ? primaryColor.withValues(alpha: 0.5)
+                        : (isDark ? Colors.white.withAlpha(18) : Colors.black.withAlpha(12)),
+                    width: isSelected ? 1.2 : 0.5,
                   ),
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                      color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant.withAlpha(120),
-                      size: 18,
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? primaryColor.withValues(alpha: 0.25)
+                            : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.smart_display_outlined,
+                        color: isSelected ? primaryColor : theme.textTheme.bodySmall?.color,
+                        size: 16,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -342,30 +407,29 @@ class VideoSourceView extends StatelessWidget {
                                 src.name,
                                 style: TextStyle(
                                   fontSize: 14,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                  color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                                  letterSpacing: -0.2,
+                                  color: isSelected ? primaryColor : theme.colorScheme.onSurface,
                                 ),
                               ),
                               if (src.isDefault) ...[
                                 const SizedBox(width: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                   decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(3),
+                                    color: primaryColor.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
                                     '默认',
                                     style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.colorScheme.primary,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: primaryColor,
                                     ),
                                   ),
                                 ),
                               ],
-                              const Spacer(),
-                              statusBadge,
                             ],
                           ),
                           const SizedBox(height: 2),
@@ -374,15 +438,24 @@ class VideoSourceView extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 11,
-                              color: probe?.status == SourceProbeStatus.ready
-                                  ? theme.colorScheme.primary
-                                  : theme.textTheme.bodySmall?.color,
+                              fontSize: 11.5,
+                              color: theme.textTheme.bodySmall?.color,
+                              letterSpacing: -0.1,
                             ),
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    statusBadge,
+                    if (isSelected) ...[
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.check_rounded,
+                        color: primaryColor,
+                        size: 18,
+                      ),
+                    ],
                   ],
                 ),
               ),

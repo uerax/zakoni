@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../models/source_models.dart';
 import 'video_source.dart';
 
@@ -7,7 +8,7 @@ const String _kDefaultUserAgent =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
 /// 稀饭Next (next.xifanacg.com) 专有视频源
-/// 1:1 对齐 animaku (apps/server/src/lib/xifan-next.ts) 架构与全套容错分支
+/// 严格遵守源站线路定义与返回直链，绝不擅自篡改用户选择的播放线路。
 class XifanNextSource extends VideoSource {
   XifanNextSource({Dio? dio}) : _dio = dio ?? Dio();
 
@@ -27,10 +28,14 @@ class XifanNextSource extends VideoSource {
   String get name => '稀饭Next';
 
   @override
-  String get version => '1.3.0';
+  String get version => '1.4.0';
 
   @override
-  String get description => '1080P · 官方推荐综合主线 (国内原画/HLS多线路)';
+  String get description => '1080P · 官方推荐综合主线 (纯净多线路直链)';
+
+  void _log(String message) {
+    debugPrint('[XifanNext] $message');
+  }
 
   Map<String, String> _buildHeaders([String? customKey]) {
     final key = customKey ?? _cachedKey;
@@ -56,7 +61,7 @@ class XifanNextSource extends VideoSource {
     }
   }
 
-  /// 凭证自愈：当遭遇 401/403 时，动态抓取 next.xifanacg.com JS Chunks 提取最新密钥与 baseUrl (对齐 animaku)
+  /// 凭证自愈：当遭遇 401/403 时，动态抓取 next.xifanacg.com JS Chunks 提取最新密钥与 baseUrl
   Future<({String baseUrl, String key})> _refreshSupabaseCredentials() async {
     if (_refreshingFuture != null) return _refreshingFuture!;
 
@@ -65,6 +70,7 @@ class XifanNextSource extends VideoSource {
       return (baseUrl: _cachedBaseUrl, key: _cachedKey);
     }
     _credentialsLastRefreshedAt = now;
+    _log('检测到凭证失效，正在从前端资源自愈刷新 Supabase 密钥...');
 
     _refreshingFuture = () async {
       try {
@@ -96,6 +102,7 @@ class XifanNextSource extends VideoSource {
             if (pairMatch != null && _isAllowedSupabaseBaseUrl(pairMatch.group(1)!)) {
               _cachedBaseUrl = pairMatch.group(1)!;
               _cachedKey = pairMatch.group(2)!;
+              _log('凭证自愈成功: baseUrl=$_cachedBaseUrl');
               break;
             }
 
@@ -106,11 +113,16 @@ class XifanNextSource extends VideoSource {
                 _cachedBaseUrl = urlMatch.group(0)!;
               }
               _cachedKey = keyMatch.group(0)!;
+              _log('凭证自愈成功: key=$_cachedKey');
               break;
             }
-          } catch (_) {}
+          } catch (e) {
+            _log('探测静态资源 $chunkPath 失败: $e');
+          }
         }
-      } catch (_) {}
+      } catch (e) {
+        _log('拉取首页静态清单异常: $e');
+      }
       return (baseUrl: _cachedBaseUrl, key: _cachedKey);
     }();
 
@@ -154,6 +166,7 @@ class XifanNextSource extends VideoSource {
       );
 
       if (res.statusCode == 401 || res.statusCode == 403) {
+        _log('请求 $endpoint 遭遇 ${res.statusCode}，尝试刷新密钥重试...');
         final refreshed = await _refreshSupabaseCredentials();
         url = _buildSupabaseUrl(refreshed.baseUrl, endpoint);
         final retryRes = await _dio.request<dynamic>(
@@ -170,8 +183,13 @@ class XifanNextSource extends VideoSource {
         return retryRes.data;
       }
 
+      if (res.statusCode != null && res.statusCode! >= 400) {
+        _log('接口 $endpoint 响应异常 HTTP ${res.statusCode}: ${res.data}');
+      }
+
       return res.data;
     } catch (e) {
+      _log('网络请求异常 $endpoint: $e');
       throw Exception('稀饭Next网络异常: $e');
     }
   }
@@ -181,6 +199,8 @@ class XifanNextSource extends VideoSource {
     final q = keyword.trim();
     if (q.isEmpty) return [];
 
+    _log('开始搜索: "$q"');
+
     // 1. Primary: RPC suggest_animes
     try {
       final res = await _fetchSupabase(
@@ -189,7 +209,7 @@ class XifanNextSource extends VideoSource {
         body: {'q': q, 'lim': 12},
       );
       if (res is List && res.isNotEmpty) {
-        return res
+        final list = res
             .whereType<Map<String, dynamic>>()
             .map((item) => SourceSearchResult(
                   name: item['title']?.toString().trim() ??
@@ -199,8 +219,12 @@ class XifanNextSource extends VideoSource {
                   cover: item['cover_url']?.toString(),
                 ))
             .toList();
+        _log('RPC 搜索成功命中 ${list.length} 条');
+        return list;
       }
-    } catch (_) {}
+    } catch (e) {
+      _log('RPC 搜索异常: $e');
+    }
 
     // 2. Fallback: animes table ilike
     try {
@@ -209,7 +233,7 @@ class XifanNextSource extends VideoSource {
         '/rest/v1/animes?or=(title.ilike.$encoded,search_title.ilike.$encoded,title_original.ilike.$encoded)&select=id,title,title_original,cover_url&limit=10',
       );
       if (res is List && res.isNotEmpty) {
-        return res
+        final list = res
             .whereType<Map<String, dynamic>>()
             .map((item) => SourceSearchResult(
                   name: item['title']?.toString().trim() ??
@@ -219,9 +243,14 @@ class XifanNextSource extends VideoSource {
                   cover: item['cover_url']?.toString(),
                 ))
             .toList();
+        _log('REST 表搜索命中 ${list.length} 条');
+        return list;
       }
-    } catch (_) {}
+    } catch (e) {
+      _log('REST 表搜索异常: $e');
+    }
 
+    _log('未搜索到相关番剧');
     return [];
   }
 
@@ -288,7 +317,7 @@ class XifanNextSource extends VideoSource {
     return chunks;
   }
 
-  /// 从 Next.js SSR HTML 中解析多线路多源列表 (对齐 animaku extractSourcesFromHtml 规范)
+  /// 从 Next.js SSR HTML 中解析多线路多源列表
   List<dynamic>? _extractSourcesFromHtml(String html) {
     final chunks = _extractNextFPushes(html);
     for (final chunkStr in chunks) {
@@ -335,7 +364,9 @@ class XifanNextSource extends VideoSource {
           try {
             final parsed = jsonDecode(chunkStr.substring(start, end));
             if (parsed is List) return parsed;
-          } catch (_) {}
+          } catch (e) {
+            _log('解析 sources JSON 失败: $e');
+          }
         }
       }
     }
@@ -349,8 +380,9 @@ class XifanNextSource extends VideoSource {
       throw Exception('无法解析稀饭番剧 ID: $animeUrl');
     }
     final animeId = match.group(1)!;
+    _log('正在获取番剧分集与线路: animeId=$animeId');
 
-    // 1. Primary: 抓取详情页 HTML 解析 RSC 块多线路 (带 source code 绑定)
+    // 1. Primary: 抓取详情页 HTML 解析 RSC 块多线路 (严格携带 source_id 与 source_code)
     try {
       final res = await _dio.get<String>(
         'https://next.xifanacg.com/anime/$animeId',
@@ -368,26 +400,46 @@ class XifanNextSource extends VideoSource {
           final rawEps = (s['episodes'] as List?) ?? [];
           if (rawEps.isEmpty) continue;
 
+          final dynamic rawSourceId = s['id'];
+          final int? sourceId = (rawSourceId is int)
+              ? rawSourceId
+              : int.tryParse(rawSourceId?.toString() ?? '');
           final code = (s['code']?.toString() ?? '').trim();
           final name = (s['name']?.toString() ?? (code.isNotEmpty ? code : '线路${sIdx + 1}')).trim();
 
           final episodes = rawEps.map((e) {
             final epNum = e['episode_number'] ?? 1;
             final epId = e['id'];
+
+            final params = <String>[];
+            if (sourceId != null) {
+              params.add('source_id=$sourceId');
+            }
+            if (code.isNotEmpty) {
+              params.add('source=${Uri.encodeComponent(code)}');
+            }
+            final queryString = params.isNotEmpty ? '?${params.join('&')}' : '';
+
             return SourceEpisode(
               name: '第$epNum集',
-              url: 'https://next.xifanacg.com/anime/$animeId/play/$epId?source=${Uri.encodeComponent(code)}',
+              url: 'https://next.xifanacg.com/anime/$animeId/play/$epId$queryString',
             );
           }).toList();
 
           roads.add(SourceChapterRoad(name: name, episodes: episodes));
         }
 
-        if (roads.isNotEmpty) return roads;
+        if (roads.isNotEmpty) {
+          _log('成功从 SSR 解析出 ${roads.length} 条独立线路: ${roads.map((r) => "${r.name}(${r.episodes.length}集)").join(', ')}');
+          return roads;
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      _log('SSR 页面抓取与解析异常: $e');
+    }
 
     // 2. Fallback: Supabase REST 表查询 (过滤 available_at 排除未播日程)
+    _log('SSR 解析无结果，回退到 REST episodes 表查询...');
     try {
       final res = await _fetchSupabase(
         '/rest/v1/episodes?anime_id=eq.$animeId&available_at=not.is.null&select=id,title,episode_number,kind&order=episode_number.asc',
@@ -416,58 +468,17 @@ class XifanNextSource extends VideoSource {
         if (spEps.isNotEmpty) {
           roads.add(SourceChapterRoad(name: 'SP / 特典', episodes: spEps));
         }
-        if (roads.isNotEmpty) return roads;
-      }
-    } catch (_) {}
-
-    return [];
-  }
-
-  /// 提取最高分辨率 HLS 变体 (对齐 animaku extractHighestResolutionHls 规范)
-  Future<String> _extractHighestResolutionHls(String masterUrl) async {
-    try {
-      final res = await _dio.get<String>(
-        masterUrl,
-        options: Options(
-          headers: {'User-Agent': _kDefaultUserAgent},
-          sendTimeout: const Duration(seconds: 5),
-          receiveTimeout: const Duration(seconds: 5),
-        ),
-      );
-      final m3u8Text = res.data ?? '';
-      if (!m3u8Text.contains('#EXT-X-STREAM-INF')) return masterUrl;
-
-      final lines = m3u8Text.split('\n');
-      var highestUrl = '';
-      var maxScore = 0;
-
-      for (var i = 0; i < lines.length; i++) {
-        final line = lines[i];
-        if (line.startsWith('#EXT-X-STREAM-INF')) {
-          var score = 0;
-          final resMatch = RegExp(r'RESOLUTION=(\d+)x(\d+)', caseSensitive: false).firstMatch(line);
-          if (resMatch != null) {
-            score = int.parse(resMatch.group(1)!) * int.parse(resMatch.group(2)!);
-          } else {
-            final bwMatch = RegExp(r'BANDWIDTH=(\d+)', caseSensitive: false).firstMatch(line);
-            if (bwMatch != null) {
-              score = int.parse(bwMatch.group(1)!);
-            }
-          }
-          final nextUrl = (i + 1 < lines.length) ? lines[i + 1].trim() : '';
-          if (score > maxScore && nextUrl.isNotEmpty && !nextUrl.startsWith('#')) {
-            maxScore = score;
-            highestUrl = nextUrl.startsWith('http')
-                ? nextUrl
-                : Uri.parse(masterUrl).resolve(nextUrl).toString();
-          }
+        if (roads.isNotEmpty) {
+          _log('从 REST 表解析出 ${roads.length} 条分集列表');
+          return roads;
         }
       }
-
-      return highestUrl.isNotEmpty ? highestUrl : masterUrl;
-    } catch (_) {
-      return masterUrl;
+    } catch (e) {
+      _log('REST episodes 表查询异常: $e');
     }
+
+    _log('未解析到任何有效分集');
+    return [];
   }
 
   @override
@@ -480,70 +491,120 @@ class XifanNextSource extends VideoSource {
       throw Exception('无法从播放链接提取稀饭分集 ID: $episodeUrl');
     }
 
+    int? sourceId;
     String sourceCode = '';
     try {
-      sourceCode = Uri.parse(trimmed).queryParameters['source'] ?? '';
-    } catch (_) {}
+      final uri = Uri.parse(trimmed);
+      sourceId = int.tryParse(uri.queryParameters['source_id'] ?? '');
+      sourceCode = uri.queryParameters['source'] ?? '';
+    } catch (e) {
+      _log('解析播放链接参数失败: $e');
+    }
 
-    final fbBody = <String, dynamic>{
+    _log('开始解析播放直链: episodeId=$episodeId, sourceId=$sourceId, sourceCode=$sourceCode');
+
+    // 构造请求体：完全遵循稀饭官网前端规范，使用 action: 'fallback'，传数字 source_id
+    final reqBody = <String, dynamic>{
       'action': 'fallback',
       'episode_id': episodeId,
     };
-    if (sourceCode.isNotEmpty) {
-      fbBody['source'] = sourceCode;
+    if (sourceId != null) {
+      reqBody['source_id'] = sourceId;
     }
 
-    // 并发向 Supabase Edge Functions 派发 fallback 与 hls 请求 (对齐 animaku)
-    final fbFuture = _fetchSupabase(
+    final dynamic res = await _fetchSupabase(
       '/functions/v1/issue-web-playback',
       method: 'POST',
-      body: fbBody,
-      timeout: const Duration(seconds: 6),
+      body: reqBody,
+      timeout: const Duration(seconds: 8),
     );
 
-    final hlsFuture = _fetchSupabase(
-      '/functions/v1/issue-web-playback',
-      method: 'POST',
-      body: {'action': 'hls', 'episode_id': episodeId},
-      timeout: const Duration(seconds: 6),
-    );
+    if (res is! Map || res['ok'] != true) {
+      final err = (res is Map) ? res['error'] : 'unknown_error';
+      _log('issue-web-playback 接口报错: $err');
+      throw Exception('稀饭Next签发直链失败: $err');
+    }
+
+    final candidates = (res['candidates'] as List?)
+            ?.whereType<Map<dynamic, dynamic>>()
+            .toList() ??
+        [];
+
+    _log('issue-web-playback 成功返回，candidates 数量: ${candidates.length}');
 
     String playUrl = '';
 
-    // 2.5s 优先竞速窗口
-    try {
-      final fbEarly = await fbFuture.timeout(const Duration(milliseconds: 2500));
-      if (fbEarly is Map && fbEarly['ok'] == true) {
-        playUrl = _pickCandidateUrl(fbEarly, sourceCode);
+    // 1. 若指定了 sourceId，严格在 candidates 中匹配该 sourceId 的源，绝不搞跨线路篡改
+    if (sourceId != null && candidates.isNotEmpty) {
+      final matched = candidates.firstWhere(
+        (c) {
+          final cId = c['source_id'];
+          return cId == sourceId || cId?.toString() == sourceId.toString();
+        },
+        orElse: () => const {},
+      );
+      if (matched.isNotEmpty && matched['url'] != null) {
+        playUrl = matched['url'].toString();
+        _log('严格命中用户指定线路 (source_id: $sourceId, 名称: ${matched['source_name']}): $playUrl');
       }
-    } catch (_) {}
+    }
 
-    if (playUrl.isEmpty) {
-      try {
-        final hlsRes = await hlsFuture;
-        if (hlsRes is Map && hlsRes['ok'] == true && hlsRes['url'] != null) {
-          playUrl = await _extractHighestResolutionHls(hlsRes['url'].toString());
+    // 2. 若通过 sourceCode 匹配
+    if (playUrl.isEmpty && sourceCode.isNotEmpty && candidates.isNotEmpty) {
+      final target = sourceCode.toLowerCase().trim();
+      final matched = candidates.firstWhere(
+        (c) => (c['source_code']?.toString().toLowerCase().trim() ?? '') == target,
+        orElse: () => const {},
+      );
+      if (matched.isNotEmpty && matched['url'] != null) {
+        playUrl = matched['url'].toString();
+        _log('严格命中用户指定线路代号 (source_code: $sourceCode, 名称: ${matched['source_name']}): $playUrl');
+      }
+    }
+
+    // 3. 若指定线路未单独匹配到，但接口给出了候选列表（通常为未传 source_id 的通用链接），严格按源返回提取直链
+    if (playUrl.isEmpty && candidates.isNotEmpty) {
+      // 默认未指定线路时，按国内主线 > 国内 HLS 备用 > 国外保底 选择
+      final primary = candidates.firstWhere(
+        (c) => (c['source_code']?.toString().toLowerCase() == 'xfxf1'),
+        orElse: () => const {},
+      );
+      if (primary.isNotEmpty && primary['url'] != null) {
+        playUrl = primary['url'].toString();
+        _log('未指定线路，默认采用国内主线: $playUrl');
+      } else {
+        final backup = candidates.firstWhere(
+          (c) => (c['source_code']?.toString().toLowerCase() == 'cs'),
+          orElse: () => const {},
+        );
+        if (backup.isNotEmpty && backup['url'] != null) {
+          playUrl = backup['url'].toString();
+          _log('未指定线路，采用国内备用 HLS: $playUrl');
+        } else {
+          playUrl = candidates.first['url']?.toString() ?? '';
+          _log('未指定线路，采用首个候选源: $playUrl');
         }
-      } catch (_) {}
+      }
+    }
+
+    // 4. 兜底直接取 root url
+    if (playUrl.isEmpty) {
+      playUrl = res['url']?.toString() ?? '';
+      _log('从响应根对象提取播放地址: $playUrl');
     }
 
     if (playUrl.isEmpty) {
-      try {
-        final fbLate = await fbFuture;
-        if (fbLate is Map && fbLate['ok'] == true) {
-          playUrl = _pickCandidateUrl(fbLate, sourceCode);
-        }
-      } catch (_) {}
-    }
-
-    if (playUrl.isEmpty) {
-      throw Exception('稀饭Next未能生成有效播放直链');
+      _log('未能在接口返回中找到有效的播放地址: $res');
+      throw Exception('稀饭Next未能生成有效播放地址');
     }
 
     final isWoPan = playUrl.contains('pan.wo.cn') ||
         playUrl.contains('moedot.net') ||
         playUrl.contains('apn.moedot.net');
     final referer = isWoPan ? 'https://pan.wo.cn/' : 'https://next.xifanacg.com/';
+    final format = playUrl.contains('.m3u8') ? 'hls' : 'mp4';
+
+    _log('最终返回直链: $playUrl, 格式: $format, Referer: $referer');
 
     return SourceResolveResult(
       url: playUrl,
@@ -551,36 +612,7 @@ class XifanNextSource extends VideoSource {
         'User-Agent': _kDefaultUserAgent,
         'Referer': referer,
       },
-      format: playUrl.contains('.m3u8') ? 'hls' : 'mp4',
+      format: format,
     );
-  }
-
-  /// 依据 sourceCode 精准提取候选 CDN 地址 (对齐 animaku selectUrlFromPlaybackResponse 规范)
-  String _pickCandidateUrl(Map<dynamic, dynamic> res, String sourceCode) {
-    final candidates = (res['candidates'] as List?)?.whereType<Map<dynamic, dynamic>>().toList() ?? [];
-    if (sourceCode.isNotEmpty && candidates.isNotEmpty) {
-      final target = sourceCode.toLowerCase().trim();
-      final matched = candidates.firstWhere(
-        (c) => (c['source_code']?.toString().toLowerCase().trim() ?? '') == target,
-        orElse: () => const {},
-      );
-      if (matched.isNotEmpty && matched['url'] != null) {
-        return matched['url'].toString();
-      }
-    }
-
-    // 避开挂掉的 :8088 端口：如果根节点是 :8088，且 candidates 中有可用 CDN，选用可用 CDN
-    final rootUrl = res['url']?.toString() ?? '';
-    if (rootUrl.contains(':8088') && candidates.isNotEmpty) {
-      final alive = candidates.firstWhere(
-        (c) => c['url'] != null && !c['url'].toString().contains(':8088'),
-        orElse: () => const {},
-      );
-      if (alive.isNotEmpty && alive['url'] != null) {
-        return alive['url'].toString();
-      }
-    }
-
-    return rootUrl;
   }
 }

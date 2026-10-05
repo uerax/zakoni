@@ -69,7 +69,14 @@ class SourceAggregator extends ChangeNotifier {
 
     await Future.wait(
       candidates.map((source) async {
-        final keywords = SourceKeywordMatcher.buildCandidates(
+        final titleRefs = <String>[
+          if (item?.nameCn.isNotEmpty ?? false) item!.nameCn,
+          if (item?.name.isNotEmpty ?? false) item!.name,
+          defaultTitle,
+          ...(item?.alias ?? const <String>[]),
+        ];
+
+        final primaryKw = SourceKeywordMatcher.resolveDefaultKeyword(
           defaultTitle: defaultTitle,
           item: item,
           sourceId: source.id,
@@ -78,18 +85,32 @@ class SourceAggregator extends ChangeNotifier {
         try {
           SourceSearchResult? bestHit;
 
-          // 依次尝试候选词，命中相似度 >= 0.55 即认定为有效资源
-          for (final kw in keywords) {
-            final hits = await runtime.search(source.id, kw);
-            if (hits.isNotEmpty) {
-              for (final h in hits) {
-                final sim = SourceKeywordMatcher.bestSimilarity(h.name, keywords);
+          // 1. 首选针对源偏好的关键词发起单次精准快速探测
+          if (primaryKw.isNotEmpty) {
+            final hits = await runtime.search(source.id, primaryKw);
+            for (final h in hits) {
+              final sim = SourceKeywordMatcher.bestSimilarity(h.name, titleRefs);
+              if (sim >= 0.55) {
+                bestHit = h;
+                break;
+              }
+            }
+          }
+
+          // 2. 若未命中且存在不同中文主名，回退尝试 1 次快速探测
+          if (bestHit == null) {
+            final fallbackKw = (item?.nameCn.isNotEmpty ?? false)
+                ? item!.nameCn
+                : defaultTitle;
+            if (fallbackKw.isNotEmpty && fallbackKw != primaryKw) {
+              final fallbackHits = await runtime.search(source.id, fallbackKw);
+              for (final h in fallbackHits) {
+                final sim = SourceKeywordMatcher.bestSimilarity(h.name, titleRefs);
                 if (sim >= 0.55) {
                   bestHit = h;
                   break;
                 }
               }
-              if (bestHit != null) break;
             }
           }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../common/widgets/bouncing_scale_card.dart';
 
-/// 律动音波小动画（参考 animaku 正在播放时的 3 条律动小柱子）
+/// 律动音波小动画（iOS 风格播放中音波指示器）
 class _PlayingBarsAnimation extends StatefulWidget {
   const _PlayingBarsAnimation();
 
@@ -17,7 +18,7 @@ class _PlayingBarsAnimationState extends State<_PlayingBarsAnimation>
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
   }
 
@@ -37,11 +38,11 @@ class _PlayingBarsAnimationState extends State<_PlayingBarsAnimation>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            _buildBar(4.0 + 8.0 * val),
-            const SizedBox(width: 2),
-            _buildBar(12.0 - 7.0 * val),
-            const SizedBox(width: 2),
-            _buildBar(6.0 + 6.0 * (1.0 - val)),
+            _buildBar(2.5 + 4.5 * val),
+            const SizedBox(width: 1.5),
+            _buildBar(7.5 - 4.0 * val),
+            const SizedBox(width: 1.5),
+            _buildBar(3.5 + 4.0 * (1.0 - val)),
           ],
         );
       },
@@ -50,17 +51,17 @@ class _PlayingBarsAnimationState extends State<_PlayingBarsAnimation>
 
   Widget _buildBar(double height) {
     return Container(
-      width: 2.5,
+      width: 1.8,
       height: height,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(1.5),
+        borderRadius: BorderRadius.circular(1.0),
       ),
     );
   }
 }
 
-/// 参考 animaku MobileEpsSection 的选集组件
+/// iOS 现代化流体选集组件 (Apple HIG Squircle & Bouncing Feedback)
 class EpisodePickerSection extends StatefulWidget {
   const EpisodePickerSection({
     super.key,
@@ -108,7 +109,7 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
     if (widget.activeRoadIndex != oldWidget.activeRoadIndex) {
       _activeRoadIndex = widget.activeRoadIndex;
     }
-    // 当外部选中新集数时，自动对其到对应区间分页
+    // 当外部选中新集数时，自动对齐到对应区间分页
     if (widget.currentEpisode != null &&
         widget.currentEpisode != oldWidget.currentEpisode &&
         widget.episodeCount > 40) {
@@ -132,6 +133,7 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.colorScheme.primary;
 
     final total = widget.episodeCount;
     final isMultiRange = total > 40;
@@ -155,64 +157,77 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
     }
 
     final currentEpLabel = widget.currentEpisode != null
-        ? '${widget.currentEpisode}/$total'
+        ? '${widget.currentEpisode}/$total 话'
         : '共 $total 话';
 
     return Column(
       children: [
-        // 1. 顶部操作栏（选集标题计数 + 刷新 + 正倒序切换）
+        // 1. 顶部 iOS 选集状态操作栏
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
               const Text(
                 '选集',
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(4),
+                  color: isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(14),
+                    width: 0.5,
+                  ),
                 ),
                 child: Text(
                   currentEpLabel,
                   style: TextStyle(
                     fontSize: 11,
                     color: theme.textTheme.bodySmall?.color,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.1,
                   ),
                 ),
               ),
               const Spacer(),
               if (widget.onRefresh != null)
                 IconButton(
-                  icon: const Icon(Icons.refresh_rounded, size: 20),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
                   tooltip: '刷新选集',
                   visualDensity: VisualDensity.compact,
                   onPressed: widget.onRefresh,
                 ),
-              // 正/倒序切换按钮
-              InkWell(
-                borderRadius: BorderRadius.circular(6),
+              // 正/倒序切换胶囊 (带 iOS 弹性按压动效)
+              BouncingScaleCard(
+                scaleDown: 0.94,
                 onTap: () => setState(() => _isDescOrder = !_isDescOrder),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isDark ? Colors.white.withAlpha(18) : Colors.black.withAlpha(12),
+                      width: 0.5,
+                    ),
+                  ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         _isDescOrder
                             ? Icons.arrow_downward_rounded
                             : Icons.arrow_upward_rounded,
-                        size: 14,
+                        size: 13,
                         color: _isDescOrder
-                            ? theme.colorScheme.primary
+                            ? primaryColor
                             : theme.textTheme.bodyMedium?.color,
                       ),
                       const SizedBox(width: 4),
@@ -220,11 +235,9 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
                         _isDescOrder ? '倒序' : '正序',
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: _isDescOrder
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                          fontWeight: _isDescOrder ? FontWeight.w700 : FontWeight.w500,
                           color: _isDescOrder
-                              ? theme.colorScheme.primary
+                              ? primaryColor
                               : theme.textTheme.bodyMedium?.color,
                         ),
                       ),
@@ -236,42 +249,73 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
           ),
         ),
 
-        // 2. 多线路切换 Tabs（Roads Pills）
+        // 2. 多线路切换 iOS 胶囊条 (Roads Pills)
         if (widget.roads.length > 1)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
             child: Row(
               children: List.generate(widget.roads.length, (idx) {
                 final isRoadActive = idx == _activeRoadIndex;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
-                  child: ChoiceChip(
-                    label: Text(widget.roads[idx]),
-                    selected: isRoadActive,
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() => _activeRoadIndex = idx);
-                        widget.onRoadSelected?.call(idx);
-                      }
+                  child: BouncingScaleCard(
+                    scaleDown: 0.95,
+                    onTap: () {
+                      setState(() => _activeRoadIndex = idx);
+                      widget.onRoadSelected?.call(idx);
                     },
-                    labelStyle: TextStyle(
-                      fontSize: 12,
-                      fontWeight:
-                          isRoadActive ? FontWeight.bold : FontWeight.normal,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                      decoration: BoxDecoration(
+                        color: isRoadActive
+                            ? primaryColor.withValues(alpha: isDark ? 0.24 : 0.14)
+                            : (isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(8)),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isRoadActive
+                              ? primaryColor.withValues(alpha: 0.5)
+                              : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isRoadActive) ...[
+                            Container(
+                              width: 5,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: primaryColor,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                          ],
+                          Text(
+                            widget.roads[idx],
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: isRoadActive ? FontWeight.w600 : FontWeight.normal,
+                              color: isRoadActive ? primaryColor : theme.textTheme.bodyMedium?.color,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    visualDensity: VisualDensity.compact,
                   ),
                 );
               }),
             ),
           ),
 
-        // 3. 长番剧区间分页 Tabs (1-50, 51-100...)
+        // 3. 长番剧区间分页胶囊 (1-50, 51-100...)
         if (isMultiRange && numRanges > 1)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
             child: Row(
               children: List.generate(numRanges, (rIdx) {
                 final rStart = rIdx * _rangeSize + 1;
@@ -285,117 +329,163 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
-                  child: FilterChip(
-                    label: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('$rStart-$rEnd'),
-                        if (containsPlaying && !isRangeActive) ...[
-                          const SizedBox(width: 4),
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: theme.colorScheme.primary,
+                  child: BouncingScaleCard(
+                    scaleDown: 0.95,
+                    onTap: () => setState(() => _selectedRangeIndex = rIdx),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isRangeActive
+                            ? primaryColor.withValues(alpha: isDark ? 0.22 : 0.12)
+                            : (isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(6)),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isRangeActive
+                              ? primaryColor.withValues(alpha: 0.45)
+                              : (isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8)),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$rStart-$rEnd',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isRangeActive ? FontWeight.w600 : FontWeight.normal,
+                              color: isRangeActive ? primaryColor : theme.textTheme.bodySmall?.color,
                             ),
                           ),
+                          if (containsPlaying && !isRangeActive) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              width: 4.5,
+                              height: 4.5,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: primaryColor,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                    selected: isRangeActive,
-                    onSelected: (_) =>
-                        setState(() => _selectedRangeIndex = rIdx),
-                    visualDensity: VisualDensity.compact,
                   ),
                 );
               }),
             ),
           ),
 
-        const Divider(height: 1, thickness: 0.5),
+        const SizedBox(height: 4),
 
-        // 4. 选集网格
+        // 4. 选集网格 (iOS 精致轻量卡片)
         Expanded(
           child: epList.isEmpty
-              ? const Center(child: Text('暂无可用分集'))
-              : GridView.builder(
-                  padding: const EdgeInsets.all(14),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1.55,
+              ? Center(
+                  child: Text(
+                    '暂无可用分集',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.textTheme.bodySmall?.color,
+                    ),
                   ),
-                  itemCount: epList.length,
-                  itemBuilder: (context, index) {
-                    final ep = epList[index];
-                    final isPlaying = ep == widget.currentEpisode;
-                    final isWatched =
-                        !isPlaying && widget.watchedEpisodes.contains(ep);
-                    final primaryColor = theme.colorScheme.primary;
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxWidth = constraints.maxWidth;
+                    final crossAxisCount = maxWidth >= 520
+                        ? (maxWidth / 90).floor().clamp(4, 8)
+                        : 4;
+                    const double spacing = 8.0;
+                    const double horizontalPadding = 32.0; // 16 * 2
+                    final itemWidth = (maxWidth -
+                            horizontalPadding -
+                            (crossAxisCount - 1) * spacing) /
+                        crossAxisCount;
+                    // 保持高度在精致小巧的 34px
+                    final childAspectRatio = (itemWidth / 34.0).clamp(1.5, 3.2);
 
-                    return InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () => widget.onSelectEpisode(ep),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: isPlaying
-                              ? primaryColor
-                              : (isDark
-                                  ? const Color(0xFF222226)
-                                  : const Color(0xFFF0F1F5)),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isPlaying
-                                ? primaryColor
-                                : (isDark
-                                    ? Colors.white.withValues(alpha: 0.06)
-                                    : Colors.black.withValues(alpha: 0.04)),
-                            width: isPlaying ? 1.5 : 1.0,
-                          ),
-                          boxShadow: isPlaying
-                              ? [
-                                  BoxShadow(
-                                    color: primaryColor.withValues(alpha: 0.35),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ]
-                              : null,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                if (isPlaying) ...[
-                                  const _PlayingBarsAnimation(),
-                                  const SizedBox(width: 5),
-                                ],
-                                Text(
-                                  _resolveTitle(ep),
-                                  style: TextStyle(
-                                    color: isPlaying
-                                        ? Colors.white
-                                        : (isWatched
-                                            ? theme.textTheme.bodySmall?.color
-                                            : theme.textTheme.bodyMedium?.color),
-                                    fontWeight: isPlaying
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    fontSize: 13,
-                                  ),
+                    return GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        mainAxisSpacing: spacing,
+                        crossAxisSpacing: spacing,
+                        childAspectRatio: childAspectRatio,
+                      ),
+                      itemCount: epList.length,
+                      itemBuilder: (context, index) {
+                        final ep = epList[index];
+                        final isPlaying = ep == widget.currentEpisode;
+                        final isWatched =
+                            !isPlaying && widget.watchedEpisodes.contains(ep);
+
+                        return BouncingScaleCard(
+                          scaleDown: 0.95,
+                          onTap: () => widget.onSelectEpisode(ep),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: isPlaying
+                                  ? primaryColor
+                                  : (isDark
+                                      ? Colors.white.withAlpha(14)
+                                      : Colors.black.withAlpha(7)),
+                              borderRadius: BorderRadius.circular(9),
+                              border: Border.all(
+                                color: isPlaying
+                                    ? primaryColor
+                                    : (isDark
+                                        ? Colors.white.withAlpha(18)
+                                        : Colors.black.withAlpha(12)),
+                                width: isPlaying ? 1.2 : 0.5,
+                              ),
+                              boxShadow: isPlaying
+                                  ? [
+                                      BoxShadow(
+                                        color: primaryColor.withValues(alpha: 0.28),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      )
+                                    ]
+                                  : null,
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (isPlaying) ...[
+                                      const _PlayingBarsAnimation(),
+                                      const SizedBox(width: 4),
+                                    ],
+                                    Text(
+                                      _resolveTitle(ep),
+                                      style: TextStyle(
+                                        color: isPlaying
+                                            ? Colors.white
+                                            : (isWatched
+                                                ? theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6)
+                                                : theme.textTheme.bodyMedium?.color),
+                                        fontWeight: isPlaying
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        fontSize: 12.0,
+                                        letterSpacing: -0.2,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     );
                   },
                 ),
