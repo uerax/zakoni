@@ -35,6 +35,11 @@ class SourceEpisode {
       url: json['url']?.toString() ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'url': url,
+  };
 }
 
 class SourceChapterRoad {
@@ -56,6 +61,11 @@ class SourceChapterRoad {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'episodes': episodes.map((e) => e.toJson()).toList(),
+  };
 }
 
 class SourceResolveResult {

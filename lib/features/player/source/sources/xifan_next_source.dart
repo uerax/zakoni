@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:zakoni/core/network/bangumi_data_disk_cache_manager.dart';
 import '../models/source_models.dart';
 import 'video_source.dart';
 
@@ -38,7 +39,8 @@ class XifanNextSource extends VideoSource {
   final Map<String, ({int time, List<SourceSearchResult> results})> _searchCache = {};
   final Map<String, Future<List<SourceSearchResult>>> _inflightSearch = {};
 
-  // 2. 章节线路缓存 (1小时)
+  // 2. 章节线路缓存 (对齐 animaku 30m session shield: 30分钟内存 + 磁盘持久化)
+  static const Duration _kChaptersTtl = Duration(minutes: 30);
   final Map<String, ({int time, List<SourceChapterRoad> roads})> _chaptersCache = {};
   final Map<String, Future<List<SourceChapterRoad>>> _inflightChapters = {};
 
@@ -417,10 +419,33 @@ class XifanNextSource extends VideoSource {
     final animeId = match.group(1)!;
 
     final now = DateTime.now().millisecondsSinceEpoch;
+    // 1. L1 内存缓存命中 (对齐 animaku 30m session shield)
     final cached = _chaptersCache[animeId];
-    if (cached != null && now - cached.time < 60 * 60 * 1000) {
+    if (cached != null && now - cached.time < _kChaptersTtl.inMilliseconds) {
       _log('命中分集线路内存缓存: animeId=$animeId (${cached.roads.length}条线路)');
       return cached.roads;
+    }
+
+    // 2. L2 本地磁盘持久化缓存命中 (复用 BangumiDataDiskCacheManager，零网络耗时秒出)
+    final diskCache = BangumiDataDiskCacheManager.instance;
+    final diskCacheKey = 'xifan_chapters_$animeId';
+    if (diskCache != null) {
+      try {
+        final diskData = await diskCache.getJson(diskCacheKey);
+        if (diskData is List && diskData.isNotEmpty) {
+          final diskRoads = diskData
+              .whereType<Map<String, dynamic>>()
+              .map(SourceChapterRoad.fromJson)
+              .toList();
+          if (diskRoads.isNotEmpty && diskRoads.any((r) => r.episodes.isNotEmpty)) {
+            _log('命中分集线路本地磁盘缓存: animeId=$animeId (${diskRoads.length}条线路)');
+            _chaptersCache[animeId] = (time: now, roads: diskRoads);
+            return diskRoads;
+          }
+        }
+      } catch (e) {
+        _log('读取分集本地磁盘缓存异常: $e');
+      }
     }
 
     if (_inflightChapters.containsKey(animeId)) {
@@ -429,6 +454,17 @@ class XifanNextSource extends VideoSource {
 
     final future = () async {
       _log('正在获取番剧分集与线路: animeId=$animeId');
+
+      void saveToCache(List<SourceChapterRoad> roads) {
+        _chaptersCache[animeId] = (time: DateTime.now().millisecondsSinceEpoch, roads: roads);
+        try {
+          diskCache?.putJson(
+            diskCacheKey,
+            roads.map((r) => r.toJson()).toList(),
+            maxAge: _kChaptersTtl,
+          ).ignore();
+        } catch (_) {}
+      }
 
       // 极速轨 (Fast-Path): Supabase REST 表查询 (过滤 available_at 排除未播日程，仅 ~1.5KB JSON，500ms 内瞬间直出)
       Future<List<SourceChapterRoad>?> fetchFastRest() async {
@@ -544,43 +580,34 @@ class XifanNextSource extends VideoSource {
         return null;
       }
 
-      // 竞速编排：并发启动 Fast-Path 与 Full-Path
-      final ssrFuture = fetchFullSsr();
+      // 特殊处理说明：
+      // 1. 并发启动 Fast-Path 与 Full-Path，彻底移除原先等待 SSR 2 秒的阻塞超时；
+      // 2. 优先等待 200~300ms 的 Fast-Path 直出分集，消除首屏白屏卡顿；
+      // 3. 后台静默等待 SSR 完成后平滑升级多线路并持久化到本地磁盘，保证不遗漏源站完整线路。
       final restFuture = fetchFastRest();
+      final ssrFuture = fetchFullSsr();
 
-      // 给 Full-Path (SSR) 预留 2 秒优先优胜窗口，若超时或失败则秒级由 Fast-Path 顶上
-      final earlySsr = await ssrFuture.timeout(
-        const Duration(seconds: 2),
-        onTimeout: () => null,
-      );
-
-      if (earlySsr != null && earlySsr.isNotEmpty) {
-        _log('SSR 完整多线路优先命中: ${earlySsr.map((r) => "${r.name}(${r.episodes.length}集)").join(', ')}');
-        _chaptersCache[animeId] = (time: DateTime.now().millisecondsSinceEpoch, roads: earlySsr);
-        return earlySsr;
-      }
-
-      // 若 SSR 耗时超过 750ms，检查极速 REST 表结果
       final fastRest = await restFuture;
       if (fastRest != null && fastRest.isNotEmpty) {
         _log('极速 Fast-Path 抢先直出 (${fastRest.length}条线路)，分集列表瞬时呈现');
-        _chaptersCache[animeId] = (time: DateTime.now().millisecondsSinceEpoch, roads: fastRest);
+        saveToCache(fastRest);
 
-        // 后台静默等待 SSR 完成后平滑升级多线路缓存
+        // 后台静默等待 SSR 完成后平滑升级多线路内存与磁盘缓存
         ssrFuture.then((ssrRoads) {
           if (ssrRoads != null && ssrRoads.isNotEmpty) {
-            _log('后台 SSR 线路解析就绪，已平滑升级多线路缓存');
-            _chaptersCache[animeId] = (time: DateTime.now().millisecondsSinceEpoch, roads: ssrRoads);
+            _log('后台 SSR 线路解析就绪，已平滑升级多线路内存与磁盘缓存');
+            saveToCache(ssrRoads);
           }
         }).catchError((_) {});
 
         return fastRest;
       }
 
-      // 若 Fast-Path 异常，最后等待 SSR 兜底
+      // 若 Fast-Path 异常，回退等待 SSR 兜底
       final lateSsr = await ssrFuture;
       if (lateSsr != null && lateSsr.isNotEmpty) {
-        _chaptersCache[animeId] = (time: DateTime.now().millisecondsSinceEpoch, roads: lateSsr);
+        _log('SSR 完整线路兜底就绪 (${lateSsr.length}条线路)');
+        saveToCache(lateSsr);
         return lateSsr;
       }
 
@@ -634,12 +661,43 @@ class XifanNextSource extends VideoSource {
       reqBody['source_id'] = sourceId;
     }
 
-    final dynamic res = await _fetchSupabase(
+    dynamic res = await _fetchSupabase(
       '/functions/v1/issue-web-playback',
       method: 'POST',
       body: reqBody,
       timeout: const Duration(seconds: 8),
     );
+
+    // 特殊处理说明：
+    // 若指定 source_id 时返回 not_found（常见于老番或非新番剧集，源站未配置该特定线路），
+    // 自动移除 source_id 回退请求全局默认候选源，避免剧集直接报错中断播放
+    if ((res is! Map || res['ok'] != true) && sourceId != null) {
+      _log('指定 source_id=$sourceId 签发失败，尝试不带 source_id 请求默认可用线路...');
+      final retryBody = Map<String, dynamic>.from(reqBody)..remove('source_id');
+      final retryRes = await _fetchSupabase(
+        '/functions/v1/issue-web-playback',
+        method: 'POST',
+        body: retryBody,
+        timeout: const Duration(seconds: 8),
+      );
+      if (retryRes is Map && retryRes['ok'] == true) {
+        res = retryRes;
+      }
+    }
+
+    // 若 fallback 依然未成功，对齐 animaku 机制尝试 action: 'hls'
+    if (res is! Map || res['ok'] != true) {
+      _log('fallback 模式未成功，尝试 action: "hls" 签发直链...');
+      final hlsRes = await _fetchSupabase(
+        '/functions/v1/issue-web-playback',
+        method: 'POST',
+        body: {'action': 'hls', 'episode_id': episodeId},
+        timeout: const Duration(seconds: 8),
+      );
+      if (hlsRes is Map && hlsRes['ok'] == true) {
+        res = hlsRes;
+      }
+    }
 
     if (res is! Map || res['ok'] != true) {
       final err = (res is Map) ? res['error'] : 'unknown_error';

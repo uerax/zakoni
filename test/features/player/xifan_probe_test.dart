@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zakoni/features/player/source/models/source_models.dart';
 import 'package:zakoni/features/player/source/sources/xifan_next_source.dart';
 
 void main() {
@@ -47,5 +48,14 @@ void main() {
     swCacheResolve.stop();
     expect(cachedRes.url, anyOf(contains('pan.wo.cn'), contains('moedot.net'), matches(r'https://\d+\.\d+\.\d+\.\d+')));
     expect(swCacheResolve.elapsedMilliseconds, lessThan(20));
+
+    // 6. 验证持久化磁盘缓存 JSON 格式可逆转换
+    final rawJsonList = roads.map((r) => r.toJson()).toList();
+    expect(rawJsonList, isNotEmpty);
+    final restoredRoads = rawJsonList.map(SourceChapterRoad.fromJson).toList();
+    expect(restoredRoads.length, roads.length);
+    expect(restoredRoads[0].name, roads[0].name);
+    expect(restoredRoads[0].episodes.length, roads[0].episodes.length);
+    expect(restoredRoads[0].episodes.first.url, roads[0].episodes.first.url);
   });
 }
