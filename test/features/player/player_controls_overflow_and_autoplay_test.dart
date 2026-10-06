@@ -5,6 +5,7 @@ import 'package:zakoni/features/player/controller/playback_controller.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
 import 'package:zakoni/features/player/services/player_preferences_service.dart';
 import 'package:zakoni/features/player/widgets/controls/danmaku_settings_icon.dart';
+import 'package:zakoni/features/player/widgets/controls/popups/player_speed_popup.dart';
 import 'package:zakoni/features/player/widgets/player_controls.dart';
 
 void main() {
@@ -118,6 +119,137 @@ void main() {
       expect(PlayerPreferencesService.instance.autoPlayNext, isTrue);
 
       autoPlayNotifier.dispose();
+    });
+
+    testWidgets('3. 验证底栏使用自绘 DanmakuToggleIcon 开关，点击切换开启与划线关闭状态',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 450,
+              child: PlayerControls(
+                controller: controller,
+                title: '测试动画',
+                danmakuController: danmakuController,
+                isFullscreen: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 验证存在自绘弹幕开关
+      expect(find.byType(DanmakuToggleIcon), findsOneWidget);
+      final initialIcon = tester.widget<DanmakuToggleIcon>(find.byType(DanmakuToggleIcon));
+      expect(initialIcon.enabled, isTrue);
+
+      // 点击弹幕开关关闭弹幕
+      await tester.tap(find.byType(DanmakuToggleIcon));
+      await tester.pumpAndSettle();
+
+      expect(danmakuController.settings.enabled, isFalse);
+      final toggledIcon = tester.widget<DanmakuToggleIcon>(find.byType(DanmakuToggleIcon));
+      expect(toggledIcon.enabled, isFalse);
+    });
+
+    testWidgets('4. 播放设置面板支持切换「控制栏图标大小」并持久化偏好', (tester) async {
+      await PlayerPreferencesService.instance.initialize();
+      PlayerPreferencesService.instance.saveControlBarScale(PlayerControlBarScale.auto);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 450,
+              child: PlayerControls(
+                controller: controller,
+                isFullscreen: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 打开播放设置
+      await tester.tap(find.byIcon(Icons.settings_outlined));
+      await tester.pumpAndSettle();
+
+      expect(find.text('控制栏图标大小'), findsOneWidget);
+      expect(find.text('自适应'), findsOneWidget);
+      expect(find.text('标准'), findsOneWidget);
+
+      // 滚动到底部并点击选择「大号」
+      await tester.ensureVisible(find.text('大号'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('大号'));
+      await tester.pumpAndSettle();
+
+      expect(PlayerPreferencesService.instance.controlBarScale,
+          equals(PlayerControlBarScale.large));
+    });
+
+    testWidgets('5. 窄屏 (360x220) 下展开倍速菜单，气泡动态自适应锚定于倍速按钮且无截断溢出',
+        (tester) async {
+      await PlayerPreferencesService.instance.initialize();
+      await PlayerPreferencesService.instance.saveControlBarScale(PlayerControlBarScale.auto);
+
+      final errors = <FlutterErrorDetails>[];
+      final oldHandler = FlutterError.onError;
+      FlutterError.onError = (details) {
+        errors.add(details);
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 360,
+              height: 220,
+              child: PlayerControls(
+                controller: controller,
+                title: '窄屏动画测试',
+                isFullscreen: false,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 点击展开倍速菜单 (1x)
+      expect(find.text('1x'), findsOneWidget);
+      await tester.tap(find.text('1x'));
+      await tester.pumpAndSettle();
+
+      FlutterError.onError = oldHandler;
+      expect(errors, isEmpty);
+
+      // 验证倍速气泡呈现且完整包含选项
+      expect(find.byType(PlayerSpeedPopup), findsOneWidget);
+      expect(find.text('2.0x'), findsOneWidget);
+      expect(find.text('0.75x'), findsOneWidget);
+
+      // 获取倍速按钮和倍速气泡的真实渲染矩形
+      final speedButtonRect = tester.getRect(find.text('1x').first);
+      final popupRect = tester.getRect(find.byType(PlayerSpeedPopup));
+
+      // 验证气泡水平居中对齐倍速按钮（允许极窄屏幕下 clamp 保护边缘，且中心偏差极小）
+      final speedBtnCenter = speedButtonRect.center.dx;
+      final popupCenter = popupRect.center.dx;
+      expect((speedBtnCenter - popupCenter).abs(), lessThan(10.0));
+
+      // 验证气泡位于倍速按钮上方
+      expect(popupRect.bottom, lessThanOrEqualTo(speedButtonRect.top));
+
+      // 验证气泡完全位于播放器视口内（left >= 0, right <= 360, top >= 0）
+      expect(popupRect.left, greaterThanOrEqualTo(0.0));
+      expect(popupRect.right, lessThanOrEqualTo(360.0));
+      expect(popupRect.top, greaterThanOrEqualTo(0.0));
     });
   });
 }

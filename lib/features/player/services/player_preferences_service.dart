@@ -3,6 +3,29 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../danmaku/models/danmaku_item.dart';
 
+/// 播放器底部控制条尺寸规格偏好
+enum PlayerControlBarScale {
+  /// 自动适应（手机紧凑小号，Windows 桌面与平板采用舒适标准大号）
+  auto,
+
+  /// 紧凑小号（按钮 22，图标 15）
+  compact,
+
+  /// 舒适标准（按钮 32，图标 20）
+  standard,
+
+  /// 醒目大号（按钮 38，图标 24）
+  large;
+
+  static PlayerControlBarScale fromString(String? name) {
+    if (name == null) return PlayerControlBarScale.auto;
+    return PlayerControlBarScale.values.firstWhere(
+      (e) => e.name == name,
+      orElse: () => PlayerControlBarScale.auto,
+    );
+  }
+}
+
 /// 播放器用户偏好设置持久化服务
 /// 记录上次的播放倍速、音量与弹幕外观偏好，应用重启后保持记忆
 class PlayerPreferencesService extends ChangeNotifier {
@@ -13,17 +36,20 @@ class PlayerPreferencesService extends ChangeNotifier {
   static const String _kVolumeKey = 'zakoni_player_volume';
   static const String _kDanmakuSettingsKey = 'zakoni_player_danmaku_settings';
   static const String _kAutoPlayNextKey = 'zakoni_player_auto_play_next';
+  static const String _kControlBarScaleKey = 'zakoni_player_control_bar_scale';
 
   double _playbackRate = 1.0;
   double _volume = 1.0;
   DanmakuSettings _danmakuSettings = const DanmakuSettings();
   bool _autoPlayNext = true;
+  PlayerControlBarScale _controlBarScale = PlayerControlBarScale.auto;
   bool _initialized = false;
 
   double get playbackRate => _playbackRate;
   double get volume => _volume;
   DanmakuSettings get danmakuSettings => _danmakuSettings;
   bool get autoPlayNext => _autoPlayNext;
+  PlayerControlBarScale get controlBarScale => _controlBarScale;
   bool get isInitialized => _initialized;
 
   Future<void> initialize() async {
@@ -33,6 +59,8 @@ class PlayerPreferencesService extends ChangeNotifier {
       _playbackRate = sp.getDouble(_kPlaybackRateKey) ?? 1.0;
       _volume = sp.getDouble(_kVolumeKey) ?? 1.0;
       _autoPlayNext = sp.getBool(_kAutoPlayNextKey) ?? true;
+      final scaleRaw = sp.getString(_kControlBarScaleKey);
+      _controlBarScale = PlayerControlBarScale.fromString(scaleRaw);
 
       final danmakuRaw = sp.getString(_kDanmakuSettingsKey);
       if (danmakuRaw != null && danmakuRaw.isNotEmpty) {
@@ -76,6 +104,17 @@ class PlayerPreferencesService extends ChangeNotifier {
     try {
       final sp = await SharedPreferences.getInstance();
       await sp.setBool(_kAutoPlayNextKey, val);
+    } catch (_) {}
+  }
+
+  Future<void> saveControlBarScale(PlayerControlBarScale scale) async {
+    if (_controlBarScale == scale) return;
+    _controlBarScale = scale;
+    notifyListeners();
+
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setString(_kControlBarScaleKey, scale.name);
     } catch (_) {}
   }
 

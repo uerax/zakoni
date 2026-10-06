@@ -162,16 +162,18 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
               alignment: Alignment.bottomLeft,
               children: [
                 // 1. 弹幕高能波形图 (Danmaku Heatmap Wave)
+                // 无缝衔接：底边缘定位在 bottom: 5.0（微量覆盖 0.5px 至底轨顶沿 bottom: 5.5），
+                // 彻底消除由于顶置绝对定位导致的 2.5px 空白裂隙
                 if (_cachedHeatmap != null)
                   Positioned(
                     left: 0,
                     right: 0,
-                    top: 0,
-                    height: 14,
+                    bottom: 5.0,
+                    height: 16,
                     child: CustomPaint(
                       painter: _DanmakuHeatmapPainter(
                         heatmap: _cachedHeatmap!,
-                        color: primary.withValues(alpha: 0.35),
+                        color: primary,
                       ),
                     ),
                   ),
@@ -331,13 +333,21 @@ class _DanmakuHeatmapPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (heatmap.length < 2) return;
 
+    final h = size.height;
+    final w = size.width;
+
     final paint = Paint()
-      ..color = color
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          color.withValues(alpha: 0.42),
+          color.withValues(alpha: 0.12),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, w, h))
       ..style = PaintingStyle.fill;
 
     final path = Path();
-    final h = size.height;
-    final w = size.width;
     final count = heatmap.length;
     final stepX = w / (count - 1);
 

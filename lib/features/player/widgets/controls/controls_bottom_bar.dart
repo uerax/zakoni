@@ -3,8 +3,130 @@ import 'package:zakoni/core/services/bangumi_oped_service.dart';
 import 'package:zakoni/features/player/controller/playback_controller.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
+import 'package:zakoni/features/player/services/player_preferences_service.dart';
 import 'package:zakoni/features/player/widgets/player_progress_bar.dart';
 import 'danmaku_settings_icon.dart';
+
+/// 底部控制栏响应式尺寸度量规范
+class _BottomBarMetrics {
+  const _BottomBarMetrics({
+    required this.buttonSize,
+    required this.iconSize,
+    required this.playBtnWidth,
+    required this.playBtnHeight,
+    required this.playIconSize,
+    required this.danmakuToggleSize,
+    required this.danmakuSettingsSize,
+    required this.timeFontSize,
+    required this.speedFontSize,
+    required this.speedPadding,
+    required this.spacing,
+    required this.leftSpacing,
+    required this.bottomPadding,
+    required this.horizontalPadding,
+  });
+
+  final double buttonSize;
+  final double iconSize;
+  final double playBtnWidth;
+  final double playBtnHeight;
+  final double playIconSize;
+  final double danmakuToggleSize;
+  final double danmakuSettingsSize;
+  final double timeFontSize;
+  final double speedFontSize;
+  final EdgeInsets speedPadding;
+  final double spacing;
+  final double leftSpacing;
+  final double bottomPadding;
+  final double horizontalPadding;
+
+  factory _BottomBarMetrics.resolve({
+    required PlayerControlBarScale scalePreference,
+    required double totalWidth,
+    required TargetPlatform platform,
+  }) {
+    // 宽屏/平板/桌面端（宽度 >= 600dp 时具备充裕空间容纳大号舒适控制条）
+    final isWideOrTablet = totalWidth >= 600;
+
+    final effectiveScale = scalePreference != PlayerControlBarScale.auto
+        ? scalePreference
+        : (isWideOrTablet
+            ? PlayerControlBarScale.standard
+            : PlayerControlBarScale.compact);
+
+    switch (effectiveScale) {
+      case PlayerControlBarScale.compact:
+        return _BottomBarMetrics(
+          buttonSize: 20.0,
+          iconSize: 14.5,
+          playBtnWidth: 20.0,
+          playBtnHeight: 20.0,
+          playIconSize: 15.0,
+          danmakuToggleSize: 15.0,
+          danmakuSettingsSize: 15.0,
+          timeFontSize: 10.0,
+          speedFontSize: 10.0,
+          speedPadding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 1.5),
+          spacing: 1.0,
+          leftSpacing: 3.0,
+          bottomPadding: 6.0,
+          horizontalPadding: totalWidth < 400 ? 3.0 : 12.0,
+        );
+      case PlayerControlBarScale.standard:
+        return _BottomBarMetrics(
+          buttonSize: 32.0,
+          iconSize: 20.0,
+          playBtnWidth: 34.0,
+          playBtnHeight: 30.0,
+          playIconSize: 22.0,
+          danmakuToggleSize: 20.0,
+          danmakuSettingsSize: 20.0,
+          timeFontSize: 12.5,
+          speedFontSize: 12.5,
+          speedPadding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 3.5),
+          spacing: 6.0,
+          leftSpacing: 8.0,
+          bottomPadding: 10.0,
+          horizontalPadding: totalWidth < 600 ? 8.0 : 16.0,
+        );
+      case PlayerControlBarScale.large:
+        return _BottomBarMetrics(
+          buttonSize: 38.0,
+          iconSize: 24.0,
+          playBtnWidth: 40.0,
+          playBtnHeight: 36.0,
+          playIconSize: 26.0,
+          danmakuToggleSize: 24.0,
+          danmakuSettingsSize: 24.0,
+          timeFontSize: 14.0,
+          speedFontSize: 14.0,
+          speedPadding: const EdgeInsets.symmetric(horizontal: 7.0, vertical: 4.5),
+          spacing: 8.0,
+          leftSpacing: 10.0,
+          bottomPadding: 12.0,
+          horizontalPadding: totalWidth < 600 ? 10.0 : 20.0,
+        );
+      case PlayerControlBarScale.auto:
+        return const _BottomBarMetrics(
+          buttonSize: 32.0,
+          iconSize: 20.0,
+          playBtnWidth: 34.0,
+          playBtnHeight: 30.0,
+          playIconSize: 22.0,
+          danmakuToggleSize: 20.0,
+          danmakuSettingsSize: 20.0,
+          timeFontSize: 12.5,
+          speedFontSize: 12.5,
+          speedPadding: EdgeInsets.symmetric(horizontal: 5.5, vertical: 3.5),
+          spacing: 6.0,
+          leftSpacing: 8.0,
+          bottomPadding: 10.0,
+          horizontalPadding: 16.0,
+        );
+    }
+  }
+}
 
 /// 播放器底部控制通栏（包含全宽流体进度条与主流对齐的经典通栏控制行）
 class PlayerControlsBottomBar extends StatelessWidget {
@@ -26,6 +148,8 @@ class PlayerControlsBottomBar extends StatelessWidget {
     this.isDanmakuPanelActive = false,
     required this.onOpenSettingsPanel,
     required this.onOpenDanmakuPanel,
+    this.speedButtonKey,
+    this.volumeButtonKey,
   });
 
   final ZakoniPlaybackController controller;
@@ -45,6 +169,8 @@ class PlayerControlsBottomBar extends StatelessWidget {
   final bool isDanmakuPanelActive;
   final VoidCallback onOpenSettingsPanel;
   final VoidCallback onOpenDanmakuPanel;
+  final GlobalKey? speedButtonKey;
+  final GlobalKey? volumeButtonKey;
 
   static String _formatDuration(Duration duration, {bool showHours = false}) {
     final hours = duration.inHours;
@@ -59,16 +185,19 @@ class PlayerControlsBottomBar extends StatelessWidget {
   Widget _buildBarButton({
     required Widget icon,
     required VoidCallback? onTap,
+    required double size,
+    Key? key,
     String? tooltip,
   }) {
     final button = Material(
+      key: key,
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(size * 0.18),
         onTap: onTap,
         child: SizedBox(
-          width: 21,
-          height: 21,
+          width: size,
+          height: size,
           child: Center(child: icon),
         ),
       ),
@@ -81,279 +210,280 @@ class PlayerControlsBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final totalWidth = constraints.maxWidth;
-        final horizontalPad = totalWidth < 400 ? 3.0 : 12.0;
+    return ListenableBuilder(
+      listenable: PlayerPreferencesService.instance,
+      builder: (context, _) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final totalWidth = constraints.maxWidth;
+            final metrics = _BottomBarMetrics.resolve(
+              scalePreference: PlayerPreferencesService.instance.controlBarScale,
+              totalWidth: totalWidth,
+              platform: Theme.of(context).platform,
+            );
 
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(horizontalPad, 0, horizontalPad, 6),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 1. 复合型全宽进度条（弹幕波形图 + OP/ED 彩色区间 + 缓冲条 + 流体滑块）
-                ValueListenableBuilder<PlaybackTimelineState>(
-                  valueListenable: controller.timeline,
-                  builder: (context, timelineState, _) {
-                    return PlayerProgressBar(
-                      position: timelineState.displayPosition,
-                      duration: timelineState.duration,
-                      buffer: timelineState.buffer,
-                      opedSegment: opedSegment,
-                      danmakuItems: danmakuController?.items,
-                      primaryColor: primaryColor,
-                      onChangeStart: (dur) {
-                        onSeekingSliderChanged?.call(true);
-                        onUserInteraction();
-                      },
-                      onChanged: (dur) {
-                        onUserInteraction();
-                        controller.updateSeekPreview(dur);
-                      },
-                      onChangeEnd: (dur) {
-                        onSeekingSliderChanged?.call(false);
-                        onUserInteraction();
-                        controller.seek(dur);
-                      },
-                    );
-                  },
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  metrics.horizontalPadding,
+                  0,
+                  metrics.horizontalPadding,
+                  metrics.bottomPadding,
                 ),
-
-                const SizedBox(height: 1),
-
-                // 2. 现代经典通栏控制行：左侧 2 个元素（播放键 + 时间）靠左，其余全部靠右
-                Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // (1) 播放 / 暂停按钮（左1）
-                    ValueListenableBuilder<PlaybackCoreState>(
-                      valueListenable: controller.core,
-                      builder: (context, coreState, _) {
-                        return Material(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(4),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(4),
-                            onTap: () {
-                              onUserInteraction();
-                              controller.togglePlay();
-                            },
-                            child: Container(
-                              width: 22,
-                              height: 20,
-                              alignment: Alignment.center,
-                              child: Icon(
-                                coreState.playing
-                                    ? Icons.pause_rounded
-                                    : Icons.play_arrow_rounded,
-                                key: ValueKey(coreState.playing),
-                                color: Colors.white,
-                                size: 15,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(width: 4),
-
-                    // (2) 时间戳展示：00:03 / 23:42（左2）
+                    // 1. 复合型全宽进度条（弹幕波形图 + OP/ED 彩色区间 + 缓冲条 + 流体滑块）
                     ValueListenableBuilder<PlaybackTimelineState>(
                       valueListenable: controller.timeline,
                       builder: (context, timelineState, _) {
-                        final hasHours = timelineState.duration.inHours > 0;
-                        final pos = _formatDuration(
-                            timelineState.displayPosition,
-                            showHours: hasHours);
-                        final total = _formatDuration(timelineState.duration,
-                            showHours: hasHours);
-                        return Text(
-                          '$pos / $total',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10.0,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: -0.2,
-                            fontFeatures: [FontFeature.tabularFigures()],
-                            shadows: [
-                              Shadow(
-                                color: Colors.black54,
-                                blurRadius: 4,
-                                offset: Offset(0, 1),
-                              ),
-                            ],
-                          ),
+                        return PlayerProgressBar(
+                          position: timelineState.displayPosition,
+                          duration: timelineState.duration,
+                          buffer: timelineState.buffer,
+                          opedSegment: opedSegment,
+                          danmakuItems: danmakuController?.items,
+                          primaryColor: primaryColor,
+                          onChangeStart: (dur) {
+                            onSeekingSliderChanged?.call(true);
+                            onUserInteraction();
+                          },
+                          onChanged: (dur) {
+                            onUserInteraction();
+                            controller.updateSeekPreview(dur);
+                          },
+                          onChangeEnd: (dur) {
+                            onSeekingSliderChanged?.call(false);
+                            onUserInteraction();
+                            controller.seek(dur);
+                          },
                         );
                       },
                     ),
 
-                    // 中间弹性空间，把后面全部元素顶到最右端
-                    const Spacer(),
+                    const SizedBox(height: 1),
 
-                    // (3) 弹幕开关药丸 [弹]
-                    if (danmakuController != null) ...[
-                      ListenableBuilder(
-                        listenable: danmakuController!,
-                        builder: (context, _) {
-                          final isEnabled =
-                              danmakuController!.settings.enabled;
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(3),
-                            onTap: () {
-                              onUserInteraction();
-                              final current = danmakuController!.settings;
-                              danmakuController!.updateSettings(
-                                current.copyWith(enabled: !isEnabled),
-                              );
-                            },
-                            child: Container(
-                              width: 17,
-                              height: 16,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(3),
-                                border: Border.all(
-                                  color: isEnabled
-                                      ? primaryColor
-                                      : Colors.white54,
-                                  width: 0.8,
+                    // 2. 现代经典通栏控制行：左侧 2 个元素（播放键 + 时间）靠左，其余全部靠右
+                    Row(
+                      children: [
+                        // (1) 播放 / 暂停按钮（左1）
+                        ValueListenableBuilder<PlaybackCoreState>(
+                          valueListenable: controller.core,
+                          builder: (context, coreState, _) {
+                            return Material(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(metrics.buttonSize * 0.16),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(metrics.buttonSize * 0.16),
+                                onTap: () {
+                                  onUserInteraction();
+                                  controller.togglePlay();
+                                },
+                                child: Container(
+                                  width: metrics.playBtnWidth,
+                                  height: metrics.playBtnHeight,
+                                  alignment: Alignment.center,
+                                  child: Icon(
+                                    coreState.playing
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                    key: ValueKey(coreState.playing),
+                                    color: Colors.white,
+                                    size: metrics.playIconSize,
+                                  ),
                                 ),
-                                color: isEnabled
-                                    ? primaryColor.withValues(alpha: 0.25)
-                                    : Colors.black.withValues(alpha: 0.2),
                               ),
-                              child: Text(
-                                '弹',
-                                style: TextStyle(
+                            );
+                          },
+                        ),
+
+                        SizedBox(width: metrics.leftSpacing),
+
+                        // (2) 时间戳展示：00:03 / 23:42（左2）
+                        ValueListenableBuilder<PlaybackTimelineState>(
+                          valueListenable: controller.timeline,
+                          builder: (context, timelineState, _) {
+                            final hasHours = timelineState.duration.inHours > 0;
+                            final pos = _formatDuration(
+                                timelineState.displayPosition,
+                                showHours: hasHours);
+                            final total = _formatDuration(timelineState.duration,
+                                showHours: hasHours);
+                            return Text(
+                              '$pos / $total',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: metrics.timeFontSize,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: -0.2,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                                shadows: const [
+                                  Shadow(
+                                    color: Colors.black54,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+
+                        // 中间弹性空间，把后面全部元素顶到最右端
+                        const Spacer(),
+
+                        // (3) 弹幕开关 [自绘圆角矩形，关闭带斜杠划线]
+                        if (danmakuController != null) ...[
+                          ListenableBuilder(
+                            listenable: danmakuController!,
+                            builder: (context, _) {
+                              final isEnabled =
+                                  danmakuController!.settings.enabled;
+                              return _buildBarButton(
+                                icon: DanmakuToggleIcon(
+                                  enabled: isEnabled,
+                                  size: metrics.danmakuToggleSize,
                                   color: isEnabled
                                       ? primaryColor
                                       : Colors.white70,
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.bold,
+                                ),
+                                size: metrics.buttonSize,
+                                tooltip: isEnabled ? '关闭弹幕' : '开启弹幕',
+                                onTap: () {
+                                  onUserInteraction();
+                                  final current = danmakuController!.settings;
+                                  danmakuController!.updateSettings(
+                                    current.copyWith(enabled: !isEnabled),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                          SizedBox(width: metrics.spacing),
+
+                          // (4) 弹幕设置面板按钮 [自绘 animaku 专属图标]
+                          _buildBarButton(
+                            icon: DanmakuSettingsIcon(
+                              size: metrics.danmakuSettingsSize,
+                              color: (isDanmakuPanelActive && isFullscreen)
+                                  ? primaryColor
+                                  : Colors.white,
+                            ),
+                            size: metrics.buttonSize,
+                            tooltip: '弹幕设置',
+                            onTap: onOpenDanmakuPanel,
+                          ),
+                          SizedBox(width: metrics.spacing),
+                        ],
+
+                        // (5) 倍速选择 [1x / 1.25x ...]
+                        ValueListenableBuilder<PlaybackCoreState>(
+                          valueListenable: controller.core,
+                          builder: (context, coreState, _) {
+                            return GestureDetector(
+                              key: speedButtonKey,
+                              behavior: HitTestBehavior.opaque,
+                              onTap: onToggleSpeedPopup,
+                              child: Container(
+                                padding: metrics.speedPadding,
+                                decoration: BoxDecoration(
+                                  color: showSpeedPopup
+                                      ? Colors.white.withValues(alpha: 0.15)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Text(
+                                  coreState.playbackRate == 1.0
+                                      ? '1x'
+                                      : '${coreState.playbackRate}x',
+                                  style: TextStyle(
+                                    color: (showSpeedPopup ||
+                                            coreState.playbackRate != 1.0)
+                                        ? primaryColor
+                                        : Colors.white.withValues(alpha: 0.9),
+                                    fontSize: metrics.speedFontSize,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: -0.2,
+                                  ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 2),
-
-                      // (4) 弹幕设置面板按钮 [自绘 animaku 专属图标]
-                      _buildBarButton(
-                        icon: DanmakuSettingsIcon(
-                          size: 15,
-                          color: (isDanmakuPanelActive && isFullscreen)
-                              ? primaryColor
-                              : Colors.white,
+                            );
+                          },
                         ),
-                        tooltip: '弹幕设置',
-                        onTap: onOpenDanmakuPanel,
-                      ),
-                      const SizedBox(width: 1),
-                    ],
 
-                    // (5) 倍速选择 [1x / 1.25x ...]
-                    ValueListenableBuilder<PlaybackCoreState>(
-                      valueListenable: controller.core,
-                      builder: (context, coreState, _) {
-                        return GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: onToggleSpeedPopup,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 2.5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: showSpeedPopup
-                                  ? Colors.white.withValues(alpha: 0.15)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: Text(
-                              coreState.playbackRate == 1.0
-                                  ? '1x'
-                                  : '${coreState.playbackRate}x',
-                              style: TextStyle(
-                                color: (showSpeedPopup ||
-                                        coreState.playbackRate != 1.0)
-                                    ? primaryColor
-                                    : Colors.white.withValues(alpha: 0.9),
-                                fontSize: 10.0,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                        SizedBox(width: metrics.spacing),
 
-                    const SizedBox(width: 1),
-
-                    // (6) 播放设置按钮 [⚙]
-                    _buildBarButton(
-                      icon: Icon(
-                        Icons.settings_outlined,
-                        color: (isSettingsPanelActive && isFullscreen)
-                            ? primaryColor
-                            : Colors.white,
-                        size: 15,
-                      ),
-                      tooltip: '播放设置',
-                      onTap: onOpenSettingsPanel,
-                    ),
-
-                    const SizedBox(width: 1),
-
-                    // (7) 竖式音量控制按钮 [🔊]
-                    ValueListenableBuilder<PlaybackCoreState>(
-                      valueListenable: controller.core,
-                      builder: (context, coreState, _) {
-                        final isMuted =
-                            coreState.muted || coreState.volume <= 0.001;
-                        return _buildBarButton(
+                        // (6) 播放设置按钮 [⚙]
+                        _buildBarButton(
                           icon: Icon(
-                            isMuted
-                                ? Icons.volume_off_rounded
-                                : (coreState.volume > 0.5
-                                    ? Icons.volume_up_rounded
-                                    : Icons.volume_down_rounded),
-                            color: isMuted ? Colors.white54 : Colors.white,
-                            size: 15,
+                            Icons.settings_outlined,
+                            color: (isSettingsPanelActive && isFullscreen)
+                                ? primaryColor
+                                : Colors.white,
+                            size: metrics.iconSize,
                           ),
-                          tooltip: isMuted ? '取消静音' : '音量调节',
-                          onTap: onToggleVolumeSlider,
-                        );
-                      },
-                    ),
-
-                    // (8) 全屏切换按钮 [⛶]
-                    if (onToggleFullscreen != null) ...[
-                      const SizedBox(width: 1),
-                      _buildBarButton(
-                        icon: Icon(
-                          isFullscreen
-                            ? Icons.fullscreen_exit_rounded
-                            : Icons.fullscreen_rounded,
-                          color: Colors.white,
-                          size: 15,
+                          size: metrics.buttonSize,
+                          tooltip: '播放设置',
+                          onTap: onOpenSettingsPanel,
                         ),
-                        tooltip: isFullscreen ? '退出全屏' : '进入全屏',
-                        onTap: () {
-                          onUserInteraction();
-                          onToggleFullscreen?.call();
-                        },
-                      ),
-                    ],
+
+                        SizedBox(width: metrics.spacing),
+
+                        // (7) 竖式音量控制按钮 [🔊]
+                        ValueListenableBuilder<PlaybackCoreState>(
+                          valueListenable: controller.core,
+                          builder: (context, coreState, _) {
+                            final isMuted =
+                                coreState.muted || coreState.volume <= 0.001;
+                            return _buildBarButton(
+                              key: volumeButtonKey,
+                              icon: Icon(
+                                isMuted
+                                    ? Icons.volume_off_rounded
+                                    : (coreState.volume > 0.5
+                                        ? Icons.volume_up_rounded
+                                        : Icons.volume_down_rounded),
+                                color: isMuted ? Colors.white54 : Colors.white,
+                                size: metrics.iconSize,
+                              ),
+                              size: metrics.buttonSize,
+                              tooltip: isMuted ? '取消静音' : '音量调节',
+                              onTap: onToggleVolumeSlider,
+                            );
+                          },
+                        ),
+
+                        // (8) 全屏切换按钮 [⛶]
+                        if (onToggleFullscreen != null) ...[
+                          SizedBox(width: metrics.spacing),
+                          _buildBarButton(
+                            icon: Icon(
+                              isFullscreen
+                                  ? Icons.fullscreen_exit_rounded
+                                  : Icons.fullscreen_rounded,
+                              color: Colors.white,
+                              size: metrics.iconSize,
+                            ),
+                            size: metrics.buttonSize,
+                            tooltip: isFullscreen ? '退出全屏' : '进入全屏',
+                            onTap: () {
+                              onUserInteraction();
+                              onToggleFullscreen?.call();
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
   }
 }
+

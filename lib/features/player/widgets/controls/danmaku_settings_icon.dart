@@ -188,18 +188,22 @@ class _DanmakuSettingsIconPainter extends CustomPainter {
         style: TextStyle(
           color: color,
           fontSize: 12.0,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           fontFamily: 'MiSans',
+          fontFamilyFallback: const ['PingFang SC', 'Microsoft YaHei', 'sans-serif'],
           height: 1.0,
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+    // 汉字「弹」全位于基线之上，无西文下降部。为了确保其像素视觉中心与 24x24 外框正中心 (12.0, 12.0)
+    // 严格吻合（四周等距留白 5.0px），加入 +0.5 的 X 轴与 +1.8 的 Y 轴补偿。
+    // 右下角被齿轮自然遮挡，整体字形骨架端正对齐。
     textPainter.paint(
       canvas,
       Offset(
-        11.5 - (textPainter.width / 2),
-        11.8 - (textPainter.height / 2),
+        12.0 - (textPainter.width / 2) + 0.5,
+        12.0 - (textPainter.height / 2) + 1.8,
       ),
     );
 
@@ -214,6 +218,121 @@ class _DanmakuSettingsIconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DanmakuSettingsIconPainter oldDelegate) {
-    return oldDelegate.color != color;
+    return true;
   }
 }
+
+/// 自绘专属弹幕开关图标
+///
+/// 视觉构成：
+/// 1. 外层完整的圆角矩形描边（24x24 视口下无右下角齿轮缺口）
+/// 2. 正中心居中「弹」字符
+/// 3. 关闭状态下由圆角斜杠贯穿划过「弹」字
+class DanmakuToggleIcon extends StatelessWidget {
+  const DanmakuToggleIcon({
+    super.key,
+    required this.enabled,
+    this.size = 18.0,
+    this.color = Colors.white,
+    this.slashColor,
+  });
+
+  final bool enabled;
+  final double size;
+  final Color color;
+  final Color? slashColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _DanmakuToggleIconPainter(
+        enabled: enabled,
+        color: color,
+        slashColor: slashColor ?? color,
+      ),
+    );
+  }
+}
+
+class _DanmakuToggleIconPainter extends CustomPainter {
+  _DanmakuToggleIconPainter({
+    required this.enabled,
+    required this.color,
+    required this.slashColor,
+  });
+
+  final bool enabled;
+  final Color color;
+  final Color slashColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24.0;
+    canvas.save();
+    canvas.scale(scale, scale);
+
+    // 1. 绘制闭合圆角方框描边 (24x24 视口，完整圆角矩形)
+    final strokePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final frameRRect = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(2.0, 2.0, 20.0, 20.0),
+      const Radius.circular(4.5),
+    );
+    canvas.drawRRect(frameRRect, strokePaint);
+
+    // 2. 绘制正中心「弹」字
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: '弹',
+        style: TextStyle(
+          color: color,
+          fontSize: 12.0,
+          fontWeight: FontWeight.w700,
+          fontFamily: 'MiSans',
+          fontFamilyFallback: const ['PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+          height: 1.0,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    // 补偿下降部与字模偏移，保持与 DanmakuSettingsIcon 完全一致的居中与粗细
+    textPainter.paint(
+      canvas,
+      Offset(
+        12.0 - (textPainter.width / 2) + 0.5,
+        12.0 - (textPainter.height / 2) + 1.8,
+      ),
+    );
+
+    // 3. 关闭状态下，绘制利落划过「弹」字的对角斜线
+    if (!enabled) {
+      final slashPaint = Paint()
+        ..color = slashColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..strokeCap = StrokeCap.round;
+
+      // 从左上圆角内侧 (3.0, 3.0) 划过中心至右下 (21.0, 21.0)
+      canvas.drawLine(
+        const Offset(3.0, 3.0),
+        const Offset(21.0, 21.0),
+        slashPaint,
+      );
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _DanmakuToggleIconPainter oldDelegate) {
+    return true;
+  }
+}
+

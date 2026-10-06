@@ -290,6 +290,68 @@ class PlayerSettingsPanelBody extends StatelessWidget {
               },
             ),
           ],
+
+          // 6. 控制栏图标大小（手机端保持紧凑，Windows桌面和平板可单独调整或跟随自适应）
+          const SizedBox(height: 10),
+          const PanelSectionHeader(title: '控制栏图标大小'),
+          ListenableBuilder(
+            listenable: PlayerPreferencesService.instance,
+            builder: (context, _) {
+              final cur = PlayerPreferencesService.instance.controlBarScale;
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    PanelOptionChip(
+                      label: '自适应',
+                      selected: cur == PlayerControlBarScale.auto,
+                      primaryColor: primaryColor,
+                      onTap: () {
+                        PlayerPreferencesService.instance
+                            .saveControlBarScale(PlayerControlBarScale.auto);
+                        onTriggerSkipToast?.call('控制栏大小：跟随设备自适应');
+                      },
+                    ),
+                    PanelOptionChip(
+                      label: '紧凑',
+                      selected: cur == PlayerControlBarScale.compact,
+                      primaryColor: primaryColor,
+                      onTap: () {
+                        PlayerPreferencesService.instance
+                            .saveControlBarScale(PlayerControlBarScale.compact);
+                        onTriggerSkipToast?.call('控制栏大小：紧凑小号');
+                      },
+                    ),
+                    PanelOptionChip(
+                      label: '标准',
+                      selected: cur == PlayerControlBarScale.standard,
+                      primaryColor: primaryColor,
+                      onTap: () {
+                        PlayerPreferencesService.instance
+                            .saveControlBarScale(PlayerControlBarScale.standard);
+                        onTriggerSkipToast?.call('控制栏大小：舒适标准');
+                      },
+                    ),
+                    PanelOptionChip(
+                      label: '大号',
+                      selected: cur == PlayerControlBarScale.large,
+                      primaryColor: primaryColor,
+                      onTap: () {
+                        PlayerPreferencesService.instance
+                            .saveControlBarScale(PlayerControlBarScale.large);
+                        onTriggerSkipToast?.call('控制栏大小：醒目大号');
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

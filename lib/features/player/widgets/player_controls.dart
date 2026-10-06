@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -83,6 +84,8 @@ class _PlayerControlsState extends State<PlayerControls> {
   _ActiveControlPanel _activePanel = _ActiveControlPanel.none;
   bool _showVolumeSlider = false;
   bool _showSpeedPopup = false;
+  final GlobalKey _speedButtonKey = GlobalKey();
+  final GlobalKey _volumeButtonKey = GlobalKey();
 
   late final FocusNode _keyboardFocusNode;
 
@@ -561,6 +564,59 @@ class _PlayerControlsState extends State<PlayerControls> {
     }
   }
 
+  Widget _buildAnchoredPopup({
+    required GlobalKey anchorKey,
+    required Widget child,
+    required double popupWidth,
+    required double playerWidth,
+    required double playerHeight,
+    required double fallbackRight,
+    required double fallbackBottom,
+  }) {
+    final renderBox =
+        anchorKey.currentContext?.findRenderObject() as RenderBox?;
+    final rootBox = context.findRenderObject() as RenderBox?;
+
+    double left;
+    double bottom;
+
+    if (renderBox != null &&
+        rootBox != null &&
+        renderBox.hasSize &&
+        rootBox.hasSize) {
+      final offset = renderBox.localToGlobal(Offset.zero, ancestor: rootBox);
+      final anchorSize = renderBox.size;
+      final anchorCenterX = offset.dx + (anchorSize.width / 2.0);
+
+      // 水平方向：严格以目标按钮中心对齐，并在左右两端保留 8px 安全边距（彻底防止窄屏被裁切）
+      final idealLeft = anchorCenterX - (popupWidth / 2.0);
+      final maxLeft = math.max(8.0, playerWidth - popupWidth - 8.0);
+      left = idealLeft.clamp(8.0, maxLeft);
+
+      // 垂直方向：精准锚定在按钮上方 6px 处
+      final idealBottom = playerHeight - offset.dy + 6.0;
+      bottom = idealBottom.clamp(0.0, math.max(0.0, playerHeight - 60.0));
+    } else {
+      // 降级兜底（未完成初次测量时）
+      left = math.max(8.0, playerWidth - fallbackRight - popupWidth);
+      bottom = fallbackBottom;
+    }
+
+    // 视口高度自适应：计算上方可用最大高度，防止矮屏被顶部导航栏裁剪
+    final maxAvailableHeight = math.max(80.0, playerHeight - bottom - 42.0);
+
+    return Positioned(
+      left: left,
+      bottom: bottom,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: maxAvailableHeight,
+        ),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -575,9 +631,15 @@ class _PlayerControlsState extends State<PlayerControls> {
         focusNode: _keyboardFocusNode,
         autofocus: true,
         onKeyEvent: (node, event) => _handleKeyEvent(event),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final playerWidth = constraints.maxWidth;
+            final playerHeight = constraints.maxHeight;
+            final isShortScreen = playerHeight < 240.0;
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
             // 0. 软件亮度滤镜遮罩（当亮度低于 1.0 时平滑暗化底层视频）
             ValueListenableBuilder<double>(
               valueListenable: _brightnessNotifier,
@@ -876,6 +938,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                             context, primaryColor, _ActiveControlPanel.settings),
                         onOpenDanmakuPanel: () => _openPanel(
                             context, primaryColor, _ActiveControlPanel.danmaku),
+                        speedButtonKey: _speedButtonKey,
+                        volumeButtonKey: _volumeButtonKey,
                       ),
                     ),
                   ],
@@ -902,7 +966,7 @@ class _PlayerControlsState extends State<PlayerControls> {
               isFullscreen: widget.isFullscreen,
             ),
 
-            // 7. 垂直音量调节面板（遮罩在下，悬浮卡片在上，手势 100% 灵敏不被遮挡）
+            // 7. 垂直音量调节面板（动态计算锚点，水平严格居中于音量键，自适应防溢出）
             if (_showVolumeSlider) ...[
               Positioned.fill(
                 child: GestureDetector(
@@ -914,9 +978,13 @@ class _PlayerControlsState extends State<PlayerControls> {
                   child: const ColoredBox(color: Colors.transparent),
                 ),
               ),
-              Positioned(
-                right: (widget.onToggleFullscreen != null ? 38.0 : 10.0),
-                bottom: 46,
+              _buildAnchoredPopup(
+                anchorKey: _volumeButtonKey,
+                popupWidth: 36.0,
+                playerWidth: playerWidth,
+                playerHeight: playerHeight,
+                fallbackRight: widget.onToggleFullscreen != null ? 38.0 : 10.0,
+                fallbackBottom: 46.0,
                 child: PlayerVerticalVolumePopup(
                   controller: widget.controller,
                   primaryColor: primaryColor,
@@ -928,7 +996,7 @@ class _PlayerControlsState extends State<PlayerControls> {
               ),
             ],
 
-            // 8. 垂直倍速调节浮层面板（0ms 瞬间直出无渐变路由，遮罩在下，卡片在上）
+            // 8. 垂直倍速调节浮层面板（动态计算锚点，水平严格居中于倍速键，左右边界防溢出，高度自适应）
             if (_showSpeedPopup) ...[
               Positioned.fill(
                 child: GestureDetector(
@@ -940,12 +1008,17 @@ class _PlayerControlsState extends State<PlayerControls> {
                   child: const ColoredBox(color: Colors.transparent),
                 ),
               ),
-              Positioned(
-                right: (widget.onToggleFullscreen != null ? 74.0 : 46.0),
-                bottom: 46,
+              _buildAnchoredPopup(
+                anchorKey: _speedButtonKey,
+                popupWidth: isShortScreen ? 82.0 : 86.0,
+                playerWidth: playerWidth,
+                playerHeight: playerHeight,
+                fallbackRight: widget.onToggleFullscreen != null ? 74.0 : 46.0,
+                fallbackBottom: 46.0,
                 child: PlayerSpeedPopup(
                   controller: widget.controller,
                   primaryColor: primaryColor,
+                  compact: isShortScreen,
                   onSelectSpeed: (speed) {
                     widget.controller.setPlaybackRate(speed);
                     setState(() => _showSpeedPopup = false);
@@ -1010,8 +1083,10 @@ class _PlayerControlsState extends State<PlayerControls> {
               ),
             ],
           ],
-        ),
-      ),
-    );
+        );
+      },
+    ),
+  ),
+);
   }
 }

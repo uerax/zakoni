@@ -10,11 +10,13 @@ class PlayerSpeedPopup extends StatelessWidget {
     required this.controller,
     required this.primaryColor,
     required this.onSelectSpeed,
+    this.compact = false,
   });
 
   final ZakoniPlaybackController controller;
   final Color primaryColor;
   final ValueChanged<double> onSelectSpeed;
+  final bool compact;
 
   // 特殊处理说明：
   // 向上展开的气泡按降序排列：顶部 2.0x -> 底部 0.75x，贴合由低到高靠近 1x 按钮的直觉排布；
@@ -23,6 +25,10 @@ class PlayerSpeedPopup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final itemHeight = compact ? 21.0 : 25.0;
+    final itemFontSize = compact ? 10.5 : 11.5;
+    final containerWidth = compact ? 82.0 : 86.0;
+
     return ValueListenableBuilder<PlaybackCoreState>(
       valueListenable: controller.core,
       builder: (context, coreState, _) {
@@ -31,7 +37,7 @@ class PlayerSpeedPopup extends StatelessWidget {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
             child: Container(
-              width: 82,
+              width: containerWidth,
               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
               decoration: BoxDecoration(
                 color: const Color(0xEE16161C),
@@ -48,12 +54,20 @@ class PlayerSpeedPopup extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final speed in supportedSpeeds)
-                    _buildSpeedItem(speed, coreState.playbackRate),
-                ],
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final speed in supportedSpeeds)
+                      _buildSpeedItem(
+                        speed,
+                        coreState.playbackRate,
+                        itemHeight,
+                        itemFontSize,
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -62,14 +76,19 @@ class PlayerSpeedPopup extends StatelessWidget {
     );
   }
 
-  Widget _buildSpeedItem(double speed, double currentRate) {
+  Widget _buildSpeedItem(
+    double speed,
+    double currentRate,
+    double height,
+    double fontSize,
+  ) {
     final isSelected = speed == currentRate;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onSelectSpeed(speed),
       child: Container(
-        height: 25,
-        padding: const EdgeInsets.symmetric(horizontal: 7),
+        height: height,
+        padding: const EdgeInsets.symmetric(horizontal: 5),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isSelected
@@ -86,13 +105,13 @@ class PlayerSpeedPopup extends StatelessWidget {
                 color: isSelected
                     ? primaryColor
                     : Colors.white.withValues(alpha: 0.9),
-                fontSize: 11.5,
+                fontSize: fontSize,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 letterSpacing: -0.2,
               ),
             ),
             if (isSelected)
-              Icon(Icons.check_rounded, color: primaryColor, size: 12),
+              Icon(Icons.check_rounded, color: primaryColor, size: compact ? 11 : 12),
           ],
         ),
       ),
