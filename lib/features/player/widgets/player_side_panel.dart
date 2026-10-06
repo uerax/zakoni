@@ -6,6 +6,7 @@ import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
 import 'package:zakoni/features/player/source/source_aggregator.dart';
 import 'package:zakoni/features/player/source/utils/playable_slot_engine.dart';
+import 'package:zakoni/core/services/watched_episodes_service.dart';
 import 'package:zakoni/features/player/widgets/episode_picker_section.dart';
 import 'package:zakoni/features/player/widgets/video_source_view.dart';
 
@@ -24,6 +25,7 @@ class PlayerSidePanel extends StatefulWidget {
     required this.isOpen,
     required this.initialTab,
     required this.onClose,
+    this.bangumiId = 0,
     required this.episodeCount,
     this.currentEpisode,
     this.roads = const ['默认线路'],
@@ -46,6 +48,7 @@ class PlayerSidePanel extends StatefulWidget {
   final bool isOpen;
   final PlayerSidePanelTab initialTab;
   final VoidCallback onClose;
+  final int bangumiId;
 
   // 选集相关
   final int episodeCount;
@@ -373,22 +376,29 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
       );
     }
 
-    return EpisodePickerSection(
-      key: const ValueKey('side_panel_episodes'),
-      episodeCount: widget.slots != null && widget.slots!.isNotEmpty
-          ? widget.slots!.length
-          : widget.episodeCount,
-      currentEpisode: widget.currentEpisode,
-      roads: widget.roads,
-      activeRoadIndex: widget.activeRoadIndex,
-      episodeTitles: widget.episodeTitles,
-      slots: widget.slots,
-      onRoadSelected: widget.onRoadSelected,
-      onRefresh: widget.onRefreshEpisodes,
-      onSelectEpisode: (ep) {
-        widget.onSelectEpisode(ep);
+    return ListenableBuilder(
+      listenable: WatchedEpisodesService.instance,
+      builder: (context, _) {
+        final watched = WatchedEpisodesService.instance.getWatchedEpisodes(widget.bangumiId);
+        return EpisodePickerSection(
+          key: const ValueKey('side_panel_episodes'),
+          episodeCount: widget.slots != null && widget.slots!.isNotEmpty
+              ? widget.slots!.length
+              : widget.episodeCount,
+          currentEpisode: widget.currentEpisode,
+          roads: widget.roads,
+          activeRoadIndex: widget.activeRoadIndex,
+          episodeTitles: widget.episodeTitles,
+          slots: widget.slots,
+          watchedEpisodes: watched,
+          onRoadSelected: widget.onRoadSelected,
+          onRefresh: widget.onRefreshEpisodes,
+          onSelectEpisode: (ep) {
+            widget.onSelectEpisode(ep);
+          },
+          onSelectSlot: widget.onSelectSlot,
+        );
       },
-      onSelectSlot: widget.onSelectSlot,
     );
   }
 

@@ -9,6 +9,7 @@ import 'core/providers/bangumi_providers.dart';
 import 'core/services/app_preferences.dart';
 import 'core/services/network_connectivity_service.dart';
 import 'core/services/watch_history_service.dart';
+import 'core/services/watched_episodes_service.dart';
 import 'core/utils/appearance_manager.dart';
 import 'core/utils/font_manager.dart';
 import 'core/utils/scroll_behavior.dart';
@@ -24,6 +25,7 @@ void main() async {
   // 1. 初始化并恢复本地持久化配置（网络线路、字体、壁纸等）
   await AppPreferences.init();
   await WatchHistoryService.instance.getHistory();
+  await WatchedEpisodesService.instance.initialize();
 
   // 1.05 初始化网络连通感知服务（用于播放器自适应 150MB Wi-Fi / 16MB 蜂窝缓冲调度）
   await NetworkConnectivityService.instance.initialize();

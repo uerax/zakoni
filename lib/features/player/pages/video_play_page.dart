@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/models/bangumi/bangumi_episode.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
+import '../../../core/models/history/watch_history_item.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/services/bangumi_oped_service.dart';
+import '../../../core/services/watch_history_service.dart';
+import '../../../core/services/watched_episodes_service.dart';
 import '../controller/playback_controller.dart';
 import '../danmaku/danmaku.dart';
 import '../services/player_preferences_service.dart';
@@ -99,6 +102,15 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
   List<SourceChapterRoad> _chapterRoads = [];
   int _selectedRoadIndex = 0;
+  String? _currentPlayingPageUrl;
+
+  // 观看统计、15秒有效播放门槛与完播仲裁状态 (对齐 animaku usePlaybackStats 核心规范)
+  double _playSecAccumulated = 0.0;
+  bool _isValidPlayReported = false;
+  double _lastPlayTick = 0.0;
+  int _lastSaveTimeMs = 0;
+
+  int get _currentCanonicalEp => _activeEpisode ?? 1;
 
   // Bangumi 官方数据补全
   BangumiItem? _fullBangumiItem;
@@ -180,6 +192,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       danmakuController: _danmakuController,
     );
     _playbackController.core.addListener(_onPlaybackCoreStateChanged);
+    _playbackController.timeline.addListener(_onPlaybackTimelineChanged);
 
     // 预热并同步用户上次持久化的弹幕外观设置与连播偏好
     PlayerPreferencesService.instance.initialize().then((_) {
@@ -282,13 +295,135 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     });
   }
 
+  void _resetPlaybackStats() {
+    _playSecAccumulated = 0.0;
+    _isValidPlayReported = false;
+    _lastPlayTick = 0.0;
+    _lastSaveTimeMs = 0;
+  }
+
+  /// 计算初始断点续播时间点并加入片尾与极短播放防卡死保护
+  /// 特殊处理说明：
+  /// 对齐 animaku usePlaybackResume 规范，若目标续播进度已处于视频终点附近（>= 95% 或 距离末尾不足 15s），
+  /// 判定为该集已完整看毕，强制重置为 0 从头开播，彻底杜绝“重新点开已看剧集立刻触发片尾/被连播切走”的死循环陷阱；
+  /// 若记录进度不足 15s 同样从 0 开播，避免 1~2 秒偶发抖动。
+  Duration? _resolveInitialResumePosition(int canonicalEp) {
+    Duration? target;
+    if (widget.initialPosition != null && canonicalEp == widget.currentEpisode) {
+      target = widget.initialPosition;
+    } else if (_effectiveBangumiId > 0) {
+      final historyId = WatchHistoryItem.buildId(_effectiveBangumiId, canonicalEp);
+      final match = WatchHistoryService.instance.items.where((e) => e.id == historyId).firstOrNull;
+      if (match != null && match.position > 0) {
+        final d = match.duration;
+        final p = match.position;
+        if ((d > 30 && (p >= d - 15 || p / d >= 0.95)) || p < 15) {
+          return null;
+        }
+        target = Duration(milliseconds: (p * 1000).round());
+      }
+    }
+
+    if (target != null && target.inSeconds < 15) {
+      return null;
+    }
+    return target;
+  }
+
+  /// 将当前播放进度正式落盘并广播至首页追番货架与历史记录页
+  void _saveCurrentProgress(double position, double duration) {
+    if (_effectiveBangumiId <= 0 || position <= 0 || !position.isFinite) return;
+
+    final ep = _currentCanonicalEp;
+    final effectiveTitle = (_effectiveBangumiItem?.nameCn.isNotEmpty ?? false)
+        ? _effectiveBangumiItem!.nameCn
+        : (_effectiveBangumiItem?.name ?? widget.title);
+
+    final item = WatchHistoryItem(
+      id: WatchHistoryItem.buildId(_effectiveBangumiId, ep),
+      bangumiId: _effectiveBangumiId,
+      title: effectiveTitle,
+      cover: _resolvedCoverUrl,
+      episode: ep,
+      road: _selectedRoadIndex,
+      pluginName: _selectedSourceId,
+      pageUrl: _currentPlayingPageUrl ?? '',
+      position: position,
+      duration: duration > 0 ? duration : 1440.0,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+
+    WatchHistoryService.instance.recordProgress(item).ignore();
+  }
+
+  /// 页面销毁或返回退出时的安全落盘保护
+  /// 特殊处理说明：
+  /// 严禁任何起播秒退都无脑写入历史记录！
+  /// 仅当达到 15 秒有效播放门槛或进度已达到 85% 完播兜底门槛时才执行保存，
+  /// 杜绝用户仅进入页面挑源 1~2 秒就退出时在历史列表中产生大量 0 秒垃圾记录。
+  void _saveProgressOnExit() {
+    if (_effectiveBangumiId <= 0) return;
+    final t = _playbackController.timeline.value.position.inMilliseconds / 1000.0;
+    final d = _playbackController.timeline.value.duration.inMilliseconds / 1000.0;
+    if (t > 0 && (_isValidPlayReported || (d > 30 && t / d >= 0.85))) {
+      _saveCurrentProgress(t, d);
+    }
+  }
+
+  /// 高频播放时间线监听（media_kit 250ms 节流触发）：
+  /// 1. 15 秒自然有效播放累加（Anti-Bounce 门槛）；
+  /// 2. 85% 实时完播兜底标记已看；
+  /// 3. 达到 15 秒后每 10 秒周期性节流同步最新进度至 WatchHistoryService。
+  void _onPlaybackTimelineChanged() {
+    final t = _playbackController.timeline.value.position.inMilliseconds / 1000.0;
+    final d = _playbackController.timeline.value.duration.inMilliseconds / 1000.0;
+    final core = _playbackController.core.value;
+    final isPlaying = core.playing && !core.buffering && !core.loading && core.firstFrameRendered;
+
+    if (t < 0 || !t.isFinite) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    // 1. 累加实际自然有效播放时长并在满 15s 时标记已看并首次正式写入观看历史
+    if (!_isValidPlayReported && _effectiveBangumiId > 0 && isPlaying) {
+      final lastTick = _lastPlayTick > 0 ? _lastPlayTick : t;
+      final tickDelta = t - lastTick;
+      // 严禁在拖拽或非正常时间跳变时累加；仅自然递增 0 < tickDelta <= 2.5s 时累加
+      if (tickDelta > 0 && tickDelta <= 2.5) {
+        _playSecAccumulated += tickDelta;
+        if (_playSecAccumulated >= 15.0) {
+          _isValidPlayReported = true;
+          final canonicalEp = _currentCanonicalEp;
+          WatchedEpisodesService.instance.markWatched(_effectiveBangumiId, canonicalEp);
+          _lastSaveTimeMs = now;
+          _saveCurrentProgress(t, d);
+        }
+      }
+    }
+    _lastPlayTick = t;
+
+    // 2. 完播兜底：单集播放接近末尾（d > 30 且 t / d >= 0.85）自动记录已看（纯客户端标记）
+    if (_effectiveBangumiId > 0 && d > 30 && t / d >= 0.85) {
+      final canonicalEp = _currentCanonicalEp;
+      WatchedEpisodesService.instance.markWatched(_effectiveBangumiId, canonicalEp);
+    }
+
+    // 3. 周期保存历史进度：仅在达到有效播放门槛（满 15s）后，每 10s 同步一次最新进度
+    if (_isValidPlayReported && now - _lastSaveTimeMs >= 10000) {
+      _lastSaveTimeMs = now;
+      _saveCurrentProgress(t, d);
+    }
+  }
+
   Future<void> _initPlayback() async {
     if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
+      _resetPlaybackStats();
       _loadDanmakuForCurrentEpisode();
+      final start = _resolveInitialResumePosition(_currentCanonicalEp);
       await _playbackController.open(
         widget.videoUrl!,
         httpHeaders: widget.httpHeaders,
-        start: widget.initialPosition,
+        start: start,
       );
     }
   }
@@ -663,24 +798,29 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
     setState(() {
       _activeEpisode = slot.canonicalEp;
+      _currentPlayingPageUrl = slot.pageUrl;
       _hasStartedPlayback = true;
       _resolveError = null;
     });
 
+    _resetPlaybackStats();
     widget.onEpisodeSelected?.call(slot.canonicalEp);
     _loadDanmakuForCurrentEpisode();
+
+    final startPos = _resolveInitialResumePosition(slot.canonicalEp);
 
     // 1. 若有预置直接流地址 (或单测环境测试流)
     if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
       await _playbackController.open(
         widget.videoUrl!,
         httpHeaders: widget.httpHeaders,
+        start: startPos,
       );
       return;
     }
 
     if (Platform.environment.containsKey('FLUTTER_TEST')) {
-      await _playbackController.open(slot.pageUrl);
+      await _playbackController.open(slot.pageUrl, start: startPos);
       return;
     }
 
@@ -696,6 +836,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       await _playbackController.open(
         result.url,
         httpHeaders: result.headers,
+        start: startPos,
       );
 
       // 后台静默预热下一集
@@ -743,23 +884,27 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
     setState(() {
       _activeEpisode = ep;
+      _currentPlayingPageUrl = targetEp.url;
       _hasStartedPlayback = true;
       _resolveError = null;
     });
 
+    _resetPlaybackStats();
     widget.onEpisodeSelected?.call(mappedOfficialEp);
+    final startPos = _resolveInitialResumePosition(mappedOfficialEp);
 
     // 1. 若有预置直接流地址 (或单测环境测试流)
     if (widget.videoUrl != null && widget.videoUrl!.isNotEmpty) {
       await _playbackController.open(
         widget.videoUrl!,
         httpHeaders: widget.httpHeaders,
+        start: startPos,
       );
       return;
     }
 
     if (Platform.environment.containsKey('FLUTTER_TEST')) {
-      await _playbackController.open(targetEp.url);
+      await _playbackController.open(targetEp.url, start: startPos);
       return;
     }
 
@@ -775,6 +920,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       await _playbackController.open(
         result.url,
         httpHeaders: result.headers,
+        start: startPos,
       );
 
       // 后台静默预热下一集播放直链
@@ -790,15 +936,38 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   }
 
   void _onPlaybackCoreStateChanged() {
-    final isCompleted = _playbackController.core.value.completed;
+    final core = _playbackController.core.value;
+    final isCompleted = core.completed;
+
+    // 暂停时保存：仅在已满 15 秒且视频时长有效时保存
+    if (!core.playing && _isValidPlayReported) {
+      final t = _playbackController.timeline.value.position.inMilliseconds / 1000.0;
+      final d = _playbackController.timeline.value.duration.inMilliseconds / 1000.0;
+      if (d > 0 && t > 0) {
+        _saveCurrentProgress(t, d);
+      }
+    }
+
     if (isCompleted != _lastPlaybackCompleted) {
       _lastPlaybackCompleted = isCompleted;
-      if (isCompleted && _autoPlayNextNotifier.value) {
-        if (_activeEpisode != null &&
-            _activeEpisode! < _currentEpisodes.length) {
-          final nextEp = _activeEpisode! + 1;
-          _showHudToast('本集播放完毕，自动播放第 $nextEp 话');
-          _selectEpisode(nextEp);
+      if (isCompleted) {
+        // 完播（ended）时无条件标记已看
+        if (_effectiveBangumiId > 0) {
+          WatchedEpisodesService.instance.markWatched(_effectiveBangumiId, _currentCanonicalEp);
+        }
+        final d = _playbackController.timeline.value.duration.inMilliseconds / 1000.0;
+        if (d > 0) {
+          _saveCurrentProgress(d, d);
+        }
+
+        if (_autoPlayNextNotifier.value) {
+          final slots = _currentSlots;
+          final maxCount = slots.isNotEmpty ? slots.length : _currentEpisodes.length;
+          if (_activeEpisode != null && _activeEpisode! < maxCount) {
+            final nextEp = _activeEpisode! + 1;
+            _showHudToast('本集播放完毕，即将自动播放第 $nextEp 话');
+            _selectEpisode(nextEp);
+          }
         }
       }
     }
@@ -806,10 +975,12 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
   @override
   void dispose() {
+    _saveProgressOnExit();
     if (_isFullscreen) {
       _exitFullscreen();
     }
     _tabController.dispose();
+    _playbackController.timeline.removeListener(_onPlaybackTimelineChanged);
     _playbackController.core.removeListener(_onPlaybackCoreStateChanged);
     _playbackController.dispose();
     _autoPlayNextNotifier.dispose();
@@ -853,6 +1024,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       _exitFullscreen();
       return;
     }
+    _saveProgressOnExit();
     _playbackController.pause();
     _playbackController.setVolume(0.0);
     Navigator.of(context).maybePop();
@@ -1006,6 +1178,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         isOpen: _isSidePanelOpen,
         initialTab: _sidePanelInitialTab,
         onClose: () => setState(() => _isSidePanelOpen = false),
+        bangumiId: _effectiveBangumiId,
         episodeCount: _displayEpisodeCount,
         currentEpisode: _activeEpisode,
         roads: _roadNames,

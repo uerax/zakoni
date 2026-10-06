@@ -126,6 +126,24 @@ void main() {
       expect(candidates, contains('Re：从零开始的异世界生活'));
     });
 
+    test('继续追番同名实体 (name == nameCn) buildCandidates 严禁触发 RangeError 越界崩溃', () {
+      // 模拟继续追番卡片生成的实体 (WatchHistoryItem.toBangumiItem): name 与 nameCn 均为 title
+      final historyItem = _createItem(
+        id: 400650,
+        name: '葬送的芙莉莲',
+        nameCn: '葬送的芙莉莲',
+      );
+
+      final candidates = SourceKeywordMatcher.buildCandidates(
+        defaultTitle: '葬送的芙莉莲',
+        item: historyItem,
+        sourceId: 'xifan-next', // 偏好 original 的源
+      );
+
+      expect(candidates, isNotEmpty);
+      expect(candidates.first, '葬送的芙莉莲');
+    });
+
     test('季数提取 (extractSeason) 覆盖中文数字、罗马数字与阿拉伯数字', () {
       expect(SourceKeywordMatcher.extractSeason('间谍过家家 第二季'), 2);
       expect(SourceKeywordMatcher.extractSeason('关于我转生成为史莱姆的那档事 第3期'), 3);

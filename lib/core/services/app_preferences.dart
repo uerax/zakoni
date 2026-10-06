@@ -29,6 +29,7 @@ class AppPreferences {
   static const _kWallpaperBlur = 'pref_wallpaper_blur';
   static const _kSearchHistory = 'pref_search_history';
   static const _kWatchHistory = 'pref_watch_history';
+  static const _kWatchedEpisodes = 'pref_watched_episodes';
   static const _kDeviceInstallId = 'pref_device_install_id';
 
   static SharedPreferences? _prefs;
@@ -240,6 +241,20 @@ class AppPreferences {
 
   static Future<void> clearWatchHistory() async {
     await _prefs?.remove(_kWatchHistory);
+  }
+
+  // --- 已观看集数持久化 (Map<bangumiId, Map<ep, timestamp>>) ---
+
+  static String? getWatchedEpisodesJson() {
+    return _prefs?.getString(_kWatchedEpisodes);
+  }
+
+  static Future<void> saveWatchedEpisodesJson(String jsonStr) async {
+    await _prefs?.setString(_kWatchedEpisodes, jsonStr);
+  }
+
+  static Future<void> clearWatchedEpisodes() async {
+    await _prefs?.remove(_kWatchedEpisodes);
   }
 
   // --- 设备唯一标识持久化（用于每日推荐确定性种子生成） ---

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
+import 'package:zakoni/core/services/watched_episodes_service.dart';
 import 'package:zakoni/features/common/widgets/bouncing_scale_card.dart';
 import 'package:zakoni/features/player/source/models/source_models.dart';
 import 'package:zakoni/features/player/source/source_aggregator.dart';
@@ -249,17 +250,24 @@ class VideoPlayTabContentView extends StatelessWidget {
       );
     }
 
-    return EpisodePickerSection(
-      episodeCount: currentSlots.isNotEmpty ? currentSlots.length : episodeCount,
-      currentEpisode: currentEpisode,
-      roads: roadNames,
-      activeRoadIndex: selectedRoadIndex,
-      episodeTitles: mappedEpisodeTitles,
-      slots: currentSlots,
-      onRoadSelected: onRoadSelected,
-      onRefresh: onRefreshEpisodes,
-      onSelectEpisode: onSelectEpisode,
-      onSelectSlot: onSelectSlot,
+    return ListenableBuilder(
+      listenable: WatchedEpisodesService.instance,
+      builder: (context, _) {
+        final watched = WatchedEpisodesService.instance.getWatchedEpisodes(bangumiItem?.id ?? 0);
+        return EpisodePickerSection(
+          episodeCount: currentSlots.isNotEmpty ? currentSlots.length : episodeCount,
+          currentEpisode: currentEpisode,
+          roads: roadNames,
+          activeRoadIndex: selectedRoadIndex,
+          episodeTitles: mappedEpisodeTitles,
+          slots: currentSlots,
+          watchedEpisodes: watched,
+          onRoadSelected: onRoadSelected,
+          onRefresh: onRefreshEpisodes,
+          onSelectEpisode: onSelectEpisode,
+          onSelectSlot: onSelectSlot,
+        );
+      },
     );
   }
 }

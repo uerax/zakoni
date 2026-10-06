@@ -100,6 +100,43 @@ void main() {
       expect(find.textContaining('72%'), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
     });
+
+    testWidgets('Extremely narrow width (279.5dp) does not throw RenderFlex overflow', (tester) async {
+      final records = [
+        WatchProgressItem(
+          item: _createMockItem(10, 'Frieren', 9.4),
+          episodeNumber: 8,
+          progress: 0.72,
+          positionText: '18:23 / 24:00',
+          lastWatchTime: DateTime.now(),
+        ),
+        WatchProgressItem(
+          item: _createMockItem(11, 'DunMeshi', 9.0),
+          episodeNumber: 5,
+          progress: 0.50,
+          positionText: '12:00 / 24:00',
+          lastWatchTime: DateTime.now(),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 279.5, // 模拟引发 8.5px 溢出的极窄边界宽度
+                child: ContinueWatchingShelf(records: records),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('继续追番'), findsOneWidget);
+      expect(find.text('Frieren 中文'), findsOneWidget);
+      expect(find.text('DunMeshi 中文'), findsOneWidget);
+    });
   });
 
   group('DailySpotlightCard widget tests', () {

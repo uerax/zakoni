@@ -76,10 +76,6 @@ class ContinueWatchingShelf extends StatelessWidget {
         if (displayItems.isEmpty) return const SizedBox.shrink();
 
         const double gap = 8.0;
-        final double availableWidth = screenWidth - 32.0;
-        final double cardWidth = ((availableWidth - gap * (maxColumns - 1)) / maxColumns)
-            .floorToDouble()
-            .clamp(140.0, 320.0);
         const double cardHeight = 68.0;
 
         return Padding(
@@ -138,21 +134,26 @@ class ContinueWatchingShelf extends StatelessWidget {
               ),
 
               // 响应式静态平铺行（零横向滚动，彻底杜绝手势竞争与误触）
+              // 特殊处理说明：
+              // 平铺行内部子卡片采用 Expanded 弹性均分空间，彻底杜绝极小屏幕、分屏或带边距容器中
+              // 因固定像素下限（如 clamp 140px）产生的 RenderFlex 像素溢出问题；
+              // 卡片内部自带单行截断与自适应排版，保证任意分配宽度下均安全无溢出。
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
                     for (var i = 0; i < displayItems.length; i++) ...[
                       if (i > 0) const SizedBox(width: gap),
-                      SizedBox(
-                        width: cardWidth,
-                        height: cardHeight,
-                        child: _buildWatchCard(
-                          context,
-                          theme,
-                          isDark,
-                          displayItems[i],
-                          cardHeight: cardHeight,
+                      Expanded(
+                        child: SizedBox(
+                          height: cardHeight,
+                          child: _buildWatchCard(
+                            context,
+                            theme,
+                            isDark,
+                            displayItems[i],
+                            cardHeight: cardHeight,
+                          ),
                         ),
                       ),
                     ],

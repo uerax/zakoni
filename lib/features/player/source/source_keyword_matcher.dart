@@ -242,14 +242,20 @@ class SourceKeywordMatcher {
     }
 
     // 针对偏好日语原名的源（如 xifan-next, moonci），在候选池中将日文原名排到首位
+    // 特殊处理说明：
+    // 当从播放历史等入口启动时，传入的 BangumiItem 常常是 name == nameCn（如均等于番剧标题）。
+    // 若先 insert 原名再 remove 中文名，会导致刚刚插入的原名被误删造成列表为空，
+    // 紧接着执行 insert(1, ...) 会抛出 RangeError (Invalid value: Only valid value is 0: 1) 导致整页红屏崩溃。
+    // 因此这里先判断 nameCn != nameOriginal 并优先将其置于头部，最后将 nameOriginal 插入索引 0；
+    // 两次均为 insert(0, ...)，在任何列表长度下均绝对安全，且原名稳居首位，中文名顺延至次席。
     final pref = getPreferenceForSource(sourceId);
     if (pref == TitlePreference.original && nameOriginal.isNotEmpty) {
       variants.remove(nameOriginal);
-      variants.insert(0, nameOriginal);
-      if (nameCn.isNotEmpty) {
+      if (nameCn.isNotEmpty && nameCn != nameOriginal) {
         variants.remove(nameCn);
-        variants.insert(1, nameCn);
+        variants.insert(0, nameCn);
       }
+      variants.insert(0, nameOriginal);
     } else if (pref == TitlePreference.traditional) {
       // 繁体源优先全量繁体化候选词
       final tradList = variants.map(ChineseS2TConverter.convert).toList();
