@@ -234,7 +234,11 @@ class NativeSourceRuntime {
     }
   }
 
-  /// 解析播放直链 (带 L1 内存 + L2 硬盘双层缓存与请求去重)
+  /// 解析播放直链 (带 L1 内存 20 分钟缓存与 Single-Flight 请求去重)
+  ///
+  /// 特殊处理说明：视频直链通常包含临时鉴权令牌、短期 CDN 签名或会话 Cookie，
+  /// 跨进程持久化到磁盘极易导致重启后读取过期废链引发 403 播放失败。
+  /// 因此直链仅保留 20 分钟 L1 内存缓存与单飞去重，不进行 L2 磁盘持久化。
   Future<SourceResolveResult> resolve(
     String sourceId,
     String episodeUrl, {
@@ -246,30 +250,14 @@ class NativeSourceRuntime {
     }
 
     final cacheKey = '$sourceId:$episodeUrl';
-    final diskCacheKey = 'src_res_${sourceId}_${episodeUrl.hashCode.abs()}';
 
     if (!bypassCache) {
       // 1. L1 内存缓存
       final memHit = _resolveMemoryCache.get(cacheKey);
       if (memHit != null && memHit.url.isNotEmpty) return memHit;
-
-      // 2. L2 本地硬盘持久化缓存
-      final disk = PlayerMediaDiskCacheManager.instance;
-      if (disk != null) {
-        try {
-          final diskData = await disk.getJson(diskCacheKey);
-          if (diskData is Map<String, dynamic>) {
-            final res = SourceResolveResult.fromJson(diskData);
-            if (res.url.isNotEmpty) {
-              _resolveMemoryCache.set(cacheKey, res, 256);
-              return res;
-            }
-          }
-        } catch (_) {}
-      }
     }
 
-    // 3. 并发单飞去重
+    // 2. 并发单飞去重
     if (_inflightResolve.containsKey(cacheKey)) {
       return _inflightResolve[cacheKey]!;
     }
@@ -280,14 +268,6 @@ class NativeSourceRuntime {
         if (result.url.isNotEmpty) {
           // 回填 L1 内存 (20 分钟)
           _resolveMemoryCache.set(cacheKey, result, 256);
-
-          // 回填 L2 硬盘 (20 分钟)
-          final disk = PlayerMediaDiskCacheManager.instance;
-          disk?.putJson(
-            diskCacheKey,
-            result.toJson(),
-            maxAge: const Duration(minutes: 20),
-          ).ignore();
         }
         return result;
       } catch (e) {
@@ -315,6 +295,9 @@ class NativeSourceRuntime {
     _searchMemoryCache.clear();
     _chaptersMemoryCache.clear();
     _resolveMemoryCache.clear();
+    for (final s in _sources.values) {
+      s.clearCache();
+    }
   }
 
   void dispose() {

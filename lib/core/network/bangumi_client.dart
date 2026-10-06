@@ -434,11 +434,18 @@ class BangumiClient {
     }
   }
 
-  /// 获取番剧条目详情 (带 6 小时内存缓存与 Single-Flight 并发合并)
+  /// 获取番剧条目详情 (带 6 小时内存与磁盘多级缓存与 Single-Flight 并发合并)
   Future<BangumiItem> getSubject(int subjectId, {bool forceRefresh = false}) async {
     if (!forceRefresh) {
       final cached = _subjectCache.get(subjectId);
       if (cached != null) return cached;
+
+      final diskJson = await _diskCache?.getJson('bangumi_subject_$subjectId');
+      if (diskJson is Map<String, dynamic>) {
+        final item = BangumiItem.fromJson(diskJson);
+        _subjectCache.set(subjectId, item, 4096);
+        return item;
+      }
     }
 
     final inflightKey = 'subject_$subjectId';
@@ -452,12 +459,24 @@ class BangumiClient {
         if (res.data is Map<String, dynamic>) {
           final item = BangumiItem.fromJson(res.data as Map<String, dynamic>);
           _subjectCache.set(subjectId, item, 4096);
+          unawaited(_diskCache?.putJson(
+            'bangumi_subject_$subjectId',
+            item.toJson(),
+            maxAge: const Duration(hours: 6),
+          ) ?? Future.value());
           return item;
         }
         throw const BangumiApiException('响应格式不正确');
       } on DioException catch (e) {
         final stale = _subjectCache.getStale(subjectId);
         if (stale != null) return stale;
+        // 特殊处理说明：网络异常时回退磁盘持久化缓存，保障断网或弱网下的详情页秒开与离线可用
+        final diskJson = await _diskCache?.getJson('bangumi_subject_$subjectId');
+        if (diskJson is Map<String, dynamic>) {
+          final item = BangumiItem.fromJson(diskJson);
+          _subjectCache.set(subjectId, item, 4096);
+          return item;
+        }
         throw _handleDioError('获取番剧详情失败 (ID: $subjectId)', e);
       }
     }();
@@ -470,7 +489,7 @@ class BangumiClient {
     }
   }
 
-  /// 获取番剧剧集列表 (默认 type=0 为正片，1 为 SP，带 2 小时内存缓存)
+  /// 获取番剧剧集列表 (默认 type=0 为正片，1 为 SP，带 2 小时内存与磁盘多级缓存)
   Future<List<BangumiEpisode>> getEpisodes(
     int subjectId, {
     int type = 0,
@@ -479,9 +498,22 @@ class BangumiClient {
     bool forceRefresh = false,
   }) async {
     final cacheKey = '${subjectId}_${type}_${limit}_$offset';
+    final diskCacheKey = 'bangumi_episodes_$cacheKey';
     if (!forceRefresh) {
       final cached = _episodesCache.get(cacheKey);
       if (cached != null) return cached;
+
+      final diskData = await _diskCache?.getJson(diskCacheKey);
+      if (diskData is List) {
+        final eps = diskData
+            .whereType<Map<String, dynamic>>()
+            .map((ep) => BangumiEpisode.fromJson(ep))
+            .toList();
+        if (eps.isNotEmpty) {
+          _episodesCache.set(cacheKey, eps, eps.length * 400 + 256);
+          return eps;
+        }
+      }
     }
 
     final inflightKey = 'episodes_$cacheKey';
@@ -509,12 +541,31 @@ class BangumiClient {
               .map((ep) => BangumiEpisode.fromJson(ep))
               .toList();
           _episodesCache.set(cacheKey, eps, eps.length * 400 + 256);
+          if (eps.isNotEmpty) {
+            unawaited(_diskCache?.putJson(
+              diskCacheKey,
+              eps.map((e) => e.toJson()).toList(),
+              maxAge: const Duration(hours: 2),
+            ) ?? Future.value());
+          }
           return eps;
         }
         return const <BangumiEpisode>[];
       } on DioException catch (e) {
         final stale = _episodesCache.getStale(cacheKey);
         if (stale != null) return stale;
+        // 特殊处理说明：网络异常时回退磁盘持久化缓存，保障剧集选集面板弱网可用
+        final diskData = await _diskCache?.getJson(diskCacheKey);
+        if (diskData is List) {
+          final eps = diskData
+              .whereType<Map<String, dynamic>>()
+              .map((ep) => BangumiEpisode.fromJson(ep))
+              .toList();
+          if (eps.isNotEmpty) {
+            _episodesCache.set(cacheKey, eps, eps.length * 400 + 256);
+            return eps;
+          }
+        }
         throw _handleDioError('获取剧集列表失败 (ID: $subjectId)', e);
       }
     }();

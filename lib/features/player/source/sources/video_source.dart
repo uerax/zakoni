@@ -26,6 +26,9 @@ abstract class VideoSource {
   Future<List<SourceChapterRoad>> chapters(String animeUrl);
   Future<SourceResolveResult> resolve(String episodeUrl);
 
+  /// 清空视频源私有缓存（默认空实现）
+  void clearCache() {}
+
   SourceMeta toMeta() => SourceMeta(
         id: id,
         name: name,

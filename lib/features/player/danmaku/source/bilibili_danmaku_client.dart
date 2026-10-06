@@ -111,6 +111,9 @@ class BilibiliDanmakuResult {
 class BilibiliDanmakuClient {
   BilibiliDanmakuClient({Dio? dio}) : _dio = dio ?? Dio();
 
+  static BilibiliDanmakuClient? _instance;
+  static BilibiliDanmakuClient get instance => _instance ??= BilibiliDanmakuClient();
+
   final Dio _dio;
 
   // L1 内存缓存 (30 分钟)

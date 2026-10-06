@@ -46,8 +46,8 @@ class DanmakuSessionCoordinator extends ChangeNotifier {
     required this.danmakuController,
     DandanClient? dandanClient,
     BilibiliDanmakuClient? bilibiliClient,
-  })  : dandanClient = dandanClient ?? DandanClient(),
-        bilibiliClient = bilibiliClient ?? BilibiliDanmakuClient(),
+  })  : dandanClient = dandanClient ?? DandanClient.instance,
+        bilibiliClient = bilibiliClient ?? BilibiliDanmakuClient.instance,
         poolsManager = DanmakuPoolsManager() {
     poolsManager.addListener(_onPoolsChanged);
   }

@@ -892,4 +892,13 @@ class XifanNextSource extends VideoSource {
       );
     }
   }
+
+  @override
+  void clearCache() {
+    _searchCache.clear();
+    _chaptersCache.clear();
+    _resolveCache.clear();
+    _inflightSearch.clear();
+    _inflightChapters.clear();
+  }
 }

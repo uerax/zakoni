@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../utils/timed_cache.dart';
 
 /// 单集片头片尾时间戳区间
 @immutable
@@ -46,30 +47,64 @@ class BangumiOpedService {
     ),
   );
 
-  final Map<int, Map<int, EpisodeOpedSegment>> _memoryCache = {};
+  // 正向打点数据缓存池：24 小时 TTL，上限 200 部番剧 (LRU 淘汰)
+  // 确保当日播放毫秒级秒开，同时兼顾新番每周增量补充新集打点的自动拉取
+  final TimedKeyedCache<int, Map<int, EpisodeOpedSegment>> _cache =
+      TimedKeyedCache(maxAge: const Duration(hours: 24), maxEntries: 200);
+
+  // 负缓存池 (404/暂未收录)：2 小时短 TTL，上限 100 部
+  // 特殊处理说明：新番刚开播时仓库尚未录入打点，若永久缓存空结果会导致后续补录后客户端永远无法自愈；
+  // 设置 2 小时短 TTL 既杜绝播放切集时的反复 CDN 404 击穿，又能在 2 小时后自动重新探查最新打点。
+  final TimedKeyedCache<int, bool> _negativeCache =
+      TimedKeyedCache(maxAge: const Duration(hours: 2), maxEntries: 100);
+
+  // Single-Flight 并发请求锁
+  final Map<int, Future<Map<int, EpisodeOpedSegment>>> _inflight = {};
 
   /// 获取指定 Bangumi 番剧 ID 的全集 OP/ED 时间标记映射 (Key 为集数编号 1, 2, 3...)
   Future<Map<int, EpisodeOpedSegment>> getOpedData(int subjectId) async {
     if (subjectId <= 0) return const {};
 
-    if (_memoryCache.containsKey(subjectId)) {
-      return _memoryCache[subjectId]!;
+    // 1. 优先查正向有效缓存 (LRU 命中并刷新访问顺序)
+    final hit = _cache.get(subjectId);
+    if (hit != null) return hit;
+
+    // 2. 查负缓存 (未收录状态在 2 小时内直接拦截，防止频繁 404)
+    if (_negativeCache.get(subjectId) == true) {
+      return const {};
     }
 
-    final url = '$_kBaseUrl/$subjectId/$subjectId.txt';
-    try {
-      final response = await _dio.get<String>(url);
-      if (response.statusCode == 200 && response.data != null) {
-        final parsed = parseOpedData(response.data!);
-        _memoryCache[subjectId] = parsed;
-        return parsed;
+    // 3. 并发单飞去重
+    if (_inflight.containsKey(subjectId)) {
+      return await _inflight[subjectId]!;
+    }
+
+    final future = () async {
+      final url = '$_kBaseUrl/$subjectId/$subjectId.txt';
+      try {
+        final response = await _dio.get<String>(url);
+        if (response.statusCode == 200 && response.data != null && response.data!.trim().isNotEmpty) {
+          final parsed = parseOpedData(response.data!);
+          if (parsed.isNotEmpty) {
+            _cache.set(subjectId, parsed, parsed.length * 64 + 64);
+            return parsed;
+          }
+        }
+      } catch (_) {
+        // 404 或网络异常
       }
-    } catch (_) {
-      // 404 或无数据时静默回退
-    }
 
-    _memoryCache[subjectId] = const {};
-    return const {};
+      // 写入负缓存，2 小时内避免重复请求
+      _negativeCache.set(subjectId, true, 16);
+      return const <int, EpisodeOpedSegment>{};
+    }();
+
+    _inflight[subjectId] = future;
+    try {
+      return await future;
+    } finally {
+      _inflight.remove(subjectId);
+    }
   }
 
   /// 解析远端文本

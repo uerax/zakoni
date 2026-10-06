@@ -58,7 +58,7 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
 
     dataBytes += SourceBundleManager.instance.runtime.memoryCacheSizeBytes;
     dataBytes += DandanClient.instance.memoryCacheSizeBytes;
-    dataBytes += BilibiliDanmakuClient().memoryCacheSizeBytes;
+    dataBytes += BilibiliDanmakuClient.instance.memoryCacheSizeBytes;
 
     if (!mounted) return;
     setState(() {
@@ -102,7 +102,7 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
       await PlayerMediaDiskCacheManager.instance?.clearAll();
       SourceBundleManager.instance.runtime.clearMemoryCache();
       DandanClient.instance.clearMemoryCache();
-      BilibiliDanmakuClient().clearMemoryCache();
+      BilibiliDanmakuClient.instance.clearMemoryCache();
       await _updateCacheSizes();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
