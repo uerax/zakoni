@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/models/history/watch_history_item.dart';
@@ -76,7 +77,16 @@ class ContinueWatchingShelf extends StatelessWidget {
         if (displayItems.isEmpty) return const SizedBox.shrink();
 
         const double gap = 8.0;
+        const double maxCardWidth = 280.0;
         const double cardHeight = 68.0;
+        final double availableWidth = screenWidth - 32.0;
+
+        // 特殊处理说明：
+        // 双向自适应宽度设计：
+        // 1. 小屏/极窄小窗场景：以实际条目数均分可用空间 (slotWidth)，向下自由收缩，彻底杜绝 RenderFlex 溢出；
+        // 2. 宽屏/单条记录场景：将单张卡片封顶在 280px (math.min)，防止在宽屏大显示器或历史条目少时被无限拉伸成超长横条。
+        final double slotWidth = (availableWidth - gap * (displayItems.length - 1)) / displayItems.length;
+        final double cardWidth = math.min(slotWidth.floorToDouble(), maxCardWidth);
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -134,26 +144,21 @@ class ContinueWatchingShelf extends StatelessWidget {
               ),
 
               // 响应式静态平铺行（零横向滚动，彻底杜绝手势竞争与误触）
-              // 特殊处理说明：
-              // 平铺行内部子卡片采用 Expanded 弹性均分空间，彻底杜绝极小屏幕、分屏或带边距容器中
-              // 因固定像素下限（如 clamp 140px）产生的 RenderFlex 像素溢出问题；
-              // 卡片内部自带单行截断与自适应排版，保证任意分配宽度下均安全无溢出。
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
                     for (var i = 0; i < displayItems.length; i++) ...[
                       if (i > 0) const SizedBox(width: gap),
-                      Expanded(
-                        child: SizedBox(
-                          height: cardHeight,
-                          child: _buildWatchCard(
-                            context,
-                            theme,
-                            isDark,
-                            displayItems[i],
-                            cardHeight: cardHeight,
-                          ),
+                      SizedBox(
+                        width: cardWidth,
+                        height: cardHeight,
+                        child: _buildWatchCard(
+                          context,
+                          theme,
+                          isDark,
+                          displayItems[i],
+                          cardHeight: cardHeight,
                         ),
                       ),
                     ],

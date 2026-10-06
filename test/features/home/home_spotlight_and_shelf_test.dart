@@ -137,6 +137,39 @@ void main() {
       expect(find.text('Frieren 中文'), findsOneWidget);
       expect(find.text('DunMeshi 中文'), findsOneWidget);
     });
+
+    testWidgets('Wide screen (1440dp) caps card width to 280dp and does not stretch infinitely', (tester) async {
+      final records = [
+        WatchProgressItem(
+          item: _createMockItem(10, 'Frieren', 9.4),
+          episodeNumber: 8,
+          progress: 0.72,
+          positionText: '18:23 / 24:00',
+          lastWatchTime: DateTime.now(),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1440.0,
+              child: ContinueWatchingShelf(records: records),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      // 获取卡片容器尺寸
+      final cardFinder = find.ancestor(
+        of: find.text('Frieren 中文'),
+        matching: find.byType(SizedBox),
+      ).first;
+      final size = tester.getSize(cardFinder);
+      expect(size.width, lessThanOrEqualTo(280.0));
+      expect(size.height, equals(68.0));
+    });
   });
 
   group('DailySpotlightCard widget tests', () {

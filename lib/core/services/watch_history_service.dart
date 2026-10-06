@@ -6,7 +6,7 @@ import 'app_preferences.dart';
 /// 播放历史与继续观看响应式单一数据源服务（对齐 animaku apps/web/src/stores/history.ts 与 Flutter ChangeNotifier 模式）：
 /// 1. 响应式单一可信源：继承 ChangeNotifier，任何对历史的增删改均自动通过 notifyListeners() 广播至全应用所有监听页面；
 /// 2. 独立于网络请求：本地播放历史与慢速网络 API 完全解耦，首页与历史页通过 ListenableBuilder 毫秒级动态同步；
-/// 3. 单动漫聚合策略：同一番剧最新集数置顶更新，每部动漫在历史中只占一行，彻底杜绝列表刷屏；
+/// 3. 分层聚合架构：底层精确记录到分集（同番同集去重，多集共存），保证各集断点续播不丢失；同时提供 latestByAnime 聚合属性供首页使用，杜绝首页刷屏；
 /// 4. 容量与持久化管理：上限 200 条，落盘持久化至 AppPreferences；
 /// 5. 冷启动种子数据：在本地无历史时自动注入 3 条具备真实视频源与 Bangumi 封面的测试数据。
 class WatchHistoryService extends ChangeNotifier {
@@ -20,6 +20,18 @@ class WatchHistoryService extends ChangeNotifier {
 
   /// 内存中当前的播放历史列表（只读不可变快照）
   List<WatchHistoryItem> get items => List.unmodifiable(_items);
+
+  /// 供首页追番货架等场景消费：按番剧去重聚合，每部番剧只保留最新播放的一条记录
+  List<WatchHistoryItem> get latestByAnime {
+    final seen = <int>{};
+    final result = <WatchHistoryItem>[];
+    for (final item in _items) {
+      if (seen.add(item.bangumiId)) {
+        result.add(item);
+      }
+    }
+    return result;
+  }
 
   /// 预置的 3 部真实测试数据（包含视频源、线路与时长进度）
   static List<WatchHistoryItem> get initialMockSeeds {
@@ -115,20 +127,35 @@ class WatchHistoryService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 更新或插入单条播放进度（最新在前，同番剧聚合替换为最新进度，每部动漫占一行）
+  /// 更新或插入单条播放进度（最新置顶；对齐 animaku 规范，按同番剧+同集数去重）
+  /// 特殊处理说明：
+  /// 底层持久化必须精确到每集（bangumiId + episode），严禁按番剧直接整部覆盖。
+  /// 若按番剧粗暴覆盖，用户回头重温前序剧集时，当前正在追的最新剧集断点进度将被永久抹除；
+  /// 多集记录共存保证各集续播精准，展示层的防刷屏则通过 latestByAnime 在首页单独聚合解决。
   Future<void> recordProgress(WatchHistoryItem entry) async {
     if (!_isInitialized) await getHistory();
 
     final updatedList = <WatchHistoryItem>[entry];
 
-    // 核心策略：同一番剧只保留最新一条记录（按 bangumiId 聚合更新），杜绝移动端列表刷屏
+    // 同一番剧的同一集数只保留一条最新进度（不区分视频源，保存最后看的记录）；不同集数并存
     for (final item in _items) {
-      if (item.bangumiId != entry.bangumiId) {
+      final isSameBangumiAndEp =
+          item.bangumiId == entry.bangumiId && item.episode == entry.episode;
+      if (item.id != entry.id && !isSameBangumiAndEp) {
         updatedList.add(item);
       }
     }
 
     _items = updatedList.take(maxItems).toList();
+    await _persist();
+    notifyListeners();
+  }
+
+  /// 移除指定番剧的全部历史记录
+  Future<void> removeByBangumi(int bangumiId) async {
+    if (!_isInitialized) await getHistory();
+
+    _items.removeWhere((item) => item.bangumiId == bangumiId);
     await _persist();
     notifyListeners();
   }

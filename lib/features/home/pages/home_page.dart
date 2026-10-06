@@ -155,7 +155,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
       ListenableBuilder(
         listenable: WatchHistoryService.instance,
         builder: (context, _) {
-          final watchHistory = WatchHistoryService.instance.items;
+          final watchHistory = WatchHistoryService.instance.latestByAnime;
           return ContinueWatchingShelf(
             records: watchHistory,
             onResumeWatch: (record) {

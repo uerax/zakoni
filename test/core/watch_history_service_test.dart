@@ -71,8 +71,8 @@ void main() {
       expect(persistedJson, contains('omofun'));
     });
 
-    test('recordProgress prepends new record and deduplicates same anime, notifying listeners', () async {
-      await WatchHistoryService.instance.getHistory(); // 初始化 3 条种子
+    test('recordProgress accurately preserves different episodes and dedupes same episode, latestByAnime aggregates correctly', () async {
+      await WatchHistoryService.instance.getHistory(); // 初始化 3 条种子 (芙莉莲 ep14, 迷宫饭 ep8, 间谍过家家 ep4)
 
       var notified = false;
       void listener() {
@@ -80,7 +80,8 @@ void main() {
       }
       WatchHistoryService.instance.addListener(listener);
 
-      final newProgress = WatchHistoryItem(
+      // 1. 播放芙莉莲第 15 话 (新集数)：此时芙莉莲 ep14 与 ep15 应同时保存在底层历史中，共 4 条
+      final ep15Progress = WatchHistoryItem(
         id: WatchHistoryItem.buildId(400650, 15),
         bangumiId: 400650,
         title: '葬送的芙莉莲',
@@ -92,16 +93,48 @@ void main() {
         updatedAt: DateTime.now().millisecondsSinceEpoch,
       );
 
-      await WatchHistoryService.instance.recordProgress(newProgress);
+      await WatchHistoryService.instance.recordProgress(ep15Progress);
       final updated = await WatchHistoryService.instance.getHistory();
 
       expect(notified, isTrue);
-      // 数量仍为 3（同番剧聚合替换为最新集数）
-      expect(updated.length, equals(3));
+      // 底层历史总数变为 4 (芙莉莲 ep15 与 ep14 并存，多集进度不丢失)
+      expect(updated.length, equals(4));
       // 最新记录排在第一位，且集数为 15
       expect(updated.first.bangumiId, equals(400650));
       expect(updated.first.episode, equals(15));
       expect(updated.first.position, equals(1200.0));
+
+      // 验证首页聚合属性 latestByAnime：每部番剧仅保留最新一条 (共 3 部番剧)
+      final latest = WatchHistoryService.instance.latestByAnime;
+      expect(latest.length, equals(3));
+      expect(latest.first.bangumiId, equals(400650));
+      expect(latest.first.episode, equals(15)); // 取到最新的第 15 话
+
+      // 2. 重新播放同一番剧的同一集 (芙莉莲 ep15 进度更新到 22:00)
+      final ep15Updated = WatchHistoryItem(
+        id: WatchHistoryItem.buildId(400650, 15),
+        bangumiId: 400650,
+        title: '葬送的芙莉莲',
+        episode: 15,
+        pluginName: 'cycani',
+        road: 1,
+        position: 1320.0, // 22:00
+        duration: 1440.0,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      await WatchHistoryService.instance.recordProgress(ep15Updated);
+      final reUpdated = await WatchHistoryService.instance.getHistory();
+      // 同集数覆盖更新，总数依然为 4
+      expect(reUpdated.length, equals(4));
+      expect(reUpdated.first.position, equals(1320.0));
+
+      // 3. 测试按番剧全量删除
+      await WatchHistoryService.instance.removeByBangumi(400650);
+      final afterRemoveBangumi = await WatchHistoryService.instance.getHistory();
+      // 芙莉莲全部集数被清除，剩余 2 部番剧
+      expect(afterRemoveBangumi.length, equals(2));
+      expect(afterRemoveBangumi.any((i) => i.bangumiId == 400650), isFalse);
 
       WatchHistoryService.instance.removeListener(listener);
     });
