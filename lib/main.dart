@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +9,7 @@ import 'core/services/app_preferences.dart';
 import 'core/services/network_connectivity_service.dart';
 import 'core/services/watch_history_service.dart';
 import 'core/services/watched_episodes_service.dart';
+import 'core/theme/m3_expressive_theme.dart';
 import 'core/utils/appearance_manager.dart';
 import 'core/utils/font_manager.dart';
 import 'core/utils/scroll_behavior.dart';
@@ -67,70 +67,21 @@ class ZakoniApp extends StatelessWidget {
         // 动态响应用户选定的全局主题强调色
         final primaryColor = AppearanceManager.instance.primaryColor;
 
-        final cupertinoTextTheme = CupertinoTextThemeData(
-          textStyle: TextStyle(
-            fontFamily: currentFont,
-            fontFamilyFallback: fontFallback,
-          ),
-          actionTextStyle: TextStyle(
-            fontFamily: currentFont,
-            fontFamilyFallback: fontFallback,
-          ),
-          tabLabelTextStyle: TextStyle(
-            fontFamily: currentFont,
-            fontFamilyFallback: fontFallback,
-          ),
-          navTitleTextStyle: TextStyle(
-            fontFamily: currentFont,
-            fontFamilyFallback: fontFallback,
-          ),
-          navLargeTitleTextStyle: TextStyle(
-            fontFamily: currentFont,
-            fontFamilyFallback: fontFallback,
-          ),
-          pickerTextStyle: TextStyle(
-            fontFamily: currentFont,
-            fontFamilyFallback: fontFallback,
-          ),
-          dateTimePickerTextStyle: TextStyle(
-            fontFamily: currentFont,
-            fontFamilyFallback: fontFallback,
-          ),
-        );
-
         return MaterialApp(
           title: 'Zakoni 动漫',
           debugShowCheckedModeBanner: false,
           scrollBehavior: const AppScrollBehavior(),
-          theme: ThemeData(
-            useMaterial3: true,
-            fontFamily: currentFont,
-            fontFamilyFallback: fontFallback,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: primaryColor,
-              primary: primaryColor,
-              brightness: Brightness.light,
-            ),
-            cupertinoOverrideTheme: CupertinoThemeData(
-              primaryColor: primaryColor,
-              brightness: Brightness.light,
-              textTheme: cupertinoTextTheme,
-            ),
+          theme: M3ExpressiveTheme.build(
+            primaryColor: primaryColor,
+            brightness: Brightness.light,
+            currentFont: currentFont,
+            fontFallback: fontFallback,
           ),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            fontFamily: currentFont,
-            fontFamilyFallback: fontFallback,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: primaryColor,
-              primary: primaryColor,
-              brightness: Brightness.dark,
-            ),
-            cupertinoOverrideTheme: CupertinoThemeData(
-              primaryColor: primaryColor,
-              brightness: Brightness.dark,
-              textTheme: cupertinoTextTheme,
-            ),
+          darkTheme: M3ExpressiveTheme.build(
+            primaryColor: primaryColor,
+            brightness: Brightness.dark,
+            currentFont: currentFont,
+            fontFallback: fontFallback,
           ),
           themeMode: ThemeMode.system,
           home: MainNavigationShell(client: client),

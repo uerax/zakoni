@@ -104,14 +104,14 @@ class ShimmerAnimeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
-    final blockColor = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA);
+    final theme = Theme.of(context);
+    final cardBg = theme.colorScheme.surfaceContainerLow;
+    final blockColor = theme.colorScheme.surfaceContainerHighest;
 
     final card = Card(
-      elevation: 1.5,
+      elevation: 0,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: cardBg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

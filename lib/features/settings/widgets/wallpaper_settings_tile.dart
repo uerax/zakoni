@@ -1,11 +1,9 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../core/utils/appearance_manager.dart';
-import '../../../core/utils/font_manager.dart';
 import '../../common/widgets/wallpaper_crop_dialog.dart';
-import 'ios_settings_card.dart';
+import 'm3_settings_card.dart';
 
 class WallpaperSettingsTile extends StatefulWidget {
   const WallpaperSettingsTile({super.key});
@@ -99,13 +97,7 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
   }
 
   void _confirmClearWallpaper() {
-    final currentFont = FontManager.instance.activeFontFamily;
-    final fontFallback = FontManager.fallbackFontFamilies;
-    final baseStyle = TextStyle(
-      fontFamily: currentFont,
-      fontFamilyFallback: fontFallback,
-    );
-
+    final theme = Theme.of(context);
     final scopeName = switch (_wallpaperScope) {
       'all' => '全局壁纸',
       'home' => '首页专属壁纸',
@@ -113,45 +105,33 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
       _ => '背景壁纸',
     };
 
-    showCupertinoDialog(
+    showDialog(
       context: context,
-      builder: (ctx) => CupertinoTheme(
-        data: CupertinoTheme.of(ctx).copyWith(
-          textTheme: CupertinoTextThemeData(
-            textStyle: baseStyle,
-            actionTextStyle: baseStyle,
-          ),
+      builder: (ctx) => AlertDialog(
+        icon: Icon(
+          Icons.delete_outline_rounded,
+          color: theme.colorScheme.error,
+          size: 28,
         ),
-        child: CupertinoAlertDialog(
-          title: Text(
-            '清除背景壁纸',
-            style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+        title: const Text('清除背景壁纸'),
+        content: Text('确定要清除【$scopeName】吗？'),
+        actions: [
+          TextButton(
+            child: const Text('取消'),
+            onPressed: () => Navigator.of(ctx).pop(),
           ),
-          content: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '确定要清除【$scopeName】吗？',
-              style: baseStyle,
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
             ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _performClearWallpaper(scopeName);
+            },
+            child: const Text('确认清除'),
           ),
-          actions: [
-            CupertinoDialogAction(
-              child: Text('取消', style: baseStyle),
-              onPressed: () => Navigator.of(ctx).pop(),
-            ),
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _performClearWallpaper(scopeName);
-              },
-              child: Text(
-                '确认清除',
-                style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -273,32 +253,34 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IosSettingsTile(
+            M3SettingsTile(
               leading: hasWallpaperImg
                   ? Container(
-                      width: 28,
-                      height: 28,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(7),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: theme.colorScheme.primary.withAlpha(120),
-                          width: 0.8,
+                          color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                          width: 1.0,
                         ),
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: Image.file(
                         activeWallpaperFile,
                         fit: BoxFit.cover,
-                        cacheWidth: 56,
-                        errorBuilder: (context, error, stackTrace) => const IosSettingsIconBox(
+                        cacheWidth: 64,
+                        errorBuilder: (context, error, stackTrace) => M3SettingsIconBox(
                           icon: Icons.wallpaper_rounded,
-                          bg: Color(0xFF3A86FF),
+                          bg: theme.colorScheme.tertiaryContainer,
+                          iconColor: theme.colorScheme.onTertiaryContainer,
                         ),
                       ),
                     )
-                  : const IosSettingsIconBox(
+                  : M3SettingsIconBox(
                       icon: Icons.wallpaper_rounded,
-                      bg: Color(0xFF3A86FF),
+                      bg: theme.colorScheme.tertiaryContainer,
+                      iconColor: theme.colorScheme.onTertiaryContainer,
                     ),
               title: '背景壁纸',
               showDivider: false,

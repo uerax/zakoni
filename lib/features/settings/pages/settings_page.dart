@@ -91,7 +91,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
                   // 注释预留：后续正式引入用户/个人中心页面 (ProfilePage) 时，
                   // 将在此处或用户中心挂载“播放历史”入口：
-                  // Navigator.of(context).push(CupertinoPageRoute(builder: (_) => const HistoryPage()));
+                  // Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HistoryPage()));
                 ],
               ),
             ),

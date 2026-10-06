@@ -1,9 +1,9 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import '../../../core/theme/m3_surface.dart';
 import '../../../core/utils/font_manager.dart';
 import '../../common/widgets/ios_swipe_action_tile.dart';
-import 'ios_settings_card.dart';
+import 'm3_settings_card.dart';
 
 class FontSettingsCard extends StatefulWidget {
   const FontSettingsCard({super.key});
@@ -56,59 +56,42 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
   }
 
   void _confirmDeleteCustomFont(FontManager fontMgr) {
-    final currentFont = FontManager.instance.activeFontFamily;
-    final fontFallback = FontManager.fallbackFontFamilies;
-    final baseStyle = TextStyle(
-      fontFamily: currentFont,
-      fontFamilyFallback: fontFallback,
-    );
+    final theme = Theme.of(context);
 
-    showCupertinoDialog(
+    showDialog(
       context: context,
-      builder: (ctx) => CupertinoTheme(
-        data: CupertinoTheme.of(ctx).copyWith(
-          textTheme: CupertinoTextThemeData(
-            textStyle: baseStyle,
-            actionTextStyle: baseStyle,
-          ),
+      builder: (ctx) => AlertDialog(
+        icon: Icon(
+          Icons.delete_outline_rounded,
+          color: theme.colorScheme.error,
+          size: 28,
         ),
-        child: CupertinoAlertDialog(
-          title: Text(
-            '移除自定义字体',
-            style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+        title: const Text('移除自定义字体'),
+        content: Text('确定要移除【${fontMgr.customFontName}】吗？字体将恢复为默认 MiSans。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
           ),
-          content: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '确定要移除【${fontMgr.customFontName}】吗？字体将恢复为默认 MiSans。',
-              style: baseStyle,
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
             ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              fontMgr.clearCustomFont();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('已移除自定义字体'),
+                  duration: Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: const Text('确认移除'),
           ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('取消', style: baseStyle),
-            ),
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                fontMgr.clearCustomFont();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('已移除自定义字体'),
-                    duration: Duration(seconds: 2),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              child: Text(
-                '确认移除',
-                style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -116,20 +99,20 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final fontMgr = FontManager.instance;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const IosSettingsSectionHeader(title: '字体设置'),
-        IosSettingsCard(
+        const M3SettingsSectionHeader(title: '字体设置'),
+        M3SettingsCard(
           children: [
-            IosSettingsTile(
-              leading: const IosSettingsIconBox(
+            M3SettingsTile(
+              leading: M3SettingsIconBox(
                 icon: Icons.font_download_rounded,
-                bg: Color(0xFFE76F51),
+                bg: theme.colorScheme.primaryContainer,
+                iconColor: theme.colorScheme.onPrimaryContainer,
               ),
               title: 'MiSans',
               trailing: fontMgr.currentType == AppFontType.misans
@@ -137,10 +120,11 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
                   : null,
               onTap: () => fontMgr.setFontType(AppFontType.misans),
             ),
-            IosSettingsTile(
-              leading: const IosSettingsIconBox(
+            M3SettingsTile(
+              leading: M3SettingsIconBox(
                 icon: Icons.text_fields_rounded,
-                bg: Color(0xFF457B9D),
+                bg: theme.colorScheme.secondaryContainer,
+                iconColor: theme.colorScheme.onSecondaryContainer,
               ),
               title: '系统默认',
               trailing: fontMgr.currentType == AppFontType.system
@@ -151,10 +135,11 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
             if (fontMgr.customFontPath != null)
               IosSwipeActionTile(
                 onDelete: () => _confirmDeleteCustomFont(fontMgr),
-                child: IosSettingsTile(
-                  leading: const IosSettingsIconBox(
+                child: M3SettingsTile(
+                  leading: M3SettingsIconBox(
                     icon: Icons.dashboard_customize_rounded,
-                    bg: Color(0xFFF4A261),
+                    bg: theme.colorScheme.tertiaryContainer,
+                    iconColor: theme.colorScheme.onTertiaryContainer,
                   ),
                   title: fontMgr.customFontName,
                   trailing: fontMgr.currentType == AppFontType.custom
@@ -163,15 +148,20 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
                   onTap: () => fontMgr.setFontType(AppFontType.custom),
                 ),
               ),
-            IosSettingsTile(
-              leading: const IosSettingsIconBox(
+            M3SettingsTile(
+              leading: M3SettingsIconBox(
                 icon: Icons.file_upload_outlined,
-                bg: Color(0xFF8338EC),
+                bg: theme.colorScheme.surfaceContainerHighest,
+                iconColor: theme.colorScheme.onSurfaceVariant,
               ),
               title: fontMgr.customFontPath != null ? '更换字体文件' : '导入字体文件',
               subtitle: '支持 .ttf / .otf 格式',
               showDivider: false,
-              trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+              trailing: Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                size: 20,
+              ),
               onTap: _pickAndLoadCustomFont,
             ),
           ],
@@ -182,19 +172,23 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: isDark ? Colors.white.withAlpha(8) : Colors.black.withAlpha(5),
-            borderRadius: BorderRadius.circular(10),
+            color: M3Surface.container(context, level: M3ContainerLevel.lowest, pageKey: 'settings'),
+            borderRadius: BorderRadius.circular(12),
+            border: M3Surface.border(context, pageKey: 'settings'),
           ),
           child: Row(
             children: [
-              const Icon(Icons.remove_red_eye_outlined, size: 14, color: Colors.grey),
+              Icon(
+                Icons.remove_red_eye_outlined,
+                size: 15,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '预览：10月新番 · 热门排行 · OVA',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: theme.colorScheme.onSurfaceVariant.withAlpha(190),
+                  '预览：10月新番 · 热门排行 · OVA · 剧场版',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

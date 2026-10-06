@@ -27,7 +27,6 @@ class SearchFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isCompact = screenWidth < 500;
 
@@ -69,24 +68,14 @@ class SearchFilterBar extends StatelessWidget {
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
+                              horizontal: 12,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
                               color: isActive
-                                  ? theme.colorScheme.primary
-                                  : (isDark
-                                      ? Colors.white.withAlpha(14)
-                                      : Colors.black.withAlpha(10)),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isActive
-                                    ? Colors.transparent
-                                    : (isDark
-                                        ? Colors.white.withAlpha(20)
-                                        : Colors.black.withAlpha(15)),
-                                width: 0.8,
-                              ),
+                                  ? theme.colorScheme.secondaryContainer
+                                  : theme.colorScheme.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(999),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -96,11 +85,11 @@ class SearchFilterBar extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: isActive
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
                                     color: isActive
-                                        ? Colors.white
-                                        : theme.colorScheme.onSurface,
+                                        ? theme.colorScheme.onSecondaryContainer
+                                        : theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(width: 4),
@@ -108,10 +97,11 @@ class SearchFilterBar extends StatelessWidget {
                                   '(${tab.count})',
                                   style: TextStyle(
                                     fontSize: 11,
+                                    fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
                                     color: isActive
-                                        ? Colors.white.withAlpha(220)
+                                        ? theme.colorScheme.onSecondaryContainer.withValues(alpha: 0.8)
                                         : theme.colorScheme.onSurfaceVariant
-                                            .withAlpha(160),
+                                            .withValues(alpha: 0.7),
                                   ),
                                 ),
                               ],
@@ -150,34 +140,25 @@ class SearchFilterBar extends StatelessWidget {
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                              horizontal: 10,
+                              vertical: 5,
                             ),
                             decoration: BoxDecoration(
                               color: isActive
-                                  ? theme.colorScheme.primary.withAlpha(30)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isActive
-                                    ? theme.colorScheme.primary.withAlpha(120)
-                                    : (isDark
-                                        ? Colors.white.withAlpha(18)
-                                        : Colors.black.withAlpha(12)),
-                                width: 0.8,
-                              ),
+                                  ? theme.colorScheme.primaryContainer
+                                  : theme.colorScheme.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               opt.label,
                               style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: isActive
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                                 color: isActive
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.onSurfaceVariant
-                                        .withAlpha(200),
+                                    ? theme.colorScheme.onPrimaryContainer
+                                    : theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -187,7 +168,7 @@ class SearchFilterBar extends StatelessWidget {
                   ],
                 ),
               ] else ...[
-                // 小屏下使用紧凑排序按钮
+                // 小屏下使用紧凑排序按钮 (M3 胶囊)
                 PopupMenuButton<SearchSortType>(
                   initialValue: currentSort,
                   tooltip: '排序方式',
@@ -206,7 +187,7 @@ class SearchFilterBar extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: currentSort == opt.type
-                                  ? FontWeight.bold
+                                  ? FontWeight.w700
                                   : FontWeight.normal,
                               color: currentSort == opt.type
                                   ? theme.colorScheme.primary
@@ -218,20 +199,12 @@ class SearchFilterBar extends StatelessWidget {
                       .toList(),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
+                      horizontal: 10,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? Colors.white.withAlpha(14)
-                          : Colors.black.withAlpha(10),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isDark
-                            ? Colors.white.withAlpha(20)
-                            : Colors.black.withAlpha(15),
-                        width: 0.8,
-                      ),
+                      color: theme.colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(999),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

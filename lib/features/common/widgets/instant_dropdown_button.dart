@@ -110,7 +110,6 @@ class _InstantDropdownButtonState<T> extends State<InstantDropdownButton<T>>
     );
 
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     _overlayEntry = OverlayEntry(
       builder: (context) {
@@ -133,16 +132,17 @@ class _InstantDropdownButtonState<T> extends State<InstantDropdownButton<T>>
                   scale: _scaleAnim,
                   alignment: widget.alignRight ? Alignment.topRight : Alignment.topLeft,
                   child: Material(
-                    elevation: 10,
-                    color: isDark ? const Color(0xFF222226) : Colors.white,
-                    borderRadius: BorderRadius.circular(14),
+                    elevation: 6,
+                    color: theme.colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(16),
                     clipBehavior: Clip.antiAlias,
                     child: Container(
                       constraints: BoxConstraints(maxHeight: widget.maxMenuHeight),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isDark ? Colors.white.withAlpha(25) : Colors.black.withAlpha(15),
+                          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+                          width: 0.8,
                         ),
                       ),
                       child: ListView.builder(

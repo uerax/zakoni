@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
+import '../../../core/theme/m3_surface.dart';
 import '../../../core/utils/responsive.dart';
 import '../../player/player.dart';
 import 'bouncing_scale_card.dart';
@@ -43,28 +44,18 @@ class AnimeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final bottomStat = _resolveBottomStat();
+    final cardRadius = BorderRadius.circular(compact ? 12 : 16);
+    final cardBg = M3Surface.container(context, level: M3ContainerLevel.low);
+    final cardBorder = M3Surface.border(context);
 
     return BouncingScaleCard(
       onTap: onTap ?? () => navigateToVideoPlayer(context, item),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(compact ? 8 : 12),
-          color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(isDark ? 50 : 15),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withAlpha(20)
-                : Colors.black.withAlpha(12),
-            width: 1.0,
-          ),
+          borderRadius: cardRadius,
+          color: cardBg,
+          border: cardBorder,
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -94,35 +85,35 @@ class AnimeCard extends StatelessWidget {
                           end: Alignment.bottomCenter,
                           colors: [
                             Colors.transparent,
-                            Colors.black.withAlpha(180),
+                            Colors.black.withValues(alpha: 0.72),
                           ],
                         ),
                       ),
                     ),
                   ),
-                  // 右上角评分角标
+                  // 右上角评分角标 (M3 Stadium 胶囊徽标)
                   if (item.ratingScore > 0)
                     Positioned(
                       top: compact ? 4 : 6,
                       right: compact ? 4 : 6,
                       child: Container(
                         padding: EdgeInsets.symmetric(
-                          horizontal: compact ? 4 : 6,
-                          vertical: compact ? 1.5 : 2,
+                          horizontal: compact ? 6 : 8,
+                          vertical: compact ? 2 : 3,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withAlpha(180),
-                          borderRadius: BorderRadius.circular(compact ? 3 : 4),
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.star_rounded,
-                              size: compact ? 10 : 13,
+                              size: compact ? 11 : 13,
                               color: Colors.amber,
                             ),
-                            SizedBox(width: compact ? 1.5 : 2),
+                            SizedBox(width: compact ? 2 : 2.5),
                             Text(
                               '${item.ratingScore}',
                               style: TextStyle(
@@ -135,19 +126,19 @@ class AnimeCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  // 左下角状态/已看/在看/热度角标（Animaku 原生三色语义规范）
+                  // 左下角状态/已看/在看/热度角标 (M3 Stadium 胶囊徽标)
                   if (bottomStat != null)
                     Positioned(
                       bottom: compact ? 4 : 5,
                       left: compact ? 4 : 6,
                       child: Container(
                         padding: EdgeInsets.symmetric(
-                          horizontal: compact ? 4 : 5,
-                          vertical: compact ? 1.5 : 2,
+                          horizontal: compact ? 6 : 7,
+                          vertical: compact ? 2 : 2.5,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withAlpha(140),
-                          borderRadius: BorderRadius.circular(compact ? 3 : 4),
+                          color: Colors.black.withValues(alpha: 0.60),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -162,11 +153,11 @@ class AnimeCard extends StatelessWidget {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(width: compact ? 1.5 : 2),
+                            SizedBox(width: compact ? 2 : 2.5),
                             Text(
                               bottomStat.label,
                               style: TextStyle(
-                                color: Colors.white.withAlpha(210),
+                                color: Colors.white.withValues(alpha: 0.85),
                                 fontSize: compact ? 8 : 9,
                               ),
                             ),

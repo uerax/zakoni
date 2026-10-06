@@ -229,7 +229,7 @@ class _AnimeHorizontalShelfState extends State<AnimeHorizontalShelf> {
                 child: Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(14),
                       child: AspectRatio(
                         aspectRatio: AnimeHorizontalShelf.cardAspectRatio,
                         child: CachedAnimeImage(
@@ -244,16 +244,16 @@ class _AnimeHorizontalShelfState extends State<AnimeHorizontalShelf> {
                     // 左上角排名勋章
                     if (widget.showRankBadges)
                       _buildRankBadge(rank, rankColor),
-                    // 右上角评分角标
+                    // 右上角评分角标 (M3 胶囊药丸)
                     if (item.ratingScore > 0)
                       Positioned(
-                        top: 4,
-                        right: 4,
+                        top: 5,
+                        right: 5,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                           decoration: BoxDecoration(
-                            color: Colors.black.withAlpha(180),
-                            borderRadius: BorderRadius.circular(4),
+                            color: Colors.black.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(999),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -351,7 +351,6 @@ class _AnimeHorizontalShelfState extends State<AnimeHorizontalShelf> {
   /// 尺寸与普通卡片完全一致，用户滑到货架尽头时自然映入眼帘，点击带弹性反馈直接跳转
   Widget _buildViewAllCard(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -365,16 +364,8 @@ class _AnimeHorizontalShelfState extends State<AnimeHorizontalShelf> {
               Container(
                 height: AnimeHorizontalShelf.cardHeight,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: isDark
-                      ? const Color(0xFF242426)
-                      : const Color(0xFFF2F2F7),
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withAlpha(25)
-                        : Colors.black.withAlpha(15),
-                    width: 1.2,
-                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  color: theme.colorScheme.surfaceContainerHigh,
                 ),
                 child: Center(
                   child: Column(
@@ -385,16 +376,12 @@ class _AnimeHorizontalShelfState extends State<AnimeHorizontalShelf> {
                         height: 44,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: theme.colorScheme.primary.withAlpha(isDark ? 55 : 28),
-                          border: Border.all(
-                            color: theme.colorScheme.primary.withAlpha(100),
-                            width: 1.2,
-                          ),
+                          color: theme.colorScheme.secondaryContainer,
                         ),
                         child: Icon(
                           Icons.arrow_forward_rounded,
                           size: 22,
-                          color: theme.colorScheme.primary,
+                          color: theme.colorScheme.onSecondaryContainer,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -433,17 +420,17 @@ class _AnimeHorizontalShelfState extends State<AnimeHorizontalShelf> {
       top: 0,
       left: 0,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
         decoration: BoxDecoration(
           color: rankColor,
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(8),
-            bottomRight: Radius.circular(8),
+            topLeft: Radius.circular(14),
+            bottomRight: Radius.circular(12),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(40),
-              blurRadius: 3,
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 4,
               offset: const Offset(1, 1),
             ),
           ],

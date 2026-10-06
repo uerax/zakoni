@@ -106,7 +106,6 @@ class _WallpaperCropDialogState extends State<WallpaperCropDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final screenSize = MediaQuery.sizeOf(context);
     final isPortrait = screenSize.height > screenSize.width;
 
@@ -114,9 +113,9 @@ class _WallpaperCropDialogState extends State<WallpaperCropDialog> {
     final deviceAspectRatio = (screenSize.width / screenSize.height).clamp(0.40, 2.40);
 
     return Dialog(
-      backgroundColor: isDark ? const Color(0xFF1E2024) : Colors.white,
+      backgroundColor: theme.colorScheme.surfaceContainerHigh,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: ConstrainedBox(
         // 手机竖屏收紧宽度，电脑宽屏适度展开，确保取景框在任何屏幕上都优美居中
@@ -260,7 +259,7 @@ class _WallpaperCropDialogState extends State<WallpaperCropDialog> {
                     label: const Text('确认应用此画面'),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: const StadiumBorder(),
                     ),
                   ),
                 ],

@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/utils/responsive.dart';
@@ -34,7 +33,6 @@ class SearchResultView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     // 1. 加载中状态：呈现骨架屏
     if (isLoading) {
@@ -113,13 +111,11 @@ class SearchResultView extends StatelessWidget {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withAlpha(14)
-                        : Colors.black.withAlpha(8),
+                    color: theme.colorScheme.surfaceContainerHigh,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    CupertinoIcons.info_circle,
+                    Icons.info_outline_rounded,
                     size: 32,
                     color: theme.colorScheme.primary,
                   ),
@@ -181,15 +177,13 @@ class SearchResultView extends StatelessWidget {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withAlpha(14)
-                      : Colors.black.withAlpha(8),
+                  color: theme.colorScheme.surfaceContainerHigh,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  CupertinoIcons.search,
+                  Icons.search_rounded,
                   size: 32,
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 16),

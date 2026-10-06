@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/theme/m3_surface.dart';
 
 typedef NavItemWidgetBuilder = Widget Function(
   BuildContext context,
@@ -39,10 +40,12 @@ class AppFloatingNavItem {
   }
 }
 
-/// 苹果悬浮极简纯图标毛玻璃胶囊底栏（Apple Floating Frosted Dock）：
-/// 1. 外层扩散阴影，内层通过 ClipRRect + BackdropFilter(sigma: 20) 实现通透的苹果磨砂毛玻璃质感；
-/// 2. 纯图标极简布局，移除多余文字，高度精简为 52px，最大宽度 280px；
-/// 3. 通透半透明底色（约 68% 透明度），结合 Scaffold(extendBody: true) 实现内容穿透与动态高斯模糊。
+/// Material 3 Expressive 悬浮药丸导航底栏（M3 Expressive Floating Dock）：
+/// 1. 外层悬浮弥散微光，支持背景壁纸时 Material You 色相通透折射；
+/// 2. 58px 黄金悬浮高度，29px 饱满全药丸轮廓 (StadiumBorder)；
+/// 3. 采用 Material 3 标志性的横向活动药丸指示器（Active Pill Indicator），
+///    以 theme.colorScheme.secondaryContainer 配合平滑物理过冲定格；
+/// 4. 激活项采用 onSecondaryContainer 高对比度强调色，未激活项使用 onSurfaceVariant。
 class AppFloatingBottomBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -59,8 +62,10 @@ class AppFloatingBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.colorScheme.primary;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
+
+    final dockBg = M3Surface.container(context, level: M3ContainerLevel.highest);
+    final dockBorder = M3Surface.border(context);
 
     return SafeArea(
       top: false,
@@ -78,45 +83,37 @@ class AppFloatingBottomBar extends StatelessWidget {
           heightFactor: 1,
           child: ConstrainedBox(
             constraints: const BoxConstraints(
-              maxWidth: 280,
-              minHeight: 52,
-              maxHeight: 52,
+              maxWidth: 290,
+              minHeight: 58,
+              maxHeight: 58,
             ),
             // 外层：提供悬浮弥散阴影
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(26),
+                borderRadius: BorderRadius.circular(29),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withAlpha(isDark ? 80 : 25),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              // 内层：高斯模糊毛玻璃裁剪
+              // 内层：高斯模糊毛玻璃裁剪与 M3 表现力底色
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(26),
+                borderRadius: BorderRadius.circular(29),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
-                      // 高透磨砂质感底色：约 68%~70% 不透明度，确保底层卡片与内容色彩能清晰折射透出
-                      color: isDark
-                          ? const Color(0xB31C1C1E)
-                          : Colors.white.withAlpha(175),
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(
-                        color: isDark
-                            ? Colors.white.withAlpha(30)
-                            : Colors.black.withAlpha(15),
-                        width: 1.2,
-                      ),
+                      color: dockBg,
+                      borderRadius: BorderRadius.circular(29),
+                      border: dockBorder,
                     ),
                     child: Stack(
                       children: [
-                        // 平滑且带物理惯性回弹的药丸指示器滑块（Curves.easeOutBack 模拟物理过冲定格）
+                        // M3 标准横向活动药丸滑块（secondaryContainer 色彩）
                         AnimatedAlign(
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeOutBack,
@@ -131,26 +128,24 @@ class AppFloatingBottomBar extends StatelessWidget {
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 4),
                               child: Container(
-                                height: 40,
+                                height: 38,
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  color: isDark
-                                      ? primaryColor.withAlpha(55)
-                                      : primaryColor.withAlpha(28),
+                                  borderRadius: BorderRadius.circular(19),
+                                  color: theme.colorScheme.secondaryContainer,
                                 ),
                               ),
                             ),
                           ),
                         ),
 
-                        // 各导航项纯图标展示（结合 iOS 经典果冻弹簧微交互）
+                        // 各导航项图标（选中态为 onSecondaryContainer，未选中态为 onSurfaceVariant）
                         Row(
                           children: List.generate(items.length, (i) {
                             final isSelected = currentIndex == i;
                             final item = items[i];
                             final itemColor = isSelected
-                                ? primaryColor
-                                : (isDark ? Colors.white60 : const Color(0xFF6B7280));
+                                ? theme.colorScheme.onSecondaryContainer
+                                : theme.colorScheme.onSurfaceVariant;
 
                             return Expanded(
                               child: _BouncingNavItem(

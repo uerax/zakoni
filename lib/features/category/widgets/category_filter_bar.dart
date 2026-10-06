@@ -98,20 +98,14 @@ class CategoryFilterBar extends ConsumerWidget {
         );
       },
       child: Container(
-        height: 28,
+        height: 30,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: isHighlight
-              ? theme.colorScheme.primary.withAlpha(isDark ? 40 : 20)
-              : (isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8)),
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(
-            color: isHighlight
-                ? theme.colorScheme.primary.withAlpha(120)
-                : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
-            width: 0.8,
-          ),
+              ? theme.colorScheme.secondaryContainer
+              : theme.colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(999),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -119,20 +113,20 @@ class CategoryFilterBar extends ConsumerWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: isHighlight ? FontWeight.w600 : FontWeight.w500,
+                fontSize: 12,
+                fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
                 color: isHighlight
-                    ? theme.colorScheme.primary
-                    : (isDark ? Colors.white70 : Colors.black87),
+                    ? theme.colorScheme.onSecondaryContainer
+                    : theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(width: 2),
             Icon(
               Icons.keyboard_arrow_down_rounded,
-              size: 14,
+              size: 15,
               color: isHighlight
-                  ? theme.colorScheme.primary
-                  : (isDark ? Colors.white38 : Colors.black38),
+                  ? theme.colorScheme.onSecondaryContainer
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ],
         ),
@@ -216,20 +210,14 @@ class CategoryFilterBar extends ConsumerWidget {
         );
       },
       child: Container(
-        height: 28,
+        height: 30,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: isHighlight
-              ? theme.colorScheme.primary.withAlpha(isDark ? 40 : 20)
-              : (isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8)),
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(
-            color: isHighlight
-                ? theme.colorScheme.primary.withAlpha(120)
-                : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
-            width: 0.8,
-          ),
+              ? theme.colorScheme.secondaryContainer
+              : theme.colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(999),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -237,20 +225,20 @@ class CategoryFilterBar extends ConsumerWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: isHighlight ? FontWeight.w600 : FontWeight.w500,
+                fontSize: 12,
+                fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
                 color: isHighlight
-                    ? theme.colorScheme.primary
-                    : (isDark ? Colors.white70 : Colors.black87),
+                    ? theme.colorScheme.onSecondaryContainer
+                    : theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(width: 2),
             Icon(
               Icons.keyboard_arrow_down_rounded,
-              size: 14,
+              size: 15,
               color: isHighlight
-                  ? theme.colorScheme.primary
-                  : (isDark ? Colors.white38 : Colors.black38),
+                  ? theme.colorScheme.onSecondaryContainer
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ],
         ),
@@ -310,39 +298,35 @@ class CategoryFilterBar extends ConsumerWidget {
         );
       },
       child: Container(
-        height: 28,
+        height: 30,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8),
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(
-            color: isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10),
-            width: 0.8,
-          ),
+          color: theme.colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(999),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.sort_rounded,
-              size: 14,
-              color: isDark ? Colors.white60 : Colors.black54,
+              size: 15,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 4),
             Text(
               curSort.label,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white70 : Colors.black87,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(width: 2),
             Icon(
               Icons.keyboard_arrow_down_rounded,
-              size: 14,
-              color: isDark ? Colors.white38 : Colors.black38,
+              size: 15,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ],
         ),

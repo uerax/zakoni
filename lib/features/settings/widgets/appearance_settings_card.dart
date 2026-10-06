@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_icon_tile.dart';
-import 'ios_settings_card.dart';
+import 'm3_settings_card.dart';
 import 'theme_color_tile.dart';
 import 'wallpaper_settings_tile.dart';
 
@@ -13,8 +13,8 @@ class AppearanceSettingsCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        IosSettingsSectionHeader(title: '个性化外观'),
-        IosSettingsCard(
+        M3SettingsSectionHeader(title: '个性化外观'),
+        M3SettingsCard(
           children: [
             ThemeColorTile(),
             AppIconTile(),

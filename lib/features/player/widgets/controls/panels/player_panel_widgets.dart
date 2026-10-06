@@ -77,8 +77,21 @@ class PanelSwitchRow extends StatelessWidget {
             ),
             Switch(
               value: value,
-              activeThumbColor: primaryColor,
               onChanged: onChanged,
+              activeTrackColor: primaryColor,
+              thumbColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return Colors.white;
+                }
+                return Colors.white70;
+              }),
+              trackColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return primaryColor;
+                }
+                return Colors.white.withValues(alpha: 0.16);
+              }),
+              trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ],

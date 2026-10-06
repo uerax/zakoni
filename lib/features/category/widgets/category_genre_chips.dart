@@ -139,17 +139,13 @@ class CategoryGenreChips extends ConsumerWidget {
             color: Colors.transparent,
             child: InkWell(
               onTap: () => _showGenrePickerModal(context, controller, selectedTags, theme, isDark),
-              borderRadius: BorderRadius.circular(100),
+              borderRadius: BorderRadius.circular(999),
               child: Container(
-                height: 28,
-                padding: const EdgeInsets.symmetric(horizontal: 9),
+                height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8),
-                  borderRadius: BorderRadius.circular(100),
-                  border: Border.all(
-                    color: isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10),
-                    width: 0.8,
-                  ),
+                  color: theme.colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(999),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -157,16 +153,16 @@ class CategoryGenreChips extends ConsumerWidget {
                     Text(
                       '展开',
                       style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                        color: isDark ? Colors.white70 : Colors.black87,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(width: 2),
                     Icon(
                       Icons.keyboard_arrow_down_rounded,
-                      size: 14,
-                      color: isDark ? Colors.white54 : Colors.black54,
+                      size: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ],
                 ),
@@ -197,9 +193,10 @@ class CategoryGenreChips extends ConsumerWidget {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: isDark ? const Color(0xFF1E1E22) : Colors.white,
+      backgroundColor: theme.colorScheme.surfaceContainerLow,
+      showDragHandle: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (bottomSheetContext) {
         final screenHeight = MediaQuery.of(bottomSheetContext).size.height;
@@ -210,24 +207,11 @@ class CategoryGenreChips extends ConsumerWidget {
               top: false,
               child: Container(
                 constraints: BoxConstraints(maxHeight: screenHeight * 0.72),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 顶部 iOS 拖拽条
-                    Center(
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white24 : Colors.black26,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-
                     // 顶部操作栏（重置 / 标题 / 完成）
                     Row(
                       children: [
@@ -402,7 +386,7 @@ class CategoryGenreChips extends ConsumerWidget {
     });
   }
 
-  /// 弹窗内部自适应文字宽度的胶囊（绝不强行占满全行，字体多大胶囊就多大）
+  /// 弹窗内部自适应文字宽度的胶囊（M3 Stadium 胶囊）
   Widget _buildModalChip({
     required String label,
     required bool isSelected,
@@ -414,21 +398,15 @@ class CategoryGenreChips extends ConsumerWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(100),
+        borderRadius: BorderRadius.circular(999),
         child: Container(
-          height: 30,
+          height: 32,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             color: isSelected
-                ? theme.colorScheme.primary
-                : (isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8)),
-            borderRadius: BorderRadius.circular(100),
-            border: Border.all(
-              color: isSelected
-                  ? Colors.transparent
-                  : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
-              width: 0.8,
-            ),
+                ? theme.colorScheme.secondaryContainer
+                : theme.colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(999),
           ),
           child: Center(
             widthFactor: 1.0,
@@ -436,10 +414,10 @@ class CategoryGenreChips extends ConsumerWidget {
               label,
               style: TextStyle(
                 fontSize: 12.5,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected
-                    ? Colors.white
-                    : (isDark ? Colors.white70 : Colors.black87),
+                    ? theme.colorScheme.onSecondaryContainer
+                    : theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -448,7 +426,7 @@ class CategoryGenreChips extends ConsumerWidget {
     );
   }
 
-  /// 统一定制轻量级微型胶囊（高度 28dp，极简现代设计）
+  /// 统一定制轻量级微型胶囊（M3 表现力 StadiumBorder 药丸）
   Widget _buildChip({
     required String label,
     required bool isSelected,
@@ -460,31 +438,25 @@ class CategoryGenreChips extends ConsumerWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(100),
+        borderRadius: BorderRadius.circular(999),
         child: Container(
-          height: 28,
+          height: 30,
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: isSelected
-                ? theme.colorScheme.primary
-                : (isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8)),
-            borderRadius: BorderRadius.circular(100),
-            border: Border.all(
-              color: isSelected
-                  ? Colors.transparent
-                  : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
-              width: 0.8,
-            ),
+                ? theme.colorScheme.secondaryContainer
+                : theme.colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               color: isSelected
-                  ? Colors.white
-                  : (isDark ? Colors.white70 : Colors.black87),
+                  ? theme.colorScheme.onSecondaryContainer
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),

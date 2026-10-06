@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/models/history/watch_history_item.dart';
+import '../../../core/theme/m3_surface.dart';
 import '../../../core/utils/responsive.dart';
 import '../../common/widgets/bouncing_scale_card.dart';
 import '../../common/widgets/cached_anime_image.dart';
@@ -188,31 +189,17 @@ class ContinueWatchingShelf extends StatelessWidget {
       onTap: () => onResumeWatch?.call(record),
       child: Container(
         height: cardHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: isDark
-              ? const Color(0xFF1E1E22).withAlpha(190)
-              : Colors.white.withAlpha(225),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withAlpha(16)
-                : Colors.black.withAlpha(12),
-            width: 0.8,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(isDark ? 28 : 8),
-              blurRadius: 4,
-              offset: const Offset(0, 1.5),
-            ),
-          ],
+          color: M3Surface.container(context, level: M3ContainerLevel.low),
+          borderRadius: BorderRadius.circular(16),
+          border: M3Surface.border(context),
         ),
         child: Row(
           children: [
             // 封面与播放微胶囊（紧凑 38x54 尺寸）
             ClipRRect(
-              borderRadius: BorderRadius.circular(5),
+              borderRadius: BorderRadius.circular(10),
               child: SizedBox(
                 width: 38,
                 height: 54,
@@ -223,12 +210,12 @@ class ContinueWatchingShelf extends StatelessWidget {
                       imageUrl: coverUrl,
                       fit: BoxFit.cover,
                     ),
-                    ColoredBox(color: Colors.black.withAlpha(28)),
+                    ColoredBox(color: Colors.black.withValues(alpha: 0.3)),
                     const Center(
                       child: Icon(
                         Icons.play_arrow_rounded,
                         color: Colors.white,
-                        size: 18,
+                        size: 20,
                       ),
                     ),
                   ],
@@ -248,7 +235,7 @@ class ContinueWatchingShelf extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
                       color: theme.textTheme.titleSmall?.color,
                     ),
@@ -268,7 +255,7 @@ class ContinueWatchingShelf extends StatelessWidget {
                           ' · ',
                           style: TextStyle(
                             fontSize: 10,
-                            color: theme.colorScheme.onSurfaceVariant.withAlpha(120),
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                           ),
                         ),
                         Expanded(
@@ -288,18 +275,16 @@ class ContinueWatchingShelf extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
 
-                  // 纤细进度条与百分比
+                  // M3 圆润进度条与百分比
                   Row(
                     children: [
                       Expanded(
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(1.5),
+                          borderRadius: BorderRadius.circular(999),
                           child: LinearProgressIndicator(
                             value: record.progress.clamp(0.0, 1.0),
-                            minHeight: 2.5,
-                            backgroundColor: isDark
-                                ? Colors.white.withAlpha(24)
-                                : Colors.black.withAlpha(16),
+                            minHeight: 3.5,
+                            backgroundColor: theme.colorScheme.surfaceContainerHighest,
                             valueColor: AlwaysStoppedAnimation<Color>(
                               theme.colorScheme.primary,
                             ),
@@ -311,7 +296,7 @@ class ContinueWatchingShelf extends StatelessWidget {
                         '${(record.progress * 100).toInt()}%',
                         style: TextStyle(
                           fontSize: 9,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),

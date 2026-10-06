@@ -205,10 +205,10 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
   /// - 平板/宽屏端（宽 > 500dp）：限制最大宽度 420dp 居中收拢，防止元素被拉伸过扁或过度分散。
   Widget _buildWeekStrip(ThemeData theme, bool isDark) {
     final strip = Container(
-      height: 36,
+      height: 38,
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(6),
-        borderRadius: BorderRadius.circular(18),
+        color: theme.colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(19),
       ),
       padding: const EdgeInsets.all(3),
       child: Row(
@@ -226,7 +226,7 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
                 waitDuration: const Duration(milliseconds: 400),
                 child: Material(
                   color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(16),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () => _onSelectDay(index),
@@ -234,8 +234,10 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
                       duration: const Duration(milliseconds: 200),
                       curve: Curves.easeOutCubic,
                       decoration: BoxDecoration(
-                        color: isSelected ? theme.colorScheme.primary : Colors.transparent,
-                        borderRadius: BorderRadius.circular(15),
+                        color: isSelected
+                            ? theme.colorScheme.secondaryContainer
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       alignment: Alignment.center,
                       child: Text(
@@ -243,13 +245,13 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: isSelected
-                              ? FontWeight.w700
-                              : (isCurrentDay ? FontWeight.w600 : FontWeight.w500),
+                              ? FontWeight.w800
+                              : (isCurrentDay ? FontWeight.w700 : FontWeight.w500),
                           color: isSelected
-                              ? theme.colorScheme.onPrimary
+                              ? theme.colorScheme.onSecondaryContainer
                               : (isCurrentDay
                                   ? theme.colorScheme.primary
-                                  : (isDark ? Colors.white70 : Colors.black87)),
+                                  : theme.colorScheme.onSurfaceVariant),
                         ),
                       ),
                     ),

@@ -1,14 +1,12 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../../../core/network/anime_image_cache_manager.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/network/player_media_disk_cache_manager.dart';
-import '../../../core/utils/font_manager.dart';
 import '../../player/danmaku/source/bilibili_danmaku_client.dart';
 import '../../player/danmaku/source/dandan_client.dart';
 import '../../player/source/source_bundle_manager.dart';
-import 'ios_settings_card.dart';
+import 'm3_settings_card.dart';
 
 class CacheSettingsCard extends StatefulWidget {
   final BangumiClient client;
@@ -125,85 +123,69 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
   }
 
   void _confirmClearImageCache() {
-    final currentFont = FontManager.instance.activeFontFamily;
-    final fontFallback = FontManager.fallbackFontFamilies;
-    final baseStyle = TextStyle(
-      fontFamily: currentFont,
-      fontFamilyFallback: fontFallback,
-    );
+    final theme = Theme.of(context);
 
-    showCupertinoDialog(
+    showDialog(
       context: context,
-      builder: (ctx) => CupertinoTheme(
-        data: CupertinoTheme.of(ctx).copyWith(
-          textTheme: CupertinoTextThemeData(
-            textStyle: baseStyle,
-            actionTextStyle: baseStyle,
-          ),
+      builder: (ctx) => AlertDialog(
+        icon: Icon(
+          Icons.delete_sweep_rounded,
+          color: theme.colorScheme.error,
+          size: 28,
         ),
-        child: CupertinoAlertDialog(
-          title: Text('清空图片缓存', style: baseStyle.copyWith(fontWeight: FontWeight.bold)),
-          content: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text('当前图片缓存占用 $_imageCacheSizeStr，确认清空？', style: baseStyle),
+        title: const Text('清空图片缓存'),
+        content: Text('当前图片缓存占用 $_imageCacheSizeStr，确认清空？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
           ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('取消', style: baseStyle),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
             ),
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _performClearImageCache();
-              },
-              child: Text('确认清空', style: baseStyle.copyWith(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _performClearImageCache();
+            },
+            child: const Text('确认清空'),
+          ),
+        ],
       ),
     );
   }
 
   void _confirmClearDataCache() {
-    final currentFont = FontManager.instance.activeFontFamily;
-    final fontFallback = FontManager.fallbackFontFamilies;
-    final baseStyle = TextStyle(
-      fontFamily: currentFont,
-      fontFamilyFallback: fontFallback,
-    );
+    final theme = Theme.of(context);
 
-    showCupertinoDialog(
+    showDialog(
       context: context,
-      builder: (ctx) => CupertinoTheme(
-        data: CupertinoTheme.of(ctx).copyWith(
-          textTheme: CupertinoTextThemeData(
-            textStyle: baseStyle,
-            actionTextStyle: baseStyle,
-          ),
+      builder: (ctx) => AlertDialog(
+        icon: Icon(
+          Icons.cleaning_services_rounded,
+          color: theme.colorScheme.error,
+          size: 28,
         ),
-        child: CupertinoAlertDialog(
-          title: Text('清空数据缓存', style: baseStyle.copyWith(fontWeight: FontWeight.bold)),
-          content: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text('当前数据缓存占用 $_dataCacheSizeStr，确认清空？', style: baseStyle),
+        title: const Text('清空数据缓存'),
+        content: Text('当前数据缓存占用 $_dataCacheSizeStr，确认清空？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
           ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('取消', style: baseStyle),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
             ),
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _performClearDataCache();
-              },
-              child: Text('确认清空', style: baseStyle.copyWith(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _performClearDataCache();
+            },
+            child: const Text('确认清空'),
+          ),
+        ],
       ),
     );
   }
@@ -216,13 +198,14 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const IosSettingsSectionHeader(title: '存储与缓存'),
-        IosSettingsCard(
+        const M3SettingsSectionHeader(title: '存储与缓存'),
+        M3SettingsCard(
           children: [
-            IosSettingsTile(
-              leading: const IosSettingsIconBox(
+            M3SettingsTile(
+              leading: M3SettingsIconBox(
                 icon: Icons.image_outlined,
-                bg: Color(0xFFE63946),
+                bg: theme.colorScheme.errorContainer,
+                iconColor: theme.colorScheme.onErrorContainer,
               ),
               title: '图片缓存',
               showDivider: true,
@@ -233,19 +216,24 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
                     _imageCacheSizeStr,
                     style: TextStyle(
                       fontSize: 14,
-                      color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    size: 20,
+                  ),
                 ],
               ),
               onTap: _confirmClearImageCache,
             ),
-            IosSettingsTile(
-              leading: const IosSettingsIconBox(
+            M3SettingsTile(
+              leading: M3SettingsIconBox(
                 icon: Icons.storage_rounded,
-                bg: Color(0xFF0077B6),
+                bg: theme.colorScheme.secondaryContainer,
+                iconColor: theme.colorScheme.onSecondaryContainer,
               ),
               title: '数据缓存',
               showDivider: false,
@@ -256,11 +244,15 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
                     _dataCacheSizeStr,
                     style: TextStyle(
                       fontSize: 14,
-                      color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    size: 20,
+                  ),
                 ],
               ),
               onTap: _confirmClearDataCache,

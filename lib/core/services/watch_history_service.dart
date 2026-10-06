@@ -36,6 +36,14 @@ class WatchHistoryService extends ChangeNotifier {
   /// 预置的 3 部真实测试数据（包含视频源、线路与时长进度）
   static List<WatchHistoryItem> get initialMockSeeds {
     final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayTime1 = now.millisecondsSinceEpoch;
+    final todayTime2 = (todayStart.add(const Duration(minutes: 1)).isBefore(now)
+            ? todayStart.add(const Duration(minutes: 1))
+            : now)
+        .millisecondsSinceEpoch;
+    final yesterdayTime = todayStart.subtract(const Duration(hours: 2)).millisecondsSinceEpoch;
+
     return [
       WatchHistoryItem(
         id: WatchHistoryItem.buildId(400650, 14),
@@ -48,7 +56,7 @@ class WatchHistoryService extends ChangeNotifier {
         pageUrl: 'https://cycani.org/watch/400650/14',
         position: 1035.0, // 17:15
         duration: 1440.0, // 24:00
-        updatedAt: now.subtract(const Duration(minutes: 25)).millisecondsSinceEpoch,
+        updatedAt: todayTime1,
       ),
       WatchHistoryItem(
         id: WatchHistoryItem.buildId(395377, 8),
@@ -61,7 +69,7 @@ class WatchHistoryService extends ChangeNotifier {
         pageUrl: 'https://anime1.me/watch/395377/8',
         position: 650.0, // 10:50
         duration: 1440.0, // 24:00
-        updatedAt: now.subtract(const Duration(hours: 3)).millisecondsSinceEpoch,
+        updatedAt: todayTime2,
       ),
       WatchHistoryItem(
         id: WatchHistoryItem.buildId(410657, 4),
@@ -74,7 +82,7 @@ class WatchHistoryService extends ChangeNotifier {
         pageUrl: 'https://omofun.tv/watch/410657/4',
         position: 1265.0, // 21:05
         duration: 1440.0, // 24:00
-        updatedAt: now.subtract(const Duration(days: 1)).millisecondsSinceEpoch,
+        updatedAt: yesterdayTime,
       ),
     ];
   }

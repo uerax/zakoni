@@ -92,7 +92,7 @@ class PlayerSpeedPopup extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isSelected
-              ? primaryColor.withValues(alpha: 0.18)
+              ? Colors.white.withValues(alpha: 0.20)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
         ),
@@ -102,16 +102,14 @@ class PlayerSpeedPopup extends StatelessWidget {
             Text(
               '${speed}x',
               style: TextStyle(
-                color: isSelected
-                    ? primaryColor
-                    : Colors.white.withValues(alpha: 0.9),
+                color: Colors.white,
                 fontSize: fontSize,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 letterSpacing: -0.2,
               ),
             ),
             if (isSelected)
-              Icon(Icons.check_rounded, color: primaryColor, size: compact ? 11 : 12),
+              Icon(Icons.check_rounded, color: Colors.white, size: compact ? 11 : 12),
           ],
         ),
       ),

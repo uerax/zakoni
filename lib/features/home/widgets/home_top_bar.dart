@@ -46,27 +46,24 @@ class HomeTopBar extends StatelessWidget {
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF1C1C1E).withAlpha((185 * progress).toInt())
-                : Colors.white.withAlpha((190 * progress).toInt()),
+            color: theme.colorScheme.surface.withValues(alpha: 0.88 * progress),
             border: Border(
               bottom: BorderSide(
-                color: (isDark ? Colors.white : Colors.black)
-                    .withAlpha((20 * progress).toInt()),
-                width: 0.5,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.22 * progress),
+                width: 0.8,
               ),
             ),
           ),
           child: ClipRect(
             child: BackdropFilter(
               filter: ImageFilter.blur(
-                sigmaX: 20 * progress,
-                sigmaY: 20 * progress,
+                sigmaX: 18 * progress,
+                sigmaY: 18 * progress,
               ),
               child: SafeArea(
                 bottom: false,
                 child: SizedBox(
-                  height: 42,
+                  height: 46,
                   child: isDesktop
                       ? _buildDesktopContent(context, theme, isDark)
                       : _buildMobileContent(context, theme, isDark),
@@ -151,21 +148,17 @@ class HomeTopBar extends StatelessWidget {
                   theme: theme,
                   isDark: isDark,
                   trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(14),
-                      borderRadius: BorderRadius.circular(5),
-                      border: Border.all(
-                        color: isDark ? Colors.white.withAlpha(25) : Colors.black.withAlpha(15),
-                        width: 0.8,
-                      ),
+                      color: theme.colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       shortcutText,
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white60 : Colors.black54,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSecondaryContainer,
                       ),
                     ),
                   ),
@@ -220,7 +213,7 @@ class HomeTopBar extends StatelessWidget {
     );
   }
 
-  /// 铺满式胶囊搜索栏：等高 30px，与左侧 30×30 头像精细对齐
+  /// M3 表现力胶囊搜索栏：等高 38px，与左侧头像精细对齐
   Widget _buildSearchBar({
     required ThemeData theme,
     required bool isDark,
@@ -231,30 +224,23 @@ class HomeTopBar extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(100),
+        borderRadius: BorderRadius.circular(999),
+        splashColor: theme.colorScheme.primary.withValues(alpha: 0.12),
         child: Container(
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withAlpha(22)
-                : Colors.black.withAlpha(12),
-            borderRadius: BorderRadius.circular(100),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withAlpha(20)
-                  : Colors.black.withAlpha(10),
-              width: 0.8,
-            ),
+            color: theme.colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(999),
           ),
           child: Row(
             children: [
               Icon(
                 Icons.search_rounded,
-                size: 16,
-                color: isDark ? Colors.white60 : Colors.black45,
+                size: 19,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '搜索番剧、剧场版、特别篇...',
@@ -262,8 +248,8 @@ class HomeTopBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: theme.textTheme.bodyMedium?.fontFamily ?? 'MiSans',
-                    fontSize: 12,
-                    color: isDark ? Colors.white54 : Colors.black45,
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.normal,
                   ),
                 ),
@@ -309,29 +295,21 @@ class HomeTopBar extends StatelessWidget {
             height: 44,
             child: Center(
               child: Container(
-                width: 30,
-                height: 30,
-                padding: const EdgeInsets.all(1.2),
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
+                  color: theme.colorScheme.surfaceContainerHigh,
                   border: Border.all(
-                    color: theme.colorScheme.primary.withAlpha(128),
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
                     width: 1.0,
                   ),
                 ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isDark
-                        ? const Color(0xFF2C2C2E)
-                        : const Color(0xFFF2F2F7),
-                  ),
-                  child: const ClipOval(
-                    child: Icon(
-                      Icons.person_rounded,
-                      size: 16.5,
-                      color: Color(0xFF9CA3AF),
-                    ),
+                child: Center(
+                  child: Icon(
+                    Icons.person_rounded,
+                    size: 19,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),

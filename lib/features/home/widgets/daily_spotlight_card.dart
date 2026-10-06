@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/models/home/recommend_item.dart';
+import '../../../core/theme/m3_surface.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/bouncing_scale_card.dart';
 import '../../common/widgets/cached_anime_image.dart';
@@ -125,30 +126,16 @@ class _DailySpotlightCardState extends State<DailySpotlightCard> {
                 key: ValueKey('spotlight_${item.id}_$_currentIndex'),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF1E1E22).withAlpha(235)
-                      : Colors.white.withAlpha(245),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withAlpha(24)
-                        : Colors.black.withAlpha(16),
-                    width: 1.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(isDark ? 45 : 12),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+                  color: M3Surface.container(context, level: M3ContainerLevel.low),
+                  borderRadius: BorderRadius.circular(20),
+                  border: M3Surface.border(context),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 左侧：2:3 原始海报
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.circular(12),
                       child: SizedBox(
                         width: 90,
                         height: 126,
@@ -169,14 +156,14 @@ class _DailySpotlightCardState extends State<DailySpotlightCard> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 契合度与特色标签
+                            // 契合度与特色标签 (M3 Stadium 胶囊徽章)
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                                   decoration: BoxDecoration(
                                     color: amberBgColor,
-                                    borderRadius: BorderRadius.circular(4),
+                                    borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -200,16 +187,17 @@ class _DailySpotlightCardState extends State<DailySpotlightCard> {
                                 ),
                                 const SizedBox(width: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                                   decoration: BoxDecoration(
-                                    color: theme.colorScheme.onSurfaceVariant.withAlpha(20),
-                                    borderRadius: BorderRadius.circular(4),
+                                    color: theme.colorScheme.secondaryContainer,
+                                    borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
                                     current.tag,
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                      color: theme.colorScheme.onSecondaryContainer,
                                     ),
                                   ),
                                 ),
@@ -262,15 +250,15 @@ class _DailySpotlightCardState extends State<DailySpotlightCard> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withAlpha(isDark ? 22 : 12),
-                                borderRadius: BorderRadius.circular(6),
+                                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  const Text(
                                     '💡 ',
-                                    style: const TextStyle(fontSize: 11),
+                                    style: TextStyle(fontSize: 11),
                                   ),
                                   Expanded(
                                     child: Text(
@@ -281,7 +269,7 @@ class _DailySpotlightCardState extends State<DailySpotlightCard> {
                                         fontSize: 11,
                                         height: 1.35,
                                         color: theme.colorScheme.primary,
-                                        fontWeight: FontWeight.w500,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),

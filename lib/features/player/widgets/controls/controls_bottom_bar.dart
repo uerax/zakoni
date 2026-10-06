@@ -346,8 +346,9 @@ class PlayerControlsBottomBar extends StatelessWidget {
                                   enabled: isEnabled,
                                   size: metrics.danmakuToggleSize,
                                   color: isEnabled
-                                      ? primaryColor
-                                      : Colors.white70,
+                                      ? Colors.white
+                                      : Colors.white.withValues(alpha: 0.40),
+                                  slashColor: Colors.white.withValues(alpha: 0.85),
                                 ),
                                 size: metrics.buttonSize,
                                 tooltip: isEnabled ? '关闭弹幕' : '开启弹幕',
@@ -367,9 +368,7 @@ class PlayerControlsBottomBar extends StatelessWidget {
                           _buildBarButton(
                             icon: DanmakuSettingsIcon(
                               size: metrics.danmakuSettingsSize,
-                              color: (isDanmakuPanelActive && isFullscreen)
-                                  ? primaryColor
-                                  : Colors.white,
+                              color: Colors.white,
                             ),
                             size: metrics.buttonSize,
                             tooltip: '弹幕设置',
@@ -382,6 +381,9 @@ class PlayerControlsBottomBar extends StatelessWidget {
                         ValueListenableBuilder<PlaybackCoreState>(
                           valueListenable: controller.core,
                           builder: (context, coreState, _) {
+                            final isSpeedHighlighted =
+                                showSpeedPopup || coreState.playbackRate != 1.0;
+
                             return GestureDetector(
                               key: speedButtonKey,
                               behavior: HitTestBehavior.opaque,
@@ -389,22 +391,21 @@ class PlayerControlsBottomBar extends StatelessWidget {
                               child: Container(
                                 padding: metrics.speedPadding,
                                 decoration: BoxDecoration(
-                                  color: showSpeedPopup
-                                      ? Colors.white.withValues(alpha: 0.15)
+                                  color: isSpeedHighlighted
+                                      ? Colors.white.withValues(alpha: 0.20)
                                       : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(3),
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   coreState.playbackRate == 1.0
                                       ? '1x'
                                       : '${coreState.playbackRate}x',
                                   style: TextStyle(
-                                    color: (showSpeedPopup ||
-                                            coreState.playbackRate != 1.0)
-                                        ? primaryColor
-                                        : Colors.white.withValues(alpha: 0.9),
+                                    color: Colors.white,
                                     fontSize: metrics.speedFontSize,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: isSpeedHighlighted
+                                        ? FontWeight.w700
+                                        : FontWeight.w600,
                                     letterSpacing: -0.2,
                                   ),
                                 ),
@@ -419,9 +420,7 @@ class PlayerControlsBottomBar extends StatelessWidget {
                         _buildBarButton(
                           icon: Icon(
                             Icons.settings_outlined,
-                            color: (isSettingsPanelActive && isFullscreen)
-                                ? primaryColor
-                                : Colors.white,
+                            color: Colors.white,
                             size: metrics.iconSize,
                           ),
                           size: metrics.buttonSize,

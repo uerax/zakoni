@@ -1,8 +1,6 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../core/utils/appearance_manager.dart';
-import '../../../core/utils/font_manager.dart';
-import 'ios_settings_card.dart';
+import 'm3_settings_card.dart';
 
 class AppIconTile extends StatelessWidget {
   const AppIconTile({super.key});
@@ -32,47 +30,70 @@ class AppIconTile extends StatelessWidget {
     );
   }
 
-  void _showIconActionSheet(BuildContext context) {
+  void _showIconModalSheet(BuildContext context) {
     final appMgr = AppearanceManager.instance;
-    final currentFont = FontManager.instance.activeFontFamily;
-    final fontFallback = FontManager.fallbackFontFamilies;
-    final baseStyle = TextStyle(
-      fontFamily: currentFont,
-      fontFamilyFallback: fontFallback,
-    );
+    final theme = Theme.of(context);
 
-    showCupertinoModalPopup(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => CupertinoTheme(
-        data: CupertinoTheme.of(ctx).copyWith(
-          textTheme: CupertinoTextThemeData(
-            textStyle: baseStyle,
-            actionTextStyle: baseStyle,
-          ),
-        ),
-        child: CupertinoActionSheet(
-          title: Text('应用图标设置', style: baseStyle),
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _pickCustomIcon(context);
-              },
-              child: Text('上传自定义图标', style: baseStyle),
-            ),
-            if (appMgr.hasCustomIcon)
-              CupertinoActionSheetAction(
-                isDestructiveAction: true,
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  _resetDefaultIcon(context);
-                },
-                child: Text('恢复默认图标', style: baseStyle),
+      backgroundColor: theme.colorScheme.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Text(
+                  '应用图标设置',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('取消', style: baseStyle),
+              const SizedBox(height: 6),
+              ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                leading: Icon(
+                  Icons.upload_file_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+                title: const Text('上传自定义图标'),
+                subtitle: const Text('支持 png / jpg / webp 格式图片'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickCustomIcon(context);
+                },
+              ),
+              if (appMgr.hasCustomIcon) ...[
+                const SizedBox(height: 4),
+                ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  leading: Icon(
+                    Icons.restart_alt_rounded,
+                    color: theme.colorScheme.error,
+                  ),
+                  title: Text(
+                    '恢复默认图标',
+                    style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.w600),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _resetDefaultIcon(context);
+                  },
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -87,10 +108,10 @@ class AppIconTile extends StatelessWidget {
     return ListenableBuilder(
       listenable: appMgr,
       builder: (context, _) {
-        return IosSettingsTile(
+        return M3SettingsTile(
           leading: appMgr.buildAppLogoWidget(
-            size: 28,
-            borderRadius: 7,
+            size: 36,
+            borderRadius: 12,
           ),
           title: '应用图标',
           trailing: Row(
@@ -100,14 +121,18 @@ class AppIconTile extends StatelessWidget {
                 appMgr.hasCustomIcon ? '自定义' : '默认',
                 style: TextStyle(
                   fontSize: 14,
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                 ),
               ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                size: 20,
+              ),
             ],
           ),
-          onTap: () => _showIconActionSheet(context),
+          onTap: () => _showIconModalSheet(context),
         );
       },
     );

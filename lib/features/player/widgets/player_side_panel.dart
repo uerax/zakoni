@@ -1,5 +1,4 @@
 import 'dart:ui';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:zakoni/features/player/controller/playback_controller.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
@@ -99,107 +98,119 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
 
-    return Stack(
-      children: [
-        // 1. 半透明黑色遮罩（点击空白区域关闭侧边抽屉）
-        IgnorePointer(
-          ignoring: !widget.isOpen,
-          child: AnimatedOpacity(
-            opacity: widget.isOpen ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: widget.onClose,
-              child: ColoredBox(
-                color: Colors.black.withValues(alpha: 0.35),
-                child: const SizedBox.expand(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final panelWidth =
+            constraints.maxWidth < 360 ? constraints.maxWidth : 360.0;
+        final isFullCover = constraints.maxWidth < 360;
+
+        return Stack(
+          children: [
+            // 1. 半透明黑色遮罩（点击空白区域关闭侧边抽屉）
+            IgnorePointer(
+              ignoring: !widget.isOpen,
+              child: AnimatedOpacity(
+                opacity: widget.isOpen ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onClose,
+                  child: ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
 
-        // 2. 右侧悬浮毛玻璃滑出抽屉 (Side Drawer)
-        Positioned(
-          top: 0,
-          bottom: 0,
-          right: 0,
-          width: 360,
-          child: AnimatedSlide(
-            offset: widget.isOpen ? Offset.zero : const Offset(1.0, 0.0),
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            child: ClipRRect(
-              borderRadius:
-                  const BorderRadius.horizontal(left: Radius.circular(20)),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xE6141418), // 深空高透毛玻璃
-                    borderRadius:
-                        const BorderRadius.horizontal(left: Radius.circular(20)),
-                    border: Border(
-                      left: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.16),
-                        width: 0.5,
-                      ),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 24,
-                        offset: const Offset(-4, 0),
-                      ),
-                    ],
-                  ),
-                  child: Theme(
-                    data: ThemeData.dark().copyWith(
-                      scaffoldBackgroundColor: Colors.transparent,
-                      colorScheme: ColorScheme.dark(
-                        primary: primaryColor,
-                        surface: const Color(0xFF1E1E24),
-                        onSurface: Colors.white,
-                        onSurfaceVariant: Colors.white.withValues(alpha: 0.7),
-                      ),
-                      textTheme: const TextTheme(
-                        bodyLarge: TextStyle(color: Colors.white),
-                        bodyMedium: TextStyle(color: Colors.white),
-                        bodySmall: TextStyle(color: Colors.white70),
-                        titleMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                        titleSmall: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // 顶部导航与 Tab 切换头
-                          _buildHeader(primaryColor),
-
-                          const Divider(
-                            color: Color(0x22FFFFFF),
-                            height: 1,
-                            thickness: 0.5,
-                          ),
-
-                          // 内容主体
-                          Expanded(
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              child: _buildTabBody(primaryColor),
-                            ),
+            // 2. 右侧悬浮毛玻璃滑出抽屉 (Side Drawer，小屏下自适应视口宽度防截断)
+            Positioned(
+              top: 0,
+              bottom: 0,
+              right: 0,
+              width: panelWidth,
+              child: AnimatedSlide(
+                offset: widget.isOpen ? Offset.zero : const Offset(1.0, 0.0),
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                child: ClipRRect(
+                  borderRadius: isFullCover
+                      ? BorderRadius.zero
+                      : const BorderRadius.horizontal(left: Radius.circular(20)),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xE6141418), // 深空高透毛玻璃
+                        borderRadius: isFullCover
+                            ? BorderRadius.zero
+                            : const BorderRadius.horizontal(left: Radius.circular(20)),
+                        border: isFullCover
+                            ? null
+                            : Border(
+                                left: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.16),
+                                  width: 0.5,
+                                ),
+                              ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            blurRadius: 24,
+                            offset: const Offset(-4, 0),
                           ),
                         ],
+                      ),
+                      child: Theme(
+                        data: ThemeData.dark().copyWith(
+                          scaffoldBackgroundColor: Colors.transparent,
+                          colorScheme: ColorScheme.dark(
+                            primary: primaryColor,
+                            surface: const Color(0xFF1E1E24),
+                            onSurface: Colors.white,
+                            onSurfaceVariant: Colors.white.withValues(alpha: 0.7),
+                          ),
+                          textTheme: const TextTheme(
+                            bodyLarge: TextStyle(color: Colors.white),
+                            bodyMedium: TextStyle(color: Colors.white),
+                            bodySmall: TextStyle(color: Colors.white70),
+                            titleMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                            titleSmall: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        child: SafeArea(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // 顶部导航与 Tab 切换头
+                              _buildHeader(primaryColor),
+
+                              const Divider(
+                                color: Color(0x22FFFFFF),
+                                height: 1,
+                                thickness: 0.5,
+                              ),
+
+                              // 内容主体
+                              Expanded(
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  child: _buildTabBody(primaryColor),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -330,7 +341,11 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CupertinoActivityIndicator(color: Colors.white, radius: 12),
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2),
+            ),
             SizedBox(height: 12),
             Text(
               '正在加载分集列表...',
@@ -680,10 +695,24 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
               ],
             ),
           ),
-          CupertinoSwitch(
+          Switch(
             value: value,
-            activeTrackColor: primaryColor,
             onChanged: onChanged,
+            activeTrackColor: primaryColor,
+            thumbColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return Colors.white;
+              }
+              return Colors.white70;
+            }),
+            trackColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return primaryColor;
+              }
+              return Colors.white.withValues(alpha: 0.16);
+            }),
+            trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ],
       ),

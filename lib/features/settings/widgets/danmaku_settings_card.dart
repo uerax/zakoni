@@ -1,8 +1,6 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:zakoni/core/utils/font_manager.dart';
 import 'package:zakoni/features/player/danmaku/source/dandan_config_manager.dart';
-import 'ios_settings_card.dart';
+import 'm3_settings_card.dart';
 
 /// 弹弹 play 弹幕服务设置卡片
 class DanmakuSettingsCard extends StatefulWidget {
@@ -46,17 +44,10 @@ class _DanmakuSettingsCardState extends State<DanmakuSettingsCard> {
     String? testResult;
     bool? testSuccess;
 
-    showCupertinoDialog(
+    showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final currentFont = FontManager.instance.activeFontFamily;
-          final fontFallback = FontManager.fallbackFontFamilies;
-          final baseStyle = TextStyle(
-            fontFamily: currentFont,
-            fontFamilyFallback: fontFallback,
-          );
-
           Future<void> runTest() async {
             setDialogState(() {
               isTesting = true;
@@ -77,74 +68,77 @@ class _DanmakuSettingsCardState extends State<DanmakuSettingsCard> {
             });
           }
 
-          return CupertinoAlertDialog(
-            title: Text(
-              '弹弹 play 凭证配置',
-              style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+          return AlertDialog(
+            icon: Icon(
+              Icons.key_rounded,
+              color: theme.colorScheme.primary,
+              size: 28,
             ),
-            content: Padding(
-              padding: const EdgeInsets.only(top: 12),
+            title: const Text('弹弹 play 凭证配置'),
+            content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     '留空则使用内置通用凭据；若内置失效可前往 open.dandanplay.com 免费申请开发者凭证填入。',
-                    style: baseStyle.copyWith(fontSize: 12, color: Colors.grey),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: appIdController,
+                    decoration: const InputDecoration(
+                      labelText: 'App ID',
+                      hintText: '如 hvf6pzvxcm',
+                    ),
                   ),
                   const SizedBox(height: 12),
-                  CupertinoTextField(
-                    controller: appIdController,
-                    placeholder: 'App ID (如 hvf6pzvxcm)',
-                    style: baseStyle.copyWith(fontSize: 13),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  ),
-                  const SizedBox(height: 8),
-                  CupertinoTextField(
+                  TextField(
                     controller: appSecretController,
-                    placeholder: 'App Secret (开放平台私钥)',
                     obscureText: true,
-                    style: baseStyle.copyWith(fontSize: 13),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: const InputDecoration(
+                      labelText: 'App Secret',
+                      hintText: '开放平台私钥',
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  CupertinoTextField(
+                  const SizedBox(height: 12),
+                  TextField(
                     controller: endpointController,
-                    placeholder: 'API 地址 (选填，默认官方节点)',
-                    style: baseStyle.copyWith(fontSize: 13),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: const InputDecoration(
+                      labelText: 'API 地址',
+                      hintText: '选填，默认官方节点',
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
-                      CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                      FilledButton.tonal(
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          visualDensity: VisualDensity.compact,
+                        ),
                         onPressed: isTesting ? null : runTest,
                         child: isTesting
                             ? const SizedBox(
                                 width: 14,
                                 height: 14,
-                                child: CupertinoActivityIndicator(radius: 7),
+                                child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : Text(
-                                '测试连接',
-                                style: baseStyle.copyWith(
-                                  fontSize: 12,
-                                  color: theme.colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                            : const Text('测试连接'),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
                       if (testResult != null)
                         Expanded(
                           child: Text(
                             testResult!,
-                            style: baseStyle.copyWith(
-                              fontSize: 11,
-                              color: testSuccess == true ? Colors.green : Colors.red,
-                              fontWeight: FontWeight.w500,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: testSuccess == true
+                                  ? const Color(0xFF34C759)
+                                  : theme.colorScheme.error,
+                              fontWeight: FontWeight.w600,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -156,11 +150,11 @@ class _DanmakuSettingsCardState extends State<DanmakuSettingsCard> {
               ),
             ),
             actions: [
-              CupertinoDialogAction(
+              TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('取消', style: baseStyle),
+                child: const Text('取消'),
               ),
-              CupertinoDialogAction(
+              TextButton(
                 onPressed: () async {
                   await _config.resetToDefault();
                   if (ctx.mounted) Navigator.of(ctx).pop();
@@ -170,10 +164,12 @@ class _DanmakuSettingsCardState extends State<DanmakuSettingsCard> {
                     );
                   }
                 },
-                child: Text('恢复默认', style: baseStyle.copyWith(color: Colors.orange)),
+                child: Text(
+                  '恢复默认',
+                  style: TextStyle(color: theme.colorScheme.error),
+                ),
               ),
-              CupertinoDialogAction(
-                isDefaultAction: true,
+              FilledButton(
                 onPressed: () async {
                   await _config.saveConfig(
                     appId: appIdController.text,
@@ -191,7 +187,7 @@ class _DanmakuSettingsCardState extends State<DanmakuSettingsCard> {
                     );
                   }
                 },
-                child: Text('保存', style: baseStyle.copyWith(fontWeight: FontWeight.bold)),
+                child: const Text('保存'),
               ),
             ],
           );
@@ -209,13 +205,14 @@ class _DanmakuSettingsCardState extends State<DanmakuSettingsCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const IosSettingsSectionHeader(title: '弹幕服务'),
-        IosSettingsCard(
+        const M3SettingsSectionHeader(title: '弹幕服务'),
+        M3SettingsCard(
           children: [
-            IosSettingsTile(
-              leading: const IosSettingsIconBox(
+            M3SettingsTile(
+              leading: M3SettingsIconBox(
                 icon: Icons.subtitles_rounded,
-                bg: Color(0xFF00B4D8),
+                bg: theme.colorScheme.primaryContainer,
+                iconColor: theme.colorScheme.onPrimaryContainer,
               ),
               title: '弹弹 play API 凭证',
               subtitle: isCustom ? '已启用自定义开放平台凭证 (SHA-256 签名)' : '使用内置通用凭据，点击可自定义防失效',
@@ -225,11 +222,11 @@ class _DanmakuSettingsCardState extends State<DanmakuSettingsCard> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: (isCustom ? const Color(0xFF34C759) : theme.colorScheme.primary)
-                          .withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
+                          .withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       isCustom ? '自定义' : '默认',
@@ -241,7 +238,11 @@ class _DanmakuSettingsCardState extends State<DanmakuSettingsCard> {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    size: 20,
+                  ),
                 ],
               ),
             ),

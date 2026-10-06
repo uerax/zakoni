@@ -149,8 +149,6 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
   }
 
   Widget _buildWeekdayChips(ThemeData theme, bool isDark) {
-    final activeColor = theme.colorScheme.primary;
-
     return SingleChildScrollView(
       controller: _effectiveChipScrollController,
       scrollDirection: Axis.horizontal,
@@ -171,26 +169,20 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
                     _weekLabels[index],
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected || isToday ? FontWeight.w700 : FontWeight.w500,
                       color: isSelected
-                          ? Colors.white
-                          : (isToday ? activeColor : (isDark ? Colors.white70 : Colors.black87)),
+                          ? theme.colorScheme.onSecondaryContainer
+                          : (isToday ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant),
                     ),
                   ),
                 ),
                 selected: isSelected,
-                selectedColor: activeColor,
-                backgroundColor: isDark ? Colors.white.withAlpha(18) : Colors.black.withAlpha(12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(100),
-                  side: BorderSide(
-                    color: isSelected
-                        ? Colors.transparent
-                        : (isToday
-                            ? activeColor.withAlpha(120)
-                            : (isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(12))),
-                  ),
-                ),
+                selectedColor: theme.colorScheme.secondaryContainer,
+                backgroundColor: theme.colorScheme.surfaceContainerHigh,
+                shape: const StadiumBorder(),
+                side: isToday && !isSelected
+                    ? BorderSide(color: theme.colorScheme.primary.withValues(alpha: 0.6), width: 1.2)
+                    : BorderSide.none,
                 showCheckmark: false,
                 padding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,

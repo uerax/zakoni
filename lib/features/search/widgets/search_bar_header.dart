@@ -1,9 +1,8 @@
 import 'dart:ui';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// 搜索页面顶部导航栏与胶囊输入框
+/// 搜索页面顶部导航栏与胶囊输入框（Material 3 Expressive 规范）
 class SearchBarHeader extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -27,33 +26,31 @@ class SearchBarHeader extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF1C1C1E).withAlpha(190)
-            : Colors.white.withAlpha(200),
+        color: theme.colorScheme.surface.withValues(alpha: 0.88),
         border: Border(
           bottom: BorderSide(
-            color: (isDark ? Colors.white : Colors.black).withAlpha(18),
-            width: 0.5,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.25),
+            width: 0.8,
           ),
         ),
       ),
       child: ClipRect(
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 12, 8),
+              padding: const EdgeInsets.fromLTRB(6, 6, 12, 8),
               child: Row(
                 children: [
-                  // 1. 返回按钮（遵循 iOS 规范 44×44pt 触控热区）
+                  // 1. M3 圆形返回按钮
                   IconButton(
                     onPressed: () {
                       HapticFeedback.selectionClick();
                       onBack();
                     },
                     icon: Icon(
-                      CupertinoIcons.chevron_back,
+                      Icons.arrow_back_rounded,
                       size: 22,
                       color: theme.colorScheme.onSurface,
                     ),
@@ -64,29 +61,21 @@ class SearchBarHeader extends StatelessWidget {
                     ),
                   ),
 
-                  // 2. 居中一体化胶囊输入框
+                  // 2. 居中一体化 M3 大胶囊输入框 (surfaceContainerHigh)
                   Expanded(
                     child: Container(
-                      height: 38,
+                      height: 40,
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.white.withAlpha(18)
-                            : Colors.black.withAlpha(12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isDark
-                              ? Colors.white.withAlpha(22)
-                              : Colors.black.withAlpha(15),
-                          width: 0.8,
-                        ),
+                        color: theme.colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(999),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
                       child: Row(
                         children: [
                           Icon(
                             Icons.search_rounded,
-                            size: 18,
-                            color: theme.colorScheme.onSurfaceVariant.withAlpha(180),
+                            size: 19,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -106,10 +95,12 @@ class SearchBarHeader extends StatelessWidget {
                                 hintText: '搜索番剧…',
                                 hintStyle: TextStyle(
                                   fontSize: 14,
-                                  color: theme.colorScheme.onSurfaceVariant
-                                      .withAlpha(150),
+                                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                                 ),
                                 border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                filled: false,
                                 isDense: true,
                                 contentPadding: const EdgeInsets.symmetric(vertical: 8),
                               ),
@@ -131,17 +122,17 @@ class SearchBarHeader extends StatelessWidget {
                                 child: Padding(
                                   padding: const EdgeInsets.all(4),
                                   child: Container(
-                                    width: 16,
-                                    height: 16,
+                                    width: 18,
+                                    height: 18,
                                     decoration: BoxDecoration(
                                       color: isDark
-                                          ? Colors.white.withAlpha(60)
-                                          : Colors.black.withAlpha(45),
+                                          ? Colors.white.withValues(alpha: 0.25)
+                                          : Colors.black.withValues(alpha: 0.20),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
                                       Icons.close_rounded,
-                                      size: 11,
+                                      size: 12,
                                       color: Colors.white,
                                     ),
                                   ),
@@ -157,18 +148,18 @@ class SearchBarHeader extends StatelessWidget {
                   const SizedBox(width: 8),
 
                   // 3. 右侧搜索操作按钮
-                  TextButton(
+                  FilledButton.tonal(
                     onPressed: () {
                       HapticFeedback.selectionClick();
                       onSearch();
                     },
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.colorScheme.primary,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      minimumSize: const Size(44, 36),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                      minimumSize: const Size(54, 38),
+                      shape: const StadiumBorder(),
                       textStyle: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     child: const Text('搜索'),

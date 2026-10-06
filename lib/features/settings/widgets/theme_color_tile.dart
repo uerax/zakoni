@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme_color.dart';
 import '../../../core/utils/appearance_manager.dart';
-import 'ios_settings_card.dart';
+import 'm3_settings_card.dart';
 
 /// 主题颜色设置项与交互面板
 class ThemeColorTile extends StatelessWidget {
@@ -14,9 +14,9 @@ class ThemeColorTile extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDark ? const Color(0xFF1E1E20) : Colors.white,
+      backgroundColor: theme.colorScheme.surfaceContainerLow,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       showDragHandle: true,
       builder: (modalContext) {
@@ -352,10 +352,11 @@ class ThemeColorTile extends StatelessWidget {
       builder: (context, _) {
         final currentPreset = appMgr.currentThemePreset;
 
-        return IosSettingsTile(
-          leading: IosSettingsIconBox(
+        return M3SettingsTile(
+          leading: M3SettingsIconBox(
             icon: Icons.palette_rounded,
-            bg: currentPreset.color,
+            bg: currentPreset.color.withValues(alpha: 0.22),
+            iconColor: currentPreset.color,
           ),
           title: '主题颜色',
           trailing: Row(

@@ -20,16 +20,17 @@ class PlayerFloatingPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    // 自适应最大高度：占屏幕高度约 65%，clamp 限制在 240 ~ 360 之间，绝不溢出或被裁切
-    final maxHeight = (screenHeight * 0.65).clamp(240.0, 360.0);
+    final screenSize = MediaQuery.sizeOf(context);
+    final maxHeight = (screenSize.height * 0.65).clamp(240.0, 360.0);
+    // 窄屏/小窗口下自适应收敛宽度，保证左右各预留 14px 边距，绝不横向溢出屏幕
+    final panelWidth = (screenSize.width - 28.0).clamp(260.0, 310.0);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: Container(
-          width: 310,
+          width: panelWidth,
           constraints: BoxConstraints(maxHeight: maxHeight),
           decoration: BoxDecoration(
             color: const Color(0xEE16161C),

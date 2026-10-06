@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/models/history/watch_history_item.dart';
 import '../../../core/services/watch_history_service.dart';
+import '../../../core/theme/m3_surface.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/bouncing_scale_card.dart';
 import '../../common/widgets/cached_anime_image.dart';
@@ -198,23 +199,11 @@ class _HistoryPageState extends State<HistoryPage> {
     WatchHistoryStats stats,
   ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF1E1E22).withAlpha(200)
-            : Colors.white.withAlpha(240),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.white.withAlpha(18) : Colors.black.withAlpha(12),
-          width: 0.8,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(isDark ? 28 : 8),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: M3Surface.container(context, level: M3ContainerLevel.low),
+        borderRadius: BorderRadius.circular(20),
+        border: M3Surface.border(context),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -227,8 +216,8 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
           Container(
             width: 1,
-            height: 26,
-            color: isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(16),
+            height: 28,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
           ),
           _buildStatItem(
             theme: theme,
@@ -238,8 +227,8 @@ class _HistoryPageState extends State<HistoryPage> {
           ),
           Container(
             width: 1,
-            height: 26,
-            color: isDark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(16),
+            height: 28,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
           ),
           _buildStatItem(
             theme: theme,
@@ -303,9 +292,13 @@ class _HistoryPageState extends State<HistoryPage> {
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
           color: Colors.redAccent.withAlpha(210),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 24),
+        child: Icon(
+          Icons.delete_outline_rounded,
+          color: theme.colorScheme.onErrorContainer,
+          size: 24,
+        ),
       ),
       onDismissed: (_) => _deleteItem(item),
       child: BouncingScaleCard(
@@ -316,29 +309,17 @@ class _HistoryPageState extends State<HistoryPage> {
           currentEpisode: item.episode,
         ),
         child: Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(9),
           decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF1E1E22).withAlpha(190)
-                : Colors.white.withAlpha(235),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(12),
-              width: 0.8,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(isDark ? 24 : 8),
-                blurRadius: 5,
-                offset: const Offset(0, 1.5),
-              ),
-            ],
+            color: M3Surface.container(context, level: M3ContainerLevel.low),
+            borderRadius: BorderRadius.circular(16),
+            border: M3Surface.border(context),
           ),
           child: Row(
             children: [
               // 1. 左侧海报缩略图（带已看完/进度微标）
               ClipRRect(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(10),
                 child: SizedBox(
                   width: 52,
                   height: 72,
@@ -405,17 +386,17 @@ class _HistoryPageState extends State<HistoryPage> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withAlpha(isDark ? 36 : 20),
-                            borderRadius: BorderRadius.circular(4),
+                            color: theme.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
                             '第 ${item.episode} 话',
                             style: TextStyle(
                               fontSize: 10.5,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.onPrimaryContainer,
                             ),
                           ),
                         ),
@@ -442,18 +423,16 @@ class _HistoryPageState extends State<HistoryPage> {
                     ),
                     const SizedBox(height: 7),
 
-                    // 纤细平滑进度条 + 具体秒数
+                    // M3 圆润进度条 + 具体秒数
                     Row(
                       children: [
                         Expanded(
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
+                            borderRadius: BorderRadius.circular(999),
                             child: LinearProgressIndicator(
                               value: item.progress.clamp(0.0, 1.0),
-                              minHeight: 3,
-                              backgroundColor: isDark
-                                  ? Colors.white.withAlpha(24)
-                                  : Colors.black.withAlpha(16),
+                              minHeight: 3.5,
+                              backgroundColor: theme.colorScheme.surfaceContainerHighest,
                               valueColor: AlwaysStoppedAnimation<Color>(
                                 item.isFinished ? Colors.green : theme.colorScheme.primary,
                               ),

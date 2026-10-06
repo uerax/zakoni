@@ -1,13 +1,11 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/services/app_preferences.dart';
-import '../../../core/utils/font_manager.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../common/widgets/ios_swipe_action_tile.dart';
-import 'ios_settings_card.dart';
+import 'm3_settings_card.dart';
 
 class NetworkSettingsCard extends StatefulWidget {
   final BangumiClient client;
@@ -107,52 +105,35 @@ class _NetworkSettingsCardState extends State<NetworkSettingsCard> {
   }
 
   void _confirmDeleteRoute(CustomNetworkRoute route) {
-    final currentFont = FontManager.instance.activeFontFamily;
-    final fontFallback = FontManager.fallbackFontFamilies;
-    final baseStyle = TextStyle(
-      fontFamily: currentFont,
-      fontFamilyFallback: fontFallback,
-    );
+    final theme = Theme.of(context);
 
-    showCupertinoDialog(
+    showDialog(
       context: context,
-      builder: (ctx) => CupertinoTheme(
-        data: CupertinoTheme.of(ctx).copyWith(
-          textTheme: CupertinoTextThemeData(
-            textStyle: baseStyle,
-            actionTextStyle: baseStyle,
-          ),
+      builder: (ctx) => AlertDialog(
+        icon: Icon(
+          Icons.delete_outline_rounded,
+          color: theme.colorScheme.error,
+          size: 28,
         ),
-        child: CupertinoAlertDialog(
-          title: Text(
-            '移除自定义线路',
-            style: baseStyle.copyWith(fontWeight: FontWeight.bold),
+        title: const Text('移除自定义线路'),
+        content: Text('确定要移除【${route.name}】吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
           ),
-          content: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '确定要移除【${route.name}】吗？',
-              style: baseStyle,
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
             ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _deleteRoute(route);
+            },
+            child: const Text('确认移除'),
           ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('取消', style: baseStyle),
-            ),
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _deleteRoute(route);
-              },
-              child: Text(
-                '确认移除',
-                style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -182,102 +163,61 @@ class _NetworkSettingsCardState extends State<NetworkSettingsCard> {
   void _showAddRouteDialog() {
     final nameController = TextEditingController();
     final urlController = TextEditingController();
+    final theme = Theme.of(context);
 
-    final currentFont = FontManager.instance.activeFontFamily;
-    final fontFallback = FontManager.fallbackFontFamilies;
-    final baseStyle = TextStyle(
-      fontFamily: currentFont,
-      fontFamilyFallback: fontFallback,
-    );
-
-    showCupertinoDialog(
+    showDialog(
       context: context,
-      builder: (ctx) => CupertinoTheme(
-        data: CupertinoTheme.of(ctx).copyWith(
-          textTheme: CupertinoTextThemeData(
-            textStyle: baseStyle,
-            actionTextStyle: baseStyle,
-          ),
-        ),
-        child: StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
-            return CupertinoAlertDialog(
-              title: Text(
-                '添加自定义线路',
-                style: baseStyle.copyWith(fontWeight: FontWeight.bold),
-              ),
-              content: Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CupertinoTextField(
-                      controller: nameController,
-                      placeholder: '线路名称（选填）',
-                      style: baseStyle.copyWith(
-                        fontSize: 14,
-                        color: CupertinoDynamicColor.resolve(CupertinoColors.label, ctx),
-                      ),
-                      placeholderStyle: baseStyle.copyWith(
-                        fontSize: 14,
-                        color: CupertinoDynamicColor.resolve(CupertinoColors.placeholderText, ctx),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: CupertinoDynamicColor.resolve(CupertinoColors.tertiarySystemFill, ctx),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    CupertinoTextField(
-                      controller: urlController,
-                      placeholder: '反代 URL 或仓库链接',
-                      style: baseStyle.copyWith(
-                        fontSize: 14,
-                        color: CupertinoDynamicColor.resolve(CupertinoColors.label, ctx),
-                      ),
-                      placeholderStyle: baseStyle.copyWith(
-                        fontSize: 14,
-                        color: CupertinoDynamicColor.resolve(CupertinoColors.placeholderText, ctx),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: CupertinoDynamicColor.resolve(CupertinoColors.tertiarySystemFill, ctx),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    GestureDetector(
-                      onTap: () {
-                        setDialogState(() {
-                          urlController.text = AppConstants.defaultRoutesRepoUrl;
-                          if (nameController.text.trim().isEmpty) {
-                            nameController.text = '内置仓库线路';
-                          }
-                        });
-                      },
-                      child: Container(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          '点击填入内置仓库链接',
-                          style: baseStyle.copyWith(
-                            fontSize: 13,
-                            color: CupertinoTheme.of(ctx).primaryColor,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          return AlertDialog(
+            icon: Icon(
+              Icons.add_link_rounded,
+              color: theme.colorScheme.primary,
+              size: 28,
+            ),
+            title: const Text('添加自定义线路'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: '线路名称（选填）',
+                    hintText: '如：备用节点',
+                  ),
                 ),
-              ),
-              actions: [
-                CupertinoDialogAction(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: Text('取消', style: baseStyle),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: urlController,
+                  decoration: const InputDecoration(
+                    labelText: '反代 URL 或仓库链接',
+                    hintText: 'https://...',
+                  ),
                 ),
-                CupertinoDialogAction(
-                  onPressed: () async {
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      setDialogState(() {
+                        urlController.text = AppConstants.defaultRoutesRepoUrl;
+                        if (nameController.text.trim().isEmpty) {
+                          nameController.text = '内置仓库线路';
+                        }
+                      });
+                    },
+                    child: const Text('点击填入内置仓库链接'),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () async {
                     var rawUrl = urlController.text.trim();
                     if (rawUrl.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -417,17 +357,13 @@ class _NetworkSettingsCardState extends State<NetworkSettingsCard> {
                         );
                     }
                   },
-                  child: Text(
-                    '确认添加',
-                    style: baseStyle.copyWith(fontWeight: FontWeight.normal),
-                  ),
+                  child: const Text('确认添加'),
                 ),
               ],
             );
           },
         ),
-      ),
-    );
+      );
   }
 
   @override
@@ -438,13 +374,14 @@ class _NetworkSettingsCardState extends State<NetworkSettingsCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const IosSettingsSectionHeader(title: '网络线路'),
-        IosSettingsCard(
+        const M3SettingsSectionHeader(title: '网络线路'),
+        M3SettingsCard(
           children: [
-            IosSettingsTile(
-              leading: const IosSettingsIconBox(
+            M3SettingsTile(
+              leading: M3SettingsIconBox(
                 icon: Icons.bolt_rounded,
-                bg: Color(0xFF0077B6),
+                bg: theme.colorScheme.primaryContainer,
+                iconColor: theme.colorScheme.onPrimaryContainer,
               ),
               title: '镜像加速',
               subtitle: '国内 CDN 加速',
@@ -453,10 +390,11 @@ class _NetworkSettingsCardState extends State<NetworkSettingsCard> {
                   : null,
               onTap: () => _handlePresetChanged(context, BangumiSourcePreset.mirror),
             ),
-            IosSettingsTile(
-              leading: const IosSettingsIconBox(
+            M3SettingsTile(
+              leading: M3SettingsIconBox(
                 icon: Icons.public_rounded,
-                bg: Color(0xFF2A9D8F),
+                bg: theme.colorScheme.secondaryContainer,
+                iconColor: theme.colorScheme.onSecondaryContainer,
               ),
               title: '官方直连',
               subtitle: '海外直连官方源',
@@ -468,10 +406,11 @@ class _NetworkSettingsCardState extends State<NetworkSettingsCard> {
             ..._customRoutes.map((route) {
               return IosSwipeActionTile(
                 onDelete: () => _confirmDeleteRoute(route),
-                child: IosSettingsTile(
-                  leading: const IosSettingsIconBox(
+                child: M3SettingsTile(
+                  leading: M3SettingsIconBox(
                     icon: Icons.alt_route_rounded,
-                    bg: Color(0xFFF4A261),
+                    bg: theme.colorScheme.tertiaryContainer,
+                    iconColor: theme.colorScheme.onTertiaryContainer,
                   ),
                   title: route.name,
                   subtitle: route.url,
@@ -482,15 +421,20 @@ class _NetworkSettingsCardState extends State<NetworkSettingsCard> {
                 ),
               );
             }),
-            IosSettingsTile(
-              leading: const IosSettingsIconBox(
+            M3SettingsTile(
+              leading: M3SettingsIconBox(
                 icon: Icons.add_rounded,
-                bg: Color(0xFF8338EC),
+                bg: theme.colorScheme.surfaceContainerHighest,
+                iconColor: theme.colorScheme.onSurfaceVariant,
               ),
               title: '添加自定义线路',
               subtitle: '输入反代或从 URL 导入',
               showDivider: false,
-              trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+              trailing: Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                size: 20,
+              ),
               onTap: _showAddRouteDialog,
             ),
           ],

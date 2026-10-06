@@ -96,7 +96,7 @@ class _IosSwipeActionTileState extends State<IosSwipeActionTile>
             ),
           ),
 
-          // 右侧露出的 iOS 经典红色删除块（宽度随滑动动态展开，不透底）
+          // 右侧露出的 M3 红色删除块（宽度随滑动动态展开，不透底）
           if (revealWidth > 0)
             Positioned(
               right: 0,
@@ -105,22 +105,26 @@ class _IosSwipeActionTileState extends State<IosSwipeActionTile>
               width: revealWidth,
               child: ClipRect(
                 child: Material(
-                  color: const Color(0xFFFF3B30),
+                  color: Theme.of(context).colorScheme.error,
                   child: InkWell(
                     onTap: () {
                       _close();
                       widget.onDelete();
                     },
-                    child: const Center(
+                    child: Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.delete_outline_rounded, color: Colors.white, size: 20),
-                          SizedBox(height: 2),
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            color: Theme.of(context).colorScheme.onError,
+                            size: 20,
+                          ),
+                          const SizedBox(height: 2),
                           Text(
                             '删除',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onError,
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
