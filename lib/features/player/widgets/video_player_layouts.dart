@@ -52,45 +52,81 @@ class VideoPlayerDesktopLayout extends StatelessWidget {
           onPressed: onBackPressed,
         ),
       ),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 3,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  // 特殊处理说明：
-                  // 必须显式指定 Clip.antiAliasWithSaveLayer，严禁使用默认的 Clip.antiAlias。
-                  // 播放器在暂停或呼出控制条时，内部浮层（如居中暂停卡片、顶栏按钮等）包含 BackdropFilter 毛玻璃，
-                  // 默认剪裁在遇到子级 BackdropFilter 时会被渲染管线击穿导致圆角退化为直角；
-                  // 开启 antiAliasWithSaveLayer 强制分配独立离屏合成层，确保全生命周期严格保持 16px 圆角约束。
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    clipBehavior: Clip.antiAliasWithSaveLayer,
-                    child: playerWidget,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final totalWidth = constraints.maxWidth;
+
+          // 特殊处理说明：
+          // 参照 animaku (DesktopWatchLayout 与 --kz-watch-rail-w: clamp(360px, 23vw, 420px))：
+          // 桌面端右侧控制模块（选集/源/详情）所需黄金宽度为 360~420px，
+          // 严禁使用粗暴的百分比 flex (如 40% 导致 1080p 占用 768px、2K 占用 1000px 的严重空间浪费)；
+          // 将右侧栏锁定为自适应 clamp(360.0, 23vw, 420.0)，其余全部水平空间分配给左侧主播放器。
+          final railWidth = (totalWidth * 0.23).clamp(360.0, 420.0);
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: LayoutBuilder(
+                    builder: (context, playerBoxConstraints) {
+                      final availableW = playerBoxConstraints.maxWidth;
+                      final availableH = playerBoxConstraints.maxHeight;
+                      if (availableW <= 0 || availableH <= 0) {
+                        return const SizedBox.shrink();
+                      }
+
+                      // 16:9 纵向安全 Contain 适配：
+                      // 在可用宽高的包围盒内等比缩放到最大的 16:9 尺寸，
+                      // 既让播放器占满左侧可用空间，又彻底杜绝窗口过矮时出现底部 RenderFlex overflow。
+                      double targetW = availableW;
+                      double targetH = targetW / (16 / 9);
+                      if (targetH > availableH) {
+                        targetH = availableH;
+                        targetW = targetH * (16 / 9);
+                      }
+
+                      return Align(
+                        alignment: Alignment.topCenter,
+                        child: SizedBox(
+                          width: targetW,
+                          height: targetH,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.2),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            // 特殊处理说明：
+                            // 必须显式指定 Clip.antiAliasWithSaveLayer，严禁使用默认的 Clip.antiAlias。
+                            // 播放器在暂停或呼出控制条时，内部浮层（如居中暂停卡片、顶栏按钮等）包含 BackdropFilter 毛玻璃，
+                            // 默认剪裁在遇到子级 BackdropFilter 时会被渲染管线击穿导致圆角退化为直角；
+                            // 开启 antiAliasWithSaveLayer 强制分配独立离屏合成层，确保全生命周期严格保持 16px 圆角约束。
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              clipBehavior: Clip.antiAliasWithSaveLayer,
+                              child: playerWidget,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: tabSection,
-          ),
-        ],
+              SizedBox(
+                width: railWidth,
+                child: tabSection,
+              ),
+            ],
+          );
+        },
       ),
     );
   }

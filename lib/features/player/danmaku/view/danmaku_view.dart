@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:zakoni/features/player/danmaku/core/danmaku_controller.dart';
@@ -9,8 +11,7 @@ import 'package:zakoni/features/player/danmaku/models/danmaku_item.dart';
 import 'package:zakoni/features/player/danmaku/utils/danmaku_text_normalizer.dart';
 import 'package:zakoni/features/player/danmaku/view/danmaku_text_layout.dart';
 
-const double _kBaseDanmakuPx = 18.0;
-const double _kTrackSpacing = 1.25;
+const double _kTrackSpacing = 1.16;
 const double _kTopDurationMs = 5000.0;
 const double _kBottomDurationMs = 5000.0;
 const double _kScrollBaseDurationMs = 8500.0;
@@ -50,12 +51,45 @@ class _DanmakuViewState extends State<DanmakuView>
 
   double _viewWidth = 0.0;
   double _viewHeight = 0.0;
+  double _deviceShortestSide = 0.0;
   double _lineHeight = 24.0;
   double _nextExpiryMs = double.infinity;
   int _scrollingCount = 0;
 
   DanmakuController get _controller => widget.controller;
   bool get _hasViewport => _viewWidth > 0 && _viewHeight > 0;
+
+  bool get _isDesktop {
+    if (kIsWeb) {
+      return defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.macOS ||
+          defaultTargetPlatform == TargetPlatform.linux;
+    }
+    return Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+  }
+
+  bool get _isTablet => !_isDesktop && _deviceShortestSide >= 600.0;
+
+  /// 特殊处理说明：
+  /// 平台与设备型态敏感的滚动弹幕基准穿越耗时 (毫秒)
+  /// - Windows / Desktop (桌面端): 11.0s (11000ms)，严格对齐 animaku BILI_SCROLL_BASE_DURATION 与 B 站桌面播放器物理穿越标定；
+  ///   大屏显示器 (1080p~4K) 下 8.5s 会导致像素速度飙升至 250px/s 引起严重眩晕，11.0s 让文字在人眼适读舒适区平稳滑行；
+  /// - Tablet (平板端): 10.5s (10500ms)，适配 10~13 英寸大屏视距与分辨率，防止弹幕过快滑过；
+  /// - Mobile Phone (手机端): 保持原生的 8.5s (8500ms)，维持小屏紧凑轻快的视感。
+  double get _scrollBaseDurationMs {
+    if (_isDesktop) return 11000.0;
+    if (_isTablet) return 10500.0;
+    return _kScrollBaseDurationMs;
+  }
+
+  void _updateDeviceInfo(double shortestSide) {
+    if ((_deviceShortestSide - shortestSide).abs() > 0.5) {
+      _deviceShortestSide = shortestSide;
+      if (_hasViewport) {
+        _rebuildTracks();
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -265,7 +299,7 @@ class _DanmakuViewState extends State<DanmakuView>
   void _emitScroll(DanmakuItem item) {
     if (_scrollTracks.isEmpty) return;
     final settings = _controller.settings;
-    final durationMs = math.max(1000.0, _kScrollBaseDurationMs / settings.speed);
+    final durationMs = math.max(1000.0, _scrollBaseDurationMs / settings.speed);
     final fontPx = _calculateCalculatedFontSize();
 
     final layout = DanmakuTextLayout(
@@ -415,29 +449,56 @@ class _DanmakuViewState extends State<DanmakuView>
     _scheduleWork();
   }
 
-  /// 核心细节：移动端横屏基于“短边高度”限高，彻底杜绝全屏大字糊屏
+  /// 特殊处理说明：
+  /// 多端型态自适应弹幕字号计算：
+  /// 1. Windows / Desktop 桌面端：显示器物理面积大且视距远（50~70cm），解开原 18.9px 锁死限制，
+  ///    对齐 B 站桌面网页 25px 与 animaku 桌面标定，在 [19.0, 24.5] 之间随视口平滑缩放；
+  /// 2. Tablet 平板端（shortestSide >= 600）：屏幕大（10~13英寸），字号平滑标定在 [19.0, 22.0] 之间；
+  /// 3. Mobile Phone 手机端：
+  ///    - 横屏全屏（viewHeight < 600）基于短边高度限高在 [11.0, 14.0] 之间（animaku 黄金法则），防止糊屏；
+  ///    - 竖屏模式基于 18px 基准缩放（[0.70, 1.05] 约 13~19px）。
   double _calculateCalculatedFontSize() {
     final settings = _controller.settings;
     final baseScale = settings.fontSizeScale;
 
-    // 当处于横屏（宽大于高）且高度小于 600px 时（典型手机横屏全屏模式）
-    if (_viewWidth > _viewHeight && _viewHeight < 600.0) {
-      // animaku 黄金法则：targetPx 在 [11.0, 14.0] 之间，由物理高度严格约束
-      final targetBase = math.min(14.0, math.max(11.0, _viewHeight * 0.032));
+    // 1. 桌面端 (Windows / macOS / Linux 且处于常规大窗形态)
+    if (_isDesktop && _viewWidth >= 600.0 && _viewHeight > 260.0) {
+      // 视口宽度 720 时约 21.2px，1080p 全屏 (1400~1920) 时平滑上升至 24.5px
+      final targetBase = (19.0 + (_viewWidth / 960.0) * 3.0).clamp(19.0, 24.5);
       return targetBase * baseScale;
     }
 
-    // 桌面端或竖屏模式：基于 18px 基准平滑缩放，上限严格约束为 1.05 (约 18~19px)，杜绝大字糊屏
-    final scale = math.min(1.05, math.max(0.70, _viewWidth / 720.0));
-    return _kBaseDanmakuPx * scale * baseScale;
+    // 2. 平板端 (shortestSide >= 600)
+    if (_isTablet && _viewWidth >= 600.0) {
+      // 平板端适度收敛至 14.0~16.0px，大屏清爽细腻
+      final targetBase = (14.0 + (_viewWidth / 1000.0) * 1.8).clamp(14.0, 16.0);
+      return targetBase * baseScale;
+    }
+
+    // 3. 手机端或小窗形态 (Phone: shortestSide < 600 或桌面端缩窄小窗)
+    // 动态基于视口高度与目标 10 轨道数推导，字号自然适中不糊屏
+    final isWindowed = _viewHeight <= 260.0 || _viewWidth < 550.0;
+    // 竖屏小窗目标锁定 10 轨；横屏全屏按高度自适应 14~18 轨
+    final targetLanes = isWindowed
+        ? 10.0
+        : math.max(10.0, (_viewHeight / 24.0));
+    final area = _controller.settings.area;
+    final availableH = math.max(1.0, _viewHeight * area);
+    final targetPitch = availableH / targetLanes;
+    final rawFontPx = targetPitch / 1.35;
+    final targetBase = isWindowed
+        ? rawFontPx.clamp(9.5, 11.5)
+        : rawFontPx.clamp(10.5, 12.0);
+    return targetBase * baseScale;
   }
 
   void _rebuildTracks() {
     final fontPx = _calculateCalculatedFontSize();
-    _lineHeight = fontPx * 1.35;
+    _lineHeight = fontPx * 1.25;
     final availableH = math.max(0.0, _viewHeight * _controller.settings.area);
-    final rowCount = _lineHeight > 0
-        ? (availableH / (_lineHeight * _kTrackSpacing)).floor()
+    final trackPitch = _lineHeight * _kTrackSpacing;
+    final rowCount = trackPitch > 0
+        ? (availableH / trackPitch).floor()
         : 0;
 
     _scrollTracks = List.generate(rowCount, (_) => DanmakuScrollTrack());
@@ -550,6 +611,8 @@ class _DanmakuViewState extends State<DanmakuView>
 
   @override
   Widget build(BuildContext context) {
+    final shortestSide = MediaQuery.maybeSizeOf(context)?.shortestSide ?? 0.0;
+    _updateDeviceInfo(shortestSide);
     return LayoutBuilder(
       builder: (context, constraints) {
         _updateViewport(constraints);

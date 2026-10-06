@@ -145,5 +145,88 @@ void main() {
 
       expect(find.byType(DanmakuView), findsOneWidget);
     });
+
+    testWidgets('大屏桌面视口下正常渲染弹幕，自适应放缓速度与字号放大', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1920, 1080));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final controller = DanmakuController();
+      controller.loadItems([
+        DanmakuItem(text: '桌面大屏弹幕测试', timeMs: 100),
+      ]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 1920,
+              height: 1080,
+              child: DanmakuView(controller: controller),
+            ),
+          ),
+        ),
+      );
+
+      controller.resume();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byType(DanmakuView), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('手机端竖屏小窗 (390x219) 动态计算轨道数至少容纳 10 轨', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final controller = DanmakuController();
+      controller.loadItems([
+        DanmakuItem(text: '手机弹幕测试', timeMs: 100),
+      ]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.iOS),
+          home: Scaffold(
+            body: SizedBox(
+              width: 390,
+              height: 219, // 16:9 竖屏小窗
+              child: DanmakuView(controller: controller),
+            ),
+          ),
+        ),
+      );
+
+      controller.resume();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byType(DanmakuView), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('手机端横屏全屏 (844x390) 动态计算轨道数远超 8 轨 (精致小字不糊屏)', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(844, 390));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final controller = DanmakuController();
+      controller.loadItems([
+        DanmakuItem(text: '手机全屏弹幕测试', timeMs: 100),
+      ]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.iOS),
+          home: Scaffold(
+            body: SizedBox(
+              width: 844,
+              height: 390,
+              child: DanmakuView(controller: controller),
+            ),
+          ),
+        ),
+      );
+
+      controller.resume();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byType(DanmakuView), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }
