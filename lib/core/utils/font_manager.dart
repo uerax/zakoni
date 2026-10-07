@@ -25,7 +25,11 @@ class FontManager extends ChangeNotifier {
   FontManager._internal();
 
   static const List<String> fallbackFontFamilies = [
+    'Microsoft YaHei UI',
     'Microsoft YaHei',
+    '微软雅黑',
+    'Segoe UI Variable Text',
+    'Segoe UI',
     'PingFang SC',
     'Noto Sans SC',
     'sans-serif',
@@ -47,7 +51,7 @@ class FontManager extends ChangeNotifier {
       case AppFontType.system:
         if (kIsWeb) return 'sans-serif';
         if (defaultTargetPlatform == TargetPlatform.windows) {
-          return 'Microsoft YaHei';
+          return 'Microsoft YaHei UI';
         } else if (defaultTargetPlatform == TargetPlatform.macOS ||
             defaultTargetPlatform == TargetPlatform.iOS) {
           return 'PingFang SC';

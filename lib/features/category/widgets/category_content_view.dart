@@ -26,9 +26,9 @@ class CategoryContentView extends ConsumerWidget {
     );
     final controller = ref.read(categoryControllerProvider(initialCategory).notifier);
 
-    // 1. 仅在冷启动且当前内存中完全无数据时：呈现骨架屏
-    // 特殊处理说明：当屏幕上已有旧数据时（items.isNotEmpty），切换分类绝不销毁列表换骨架屏！
-    // 保持旧列表在屏平滑过渡，新数据就绪后瞬间替换，彻底消除全屏白屏与骨架屏闪烁带来的严重卡顿感。
+    // 1. 仅在冷启动且当前内存中完全无数据时：呈现单层高性能流光骨架屏
+    // 特殊处理说明：外层显式包裹单根 Shimmer，让内部十余个骨架卡片共享同一个 ShaderMask 离屏通道，
+    // 彻底消除每个卡片独立启动 ShaderMask 导致的严重 GPU 显存过载与主线程掉帧卡顿。
     if (isLoading && items.isEmpty) {
       return SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -37,16 +37,20 @@ class CategoryContentView extends ConsumerWidget {
             final width = constraints.crossAxisExtent;
             final count = AppBreakpoints.gridColumns(width);
             final skeletonCount = count * 2;
-            return SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: count,
-                childAspectRatio: 0.58,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => const ShimmerAnimeCard(),
-                childCount: skeletonCount,
+            return SliverToBoxAdapter(
+              child: Shimmer(
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: count,
+                    childAspectRatio: 0.58,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: skeletonCount,
+                  itemBuilder: (context, index) => const ShimmerAnimeCard(),
+                ),
               ),
             );
           },

@@ -253,20 +253,40 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     _fetchBangumiAuthorityData();
 
     // 待首帧构建完成后安全启动起播或检索
+    // 工业级标准优化：等待路由平滑推入动画（约 350ms）定格完成后，再启动重度视频源网络检索与起播，
+    // 保证从点击番剧卡片到播放页滑入屏幕的全程享有 100% 独立主线程算力，彻底消除页面跳转时的第一下掉帧卡顿
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // 预先后台初始化持久化绑定服务
-      SourceBindingService.instance.initialize().ignore();
 
-      // 若有显式传入的固定 URL 则直接起播
-      if (_activeEpisode != null &&
-          widget.videoUrl != null &&
-          widget.videoUrl!.isNotEmpty) {
-        _hasStartedPlayback = true;
-        _initPlayback();
+      void startPlaybackFlow() {
+        if (!mounted) return;
+        // 预先后台初始化持久化绑定服务
+        SourceBindingService.instance.initialize().ignore();
+
+        // 若有显式传入的固定 URL 则直接起播
+        if (_activeEpisode != null &&
+            widget.videoUrl != null &&
+            widget.videoUrl!.isNotEmpty) {
+          _hasStartedPlayback = true;
+          _initPlayback();
+        } else {
+          // 启动主流程：先查绑定，再查默认源，未命中则后台探测保底源
+          _startDefaultSourceSearch(autoPlayFirst: _activeEpisode != null);
+        }
+      }
+
+      final route = ModalRoute.of(context);
+      if (route != null && route.animation != null && !route.animation!.isCompleted) {
+        void onAnimationFinished(AnimationStatus status) {
+          if (status == AnimationStatus.completed) {
+            route.animation?.removeStatusListener(onAnimationFinished);
+            startPlaybackFlow();
+          }
+        }
+
+        route.animation!.addStatusListener(onAnimationFinished);
       } else {
-        // 启动主流程：先查绑定，再查默认源，未命中则后台探测保底源
-        _startDefaultSourceSearch(autoPlayFirst: _activeEpisode != null);
+        startPlaybackFlow();
       }
     });
   }

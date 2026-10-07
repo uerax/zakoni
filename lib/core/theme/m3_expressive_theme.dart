@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -43,6 +44,17 @@ class M3ExpressiveTheme {
       fontFamilyFallback: fontFallback,
       textTheme: textTheme,
       scaffoldBackgroundColor: isDark ? colorScheme.surface : colorScheme.surface,
+
+      // 全平台统一采用 iOS 丝滑平滑推入视差转场（CupertinoPageTransitionsBuilder），移动端保留边缘右滑返回手势
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+        },
+      ),
 
       // 1. 卡片规范：20dp 圆角，surfaceContainerLow 表面，去除旧版 1px 细边框与外阴影
       cardTheme: CardThemeData(
@@ -243,6 +255,7 @@ class M3ExpressiveTheme {
     required List<String> fontFallback,
   }) {
     final isDark = brightness == Brightness.dark;
+    final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
     final typography = Typography.material2021(
       platform: defaultTargetPlatform,
       colorScheme: colorScheme,
@@ -255,21 +268,35 @@ class M3ExpressiveTheme {
     );
 
     return baseText.copyWith(
-      displayLarge: baseText.displayLarge?.copyWith(fontWeight: FontWeight.w800),
-      displayMedium: baseText.displayMedium?.copyWith(fontWeight: FontWeight.w800),
+      displayLarge: baseText.displayLarge?.copyWith(fontWeight: FontWeight.w700),
+      displayMedium: baseText.displayMedium?.copyWith(fontWeight: FontWeight.w700),
       displaySmall: baseText.displaySmall?.copyWith(fontWeight: FontWeight.w700),
-      headlineLarge: baseText.headlineLarge?.copyWith(fontWeight: FontWeight.w800),
+      headlineLarge: baseText.headlineLarge?.copyWith(fontWeight: FontWeight.w700),
       headlineMedium: baseText.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
       headlineSmall: baseText.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
       titleLarge: baseText.titleLarge?.copyWith(fontWeight: FontWeight.w700),
       titleMedium: baseText.titleMedium?.copyWith(fontWeight: FontWeight.w600),
       titleSmall: baseText.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-      bodyLarge: baseText.bodyLarge,
-      bodyMedium: baseText.bodyMedium,
-      bodySmall: baseText.bodySmall,
+      // 桌面端针对缺少 ClearType 亚像素渲染进行字重补偿：
+      // 正文提升至 Medium (w500)，微调极小字号下限，防止灰度抗锯齿导致笔画单薄发虚
+      bodyLarge: isWindows
+          ? baseText.bodyLarge?.copyWith(fontWeight: FontWeight.w500)
+          : baseText.bodyLarge,
+      bodyMedium: isWindows
+          ? baseText.bodyMedium?.copyWith(fontWeight: FontWeight.w500)
+          : baseText.bodyMedium,
+      bodySmall: isWindows
+          ? baseText.bodySmall?.copyWith(
+              fontWeight: FontWeight.w500,
+              fontSize: 12.5,
+            )
+          : baseText.bodySmall,
       labelLarge: baseText.labelLarge?.copyWith(fontWeight: FontWeight.w700),
       labelMedium: baseText.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-      labelSmall: baseText.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+      labelSmall: baseText.labelSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+        fontSize: isWindows ? 11.5 : null,
+      ),
     );
   }
 }

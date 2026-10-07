@@ -1,4 +1,5 @@
 import 'dart:developer' as developer;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../../../core/models/bangumi/bangumi_calendar.dart';
@@ -122,7 +123,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
 
   void _navigateToSearch([String? query]) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (context) => SearchPage(initialQuery: query),
       ),
     );
@@ -167,7 +168,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             },
             onViewAllHistory: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
+                CupertinoPageRoute(
                   builder: (context) => const HistoryPage(),
                 ),
               );

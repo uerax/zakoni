@@ -20,18 +20,22 @@ class MainNavigationShell extends ConsumerStatefulWidget {
 
 class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
   late final BangumiClient _client;
+  late final PageController _pageController;
   int _currentIndex = 0;
   int _refreshKey = 0;
   String? _targetCategory;
-
-  // 严格遵循工业级标准规范：记录已激活挂载的 Tab 集合（冷启动默认仅激活首页 Tab 0）
-  // 未被点击过的 Tab 绝不挂载、绝不提前发起后台网络请求，首次点击后激活并常驻内存永久保活
-  final Set<int> _activatedTabs = {0};
 
   @override
   void initState() {
     super.initState();
     _client = widget.client ?? ref.read(bangumiClientProvider);
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   @override
@@ -60,40 +64,51 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
               ),
               // 1. 全局或页面专属自定义背景壁纸（支持各页面单独覆盖与视窗裁剪）
               AppearanceManager.instance.buildWallpaperLayer(pageKey: pageKey),
-              // 2. 使用 IndexedStack 保活所有已激活的页面，切换导航栏时 0 延迟；切换线路时根据 _refreshKey 彻底重建
-              IndexedStack(
-                index: _currentIndex,
+              // 2. 现代 App 高性能水平平移滑动转场架构（诉求 2）：
+              // - 禁用手势拖拽（NeverScrollableScrollPhysics），彻底切断与内部货架列表的手势竞技场冲突；
+              // - 每个页面独立包裹 RepaintBoundary，滑动时由 GPU 显存纹理直接位移合成，0 冗余重绘；
+              // - 新页面若在加载中，秒级先呈现高性能单通道流光骨架屏，网络后台异步拉取，彻底告别全员卡顿；
+              // - 点击底栏时以 280ms Curves.easeOutCubic 呈现正统且平滑的横向水平滑入滑出。
+              PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  HomePage(
-                    key: ValueKey('home_$_refreshKey'),
-                    client: _client,
-                    onNavigateToCategory: (category) {
-                      setState(() {
-                        _activatedTabs.add(1);
-                        _targetCategory = category;
-                        _currentIndex = 1;
-                      });
-                    },
+                  RepaintBoundary(
+                    child: HomePage(
+                      key: ValueKey('home_$_refreshKey'),
+                      client: _client,
+                      onNavigateToCategory: (category) {
+                        setState(() {
+                          _targetCategory = category;
+                          _currentIndex = 1;
+                        });
+                        _pageController.animateToPage(
+                          1,
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeOutCubic,
+                        );
+                      },
+                    ),
                   ),
-                  _activatedTabs.contains(1)
-                      ? CategoryPage(
-                          key: ValueKey('category_${_refreshKey}_$_targetCategory'),
-                          client: _client,
-                          initialCategory: _targetCategory,
-                        )
-                      : const SizedBox.shrink(),
-                  _activatedTabs.contains(2)
-                      ? SettingsPage(
-                          client: _client,
-                          onSettingsChanged: () {
-                            PaintingBinding.instance.imageCache.clear();
-                            PaintingBinding.instance.imageCache.clearLiveImages();
-                            setState(() {
-                              _refreshKey++;
-                            });
-                          },
-                        )
-                      : const SizedBox.shrink(),
+                  RepaintBoundary(
+                    child: CategoryPage(
+                      key: ValueKey('category_${_refreshKey}_$_targetCategory'),
+                      client: _client,
+                      initialCategory: _targetCategory,
+                    ),
+                  ),
+                  RepaintBoundary(
+                    child: SettingsPage(
+                      client: _client,
+                      onSettingsChanged: () {
+                        PaintingBinding.instance.imageCache.clear();
+                        PaintingBinding.instance.imageCache.clearLiveImages();
+                        setState(() {
+                          _refreshKey++;
+                        });
+                      },
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -101,10 +116,15 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
           bottomNavigationBar: AppFloatingBottomBar(
             currentIndex: _currentIndex,
             onTap: (index) {
+              if (_currentIndex == index) return;
               setState(() {
-                _activatedTabs.add(index);
                 _currentIndex = index;
               });
+              _pageController.animateToPage(
+                index,
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+              );
             },
             items: [
               // Tab 0: 首页 (专属吉祥物：Q 弹果冻)

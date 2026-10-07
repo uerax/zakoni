@@ -200,8 +200,8 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
     );
   }
 
-  /// 构建自适应周一至周日单字分段条：
-  /// - 手机端（宽 <= 500dp）：Row + 7 个 Expanded 撑满内容流，高度 36dp，触控热区饱满，杜绝任何滑动或溢出；
+  /// 构建自适应周一至周日单字分段条（带底层物理弹性平滑滑动药丸）：
+  /// - 手机端（宽 <= 500dp）：Row + 7 等分撑满内容流，高度 38dp，触控热区饱满，杜绝任何滑动或溢出；
   /// - 平板/宽屏端（宽 > 500dp）：限制最大宽度 420dp 居中收拢，防止元素被拉伸过扁或过度分散。
   Widget _buildWeekStrip(ThemeData theme, bool isDark) {
     final strip = Container(
@@ -211,56 +211,81 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
         borderRadius: BorderRadius.circular(19),
       ),
       padding: const EdgeInsets.all(3),
-      child: Row(
-        children: List.generate(7, (index) {
-          final isSelected = index == _selectedDayIndex;
-          final isCurrentDay = index == _todayWeekdayIndex;
-
-          return Expanded(
-            child: Semantics(
-              button: true,
-              selected: isSelected,
-              label: '${_weekLabels[index]}${isCurrentDay ? " (今日)" : ""}',
-              child: Tooltip(
-                message: '${_weekLabels[index]}${isCurrentDay ? " · 今日" : ""}',
-                waitDuration: const Duration(milliseconds: 400),
-                child: Material(
-                  color: Colors.transparent,
+      child: Stack(
+        children: [
+          // 丝滑横向滑动高亮药丸指示器（Curves.easeOutBack 模拟物理过冲定格）
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutBack,
+            alignment: AlignmentDirectional(
+              -1.0 + (_selectedDayIndex / 6.0) * 2.0,
+              0.0,
+            ),
+            child: FractionallySizedBox(
+              widthFactor: 1 / 7,
+              child: Container(
+                height: 32,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(16),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => _onSelectDay(index),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutCubic,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? theme.colorScheme.secondaryContainer
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        _singleWeekLabels[index],
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: isSelected
-                              ? FontWeight.w800
-                              : (isCurrentDay ? FontWeight.w700 : FontWeight.w500),
-                          color: isSelected
-                              ? theme.colorScheme.onSecondaryContainer
-                              : (isCurrentDay
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.onSurfaceVariant),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.25 : 0.14),
+                      blurRadius: 6,
+                      offset: const Offset(0, 1.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 7 个星期交互选项
+          Row(
+            children: List.generate(7, (index) {
+              final isSelected = index == _selectedDayIndex;
+              final isCurrentDay = index == _todayWeekdayIndex;
+
+              return Expanded(
+                child: Semantics(
+                  button: true,
+                  selected: isSelected,
+                  label: '${_weekLabels[index]}${isCurrentDay ? " (今日)" : ""}',
+                  child: Tooltip(
+                    message: '${_weekLabels[index]}${isCurrentDay ? " · 今日" : ""}',
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => _onSelectDay(index),
+                        child: Container(
+                          alignment: Alignment.center,
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 180),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.w800
+                                  : (isCurrentDay ? FontWeight.w700 : FontWeight.w500),
+                              color: isSelected
+                                  ? theme.colorScheme.onPrimaryContainer
+                                  : (isCurrentDay
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurfaceVariant),
+                            ),
+                            child: Text(_singleWeekLabels[index]),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          );
-        }),
+              );
+            }),
+          ),
+        ],
       ),
     );
 

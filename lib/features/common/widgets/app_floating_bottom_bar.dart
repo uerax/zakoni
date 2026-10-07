@@ -113,7 +113,8 @@ class AppFloatingBottomBar extends StatelessWidget {
                     ),
                     child: Stack(
                       children: [
-                        // M3 标准横向活动药丸滑块（secondaryContainer 色彩）
+                        // M3 标准横向活动药丸滑块：采用高对比度 primaryContainer 与柔和微阴影，
+                        // 确保与底衬拉开层级，让 300ms Curves.easeOutBack 物理回弹过冲滑动轨迹极其鲜明丝滑
                         AnimatedAlign(
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeOutBack,
@@ -131,20 +132,27 @@ class AppFloatingBottomBar extends StatelessWidget {
                                 height: 38,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(19),
-                                  color: theme.colorScheme.secondaryContainer,
+                                  color: theme.colorScheme.primaryContainer,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.28 : 0.16),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                           ),
                         ),
 
-                        // 各导航项图标（选中态为 onSecondaryContainer，未选中态为 onSurfaceVariant）
+                        // 各导航项图标（选中态为 onPrimaryContainer，未选中态为 onSurfaceVariant）
                         Row(
                           children: List.generate(items.length, (i) {
                             final isSelected = currentIndex == i;
                             final item = items[i];
                             final itemColor = isSelected
-                                ? theme.colorScheme.onSecondaryContainer
+                                ? theme.colorScheme.onPrimaryContainer
                                 : theme.colorScheme.onSurfaceVariant;
 
                             return Expanded(

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/theme/m3_surface.dart';
@@ -14,7 +15,7 @@ void navigateToVideoPlayer(
   int? currentEpisode,
 }) {
   Navigator.of(context).push(
-    MaterialPageRoute(
+    CupertinoPageRoute(
       builder: (context) => VideoPlayPage(
         title: item.preferredName,
         bangumiItem: item,

@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:zakoni/features/player/controller/playback_controller.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
@@ -215,11 +216,18 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
   }
 
   Widget _buildHeader(Color primaryColor) {
+    const tabs = [
+      (tab: PlayerSidePanelTab.episodes, label: '选集'),
+      (tab: PlayerSidePanelTab.sources, label: '换源'),
+      (tab: PlayerSidePanelTab.danmaku, label: '弹幕'),
+    ];
+    final activeIndex = PlayerSidePanelTab.values.indexOf(_activeTab).clamp(0, 2);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          // 3 个 Tab 切换胶囊
+          // 3 个 Tab 切换胶囊（带底层物理弹性平滑滑动药丸）
           Expanded(
             child: Container(
               height: 32,
@@ -232,22 +240,66 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
                   width: 0.5,
                 ),
               ),
-              child: Row(
+              child: Stack(
                 children: [
-                  _buildTabButton(
-                    tab: PlayerSidePanelTab.episodes,
-                    label: '选集',
-                    primaryColor: primaryColor,
+                  // 丝滑平移的活动药丸指示器（带 easeOutBack 微过冲弹性）
+                  AnimatedAlign(
+                    duration: const Duration(milliseconds: 240),
+                    curve: Curves.easeOutBack,
+                    alignment: AlignmentDirectional(
+                      -1.0 + activeIndex * 1.0,
+                      0.0,
+                    ),
+                    child: FractionallySizedBox(
+                      widthFactor: 1 / 3,
+                      child: Container(
+                        height: 27,
+                        decoration: BoxDecoration(
+                          color: primaryColor,
+                          borderRadius: BorderRadius.circular(13.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: primaryColor.withValues(alpha: 0.45),
+                              blurRadius: 6,
+                              offset: const Offset(0, 1.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  _buildTabButton(
-                    tab: PlayerSidePanelTab.sources,
-                    label: '换源',
-                    primaryColor: primaryColor,
-                  ),
-                  _buildTabButton(
-                    tab: PlayerSidePanelTab.danmaku,
-                    label: '弹幕',
-                    primaryColor: primaryColor,
+
+                  // 3 个 Tab 交互标签项
+                  Row(
+                    children: tabs.map((t) {
+                      final isSelected = _activeTab == t.tab;
+                      return Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            if (_activeTab != t.tab) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _activeTab = t.tab);
+                            }
+                          },
+                          child: Container(
+                            alignment: Alignment.center,
+                            child: AnimatedDefaultTextStyle(
+                              duration: const Duration(milliseconds: 180),
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.65),
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                letterSpacing: -0.2,
+                              ),
+                              child: Text(t.label),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ],
               ),
@@ -276,47 +328,6 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTabButton({
-    required PlayerSidePanelTab tab,
-    required String label,
-    required Color primaryColor,
-  }) {
-    final isSelected = _activeTab == tab;
-
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _activeTab = tab),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected ? primaryColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(13),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.4),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              letterSpacing: -0.2,
-            ),
-          ),
-        ),
       ),
     );
   }
