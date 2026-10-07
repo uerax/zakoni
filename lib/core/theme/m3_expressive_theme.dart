@@ -15,11 +15,20 @@ class M3ExpressiveTheme {
   }) {
     final isDark = brightness == Brightness.dark;
 
-    // 启用 M3 Expressive 动态配色算法（高色彩张力、对比度更强的辅助色与第三色配比）
-    final colorScheme = ColorScheme.fromSeed(
+    // 启用 M3 Expressive 动态配色算法构建基础衍生调色板
+    final baseColorScheme = ColorScheme.fromSeed(
       seedColor: primaryColor,
       brightness: brightness,
       dynamicSchemeVariant: DynamicSchemeVariant.expressive,
+    );
+
+    // 特殊处理说明：打破 Google Material You HCT 算法强制篡改明度（Tone 40/80）与旋转色相的限制，
+    // 强制锁定 primary 为用户在设置与调色盘中实际选定的物理真实色彩，做到 100%「所选即所得」；
+    // 同时基于明度动态决策 WCAG AA 级高对比度 onPrimary 文本图标色。
+    final isPrimaryLight = primaryColor.computeLuminance() > 0.55;
+    final colorScheme = baseColorScheme.copyWith(
+      primary: primaryColor,
+      onPrimary: isPrimaryLight ? const Color(0xFF1A1A1A) : Colors.white,
     );
 
     // 优选 InkSparkle，若在特定平台不支持则安全降级至 InkRipple
@@ -97,11 +106,11 @@ class M3ExpressiveTheme {
         elevation: 0,
         height: 76,
         backgroundColor: colorScheme.surfaceContainer,
-        indicatorColor: colorScheme.secondaryContainer,
+        indicatorColor: colorScheme.primary.withValues(alpha: isDark ? 0.22 : 0.14),
         indicatorShape: const StadiumBorder(),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return IconThemeData(color: colorScheme.onSecondaryContainer, size: 24);
+            return IconThemeData(color: colorScheme.primary, size: 24);
           }
           return IconThemeData(color: colorScheme.onSurfaceVariant, size: 24);
         }),
@@ -110,7 +119,7 @@ class M3ExpressiveTheme {
           return TextStyle(
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            color: isSelected ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+            color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
           );
         }),
       ),
@@ -143,7 +152,7 @@ class M3ExpressiveTheme {
         elevation: 0,
         pressElevation: 0,
         backgroundColor: colorScheme.surfaceContainerHigh,
-        selectedColor: colorScheme.secondaryContainer,
+        selectedColor: colorScheme.primary.withValues(alpha: isDark ? 0.22 : 0.14),
         labelStyle: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
@@ -152,7 +161,7 @@ class M3ExpressiveTheme {
         secondaryLabelStyle: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: colorScheme.onSecondaryContainer,
+          color: colorScheme.primary,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),

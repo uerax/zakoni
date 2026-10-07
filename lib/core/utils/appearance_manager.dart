@@ -345,7 +345,7 @@ class AppearanceManager extends ChangeNotifier {
     }
 
     return Positioned.fill(
-      key: ValueKey('wallpaper_layer_${pageKey}_$wallpaperPath'),
+      key: ValueKey('wallpaper_layer_$wallpaperPath'),
       child: IgnorePointer(
         child: RepaintBoundary(
           child: Opacity(

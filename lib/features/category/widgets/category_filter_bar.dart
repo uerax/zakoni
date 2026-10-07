@@ -103,7 +103,7 @@ class CategoryFilterBar extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: isHighlight
-              ? theme.colorScheme.secondaryContainer
+              ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.22 : 0.14)
               : theme.colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(999),
         ),
@@ -116,7 +116,7 @@ class CategoryFilterBar extends ConsumerWidget {
                 fontSize: 12,
                 fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
                 color: isHighlight
-                    ? theme.colorScheme.onSecondaryContainer
+                    ? theme.colorScheme.primary
                     : theme.colorScheme.onSurfaceVariant,
               ),
             ),
@@ -125,7 +125,7 @@ class CategoryFilterBar extends ConsumerWidget {
               Icons.keyboard_arrow_down_rounded,
               size: 15,
               color: isHighlight
-                  ? theme.colorScheme.onSecondaryContainer
+                  ? theme.colorScheme.primary
                   : theme.colorScheme.onSurfaceVariant,
             ),
           ],
@@ -215,7 +215,7 @@ class CategoryFilterBar extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: isHighlight
-              ? theme.colorScheme.secondaryContainer
+              ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.22 : 0.14)
               : theme.colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(999),
         ),
@@ -228,7 +228,7 @@ class CategoryFilterBar extends ConsumerWidget {
                 fontSize: 12,
                 fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
                 color: isHighlight
-                    ? theme.colorScheme.onSecondaryContainer
+                    ? theme.colorScheme.primary
                     : theme.colorScheme.onSurfaceVariant,
               ),
             ),
@@ -237,7 +237,7 @@ class CategoryFilterBar extends ConsumerWidget {
               Icons.keyboard_arrow_down_rounded,
               size: 15,
               color: isHighlight
-                  ? theme.colorScheme.onSecondaryContainer
+                  ? theme.colorScheme.primary
                   : theme.colorScheme.onSurfaceVariant,
             ),
           ],

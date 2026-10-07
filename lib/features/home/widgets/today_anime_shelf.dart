@@ -226,11 +226,13 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
               child: Container(
                 height: 32,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
+                  color: isDark
+                      ? theme.colorScheme.primary.withValues(alpha: 0.22)
+                      : theme.colorScheme.primary.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.25 : 0.14),
+                      color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.28 : 0.16),
                       blurRadius: 6,
                       offset: const Offset(0, 1.5),
                     ),
@@ -270,7 +272,7 @@ class _TodayAnimeShelfState extends State<TodayAnimeShelf> {
                                   ? FontWeight.w800
                                   : (isCurrentDay ? FontWeight.w700 : FontWeight.w500),
                               color: isSelected
-                                  ? theme.colorScheme.onPrimaryContainer
+                                  ? theme.colorScheme.primary
                                   : (isCurrentDay
                                       ? theme.colorScheme.primary
                                       : theme.colorScheme.onSurfaceVariant),

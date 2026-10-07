@@ -19,12 +19,14 @@ class CategoryController extends Notifier<CategoryState> {
   CancelToken? _cancelToken;
   Timer? _debounceTimer;
   bool _isDisposed = false;
+  bool _hasStartedInitialFetch = false;
 
   CategoryController([this.initialCategory]);
 
   @override
   CategoryState build() {
     _isDisposed = false;
+    _hasStartedInitialFetch = false;
     ref.onDispose(() {
       _isDisposed = true;
       _debounceTimer?.cancel();
@@ -32,9 +34,16 @@ class CategoryController extends Notifier<CategoryState> {
     });
 
     final filter = CategoryFilter.fromInitial(initialCategory);
-    // 在下一个 microtask 启动第一页数据加载，避免在 build 过程中同步修改状态
-    Future.microtask(fetchFirstPage);
+    // 工业级标准：初始状态只负责渲染极轻量静态骨架屏，绝不自动发起任何网络请求，
+    // 杜绝冷启动与页面切换动画期间并发抢占 CPU 与带宽
     return CategoryState(filter: filter, isLoading: true);
+  }
+
+  /// 确保首次数据加载（仅在页面真正进入可视区或切换到位后按需调用）
+  void ensureLoaded() {
+    if (_hasStartedInitialFetch && (state.items.isNotEmpty || !state.isLoading)) return;
+    _hasStartedInitialFetch = true;
+    fetchFirstPage();
   }
 
   /// 根据当前运行端型（手机 12 / 平板 20 / 桌面 24）动态计算单页最优请求量

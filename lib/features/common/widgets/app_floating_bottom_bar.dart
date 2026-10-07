@@ -62,6 +62,7 @@ class AppFloatingBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.colorScheme.primary;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
 
     final dockBg = M3Surface.container(context, level: M3ContainerLevel.highest);
@@ -113,8 +114,8 @@ class AppFloatingBottomBar extends StatelessWidget {
                     ),
                     child: Stack(
                       children: [
-                        // M3 标准横向活动药丸滑块：采用高对比度 primaryContainer 与柔和微阴影，
-                        // 确保与底衬拉开层级，让 300ms Curves.easeOutBack 物理回弹过冲滑动轨迹极其鲜明丝滑
+                        // 活动药丸滑块：采用纯正 primary 衍生的高透表现力药丸与微外发光，
+                        // 100% 呼应用户选中的主题色彩，让 300ms Curves.easeOutBack 物理回弹滑动极其鲜明丝滑
                         AnimatedAlign(
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeOutBack,
@@ -132,10 +133,12 @@ class AppFloatingBottomBar extends StatelessWidget {
                                 height: 38,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(19),
-                                  color: theme.colorScheme.primaryContainer,
+                                  color: isDark
+                                      ? primaryColor.withValues(alpha: 0.22)
+                                      : primaryColor.withValues(alpha: 0.14),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: theme.colorScheme.primary.withValues(alpha: isDark ? 0.28 : 0.16),
+                                      color: primaryColor.withValues(alpha: isDark ? 0.30 : 0.16),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -146,13 +149,13 @@ class AppFloatingBottomBar extends StatelessWidget {
                           ),
                         ),
 
-                        // 各导航项图标（选中态为 onPrimaryContainer，未选中态为 onSurfaceVariant）
+                        // 各导航项图标（选中态 100% 呈现用户自定义的纯正 primary 主题色）
                         Row(
                           children: List.generate(items.length, (i) {
                             final isSelected = currentIndex == i;
                             final item = items[i];
                             final itemColor = isSelected
-                                ? theme.colorScheme.onPrimaryContainer
+                                ? primaryColor
                                 : theme.colorScheme.onSurfaceVariant;
 
                             return Expanded(

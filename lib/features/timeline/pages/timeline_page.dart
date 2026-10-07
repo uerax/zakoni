@@ -171,13 +171,13 @@ class _TimelinePageState extends State<TimelinePage> with AutomaticKeepAliveClie
                       fontSize: 12,
                       fontWeight: isSelected || isToday ? FontWeight.w700 : FontWeight.w500,
                       color: isSelected
-                          ? theme.colorScheme.onSecondaryContainer
+                          ? theme.colorScheme.primary
                           : (isToday ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant),
                     ),
                   ),
                 ),
                 selected: isSelected,
-                selectedColor: theme.colorScheme.secondaryContainer,
+                selectedColor: theme.colorScheme.primary.withValues(alpha: isDark ? 0.22 : 0.14),
                 backgroundColor: theme.colorScheme.surfaceContainerHigh,
                 shape: const StadiumBorder(),
                 side: isToday && !isSelected

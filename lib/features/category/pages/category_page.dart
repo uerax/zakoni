@@ -10,11 +10,13 @@ import '../widgets/category_genre_chips.dart';
 class CategoryPage extends ConsumerStatefulWidget {
   final BangumiClient? client;
   final String? initialCategory;
+  final bool isVisible;
 
   const CategoryPage({
     super.key,
     this.client,
     this.initialCategory,
+    this.isVisible = false,
   });
 
   @override
@@ -33,6 +35,25 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    if (widget.isVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(categoryControllerProvider(widget.initialCategory).notifier).ensureLoaded();
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(CategoryPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isVisible && !oldWidget.isVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(categoryControllerProvider(widget.initialCategory).notifier).ensureLoaded();
+        }
+      });
+    }
   }
 
   @override

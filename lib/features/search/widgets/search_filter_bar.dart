@@ -27,6 +27,7 @@ class SearchFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isCompact = screenWidth < 500;
 
@@ -73,7 +74,7 @@ class SearchFilterBar extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: isActive
-                                  ? theme.colorScheme.secondaryContainer
+                                  ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.22 : 0.14)
                                   : theme.colorScheme.surfaceContainerHigh,
                               borderRadius: BorderRadius.circular(999),
                             ),
@@ -88,7 +89,7 @@ class SearchFilterBar extends StatelessWidget {
                                         ? FontWeight.w700
                                         : FontWeight.w500,
                                     color: isActive
-                                        ? theme.colorScheme.onSecondaryContainer
+                                        ? theme.colorScheme.primary
                                         : theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
@@ -99,7 +100,7 @@ class SearchFilterBar extends StatelessWidget {
                                     fontSize: 11,
                                     fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
                                     color: isActive
-                                        ? theme.colorScheme.onSecondaryContainer.withValues(alpha: 0.8)
+                                        ? theme.colorScheme.primary.withValues(alpha: 0.8)
                                         : theme.colorScheme.onSurfaceVariant
                                             .withValues(alpha: 0.7),
                                   ),
@@ -145,7 +146,7 @@ class SearchFilterBar extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: isActive
-                                  ? theme.colorScheme.primaryContainer
+                                  ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.22 : 0.14)
                                   : theme.colorScheme.surfaceContainerHigh,
                               borderRadius: BorderRadius.circular(999),
                             ),
@@ -157,7 +158,7 @@ class SearchFilterBar extends StatelessWidget {
                                     ? FontWeight.w700
                                     : FontWeight.w500,
                                 color: isActive
-                                    ? theme.colorScheme.onPrimaryContainer
+                                    ? theme.colorScheme.primary
                                     : theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
