@@ -40,6 +40,11 @@
 - 注释应说明“为什么必须这样处理”，而不是重复代码本身的功能。
 - 如果该处理是为了兼容特定环境、规避已知问题、安全限制、性能原因或保持现有行为，应明确注明。
 
+## 字体与排版规范（严防 Windows 跌入宋体）
+- 严禁在全局主题、模态弹窗、按钮、输入框、下拉菜单、气泡等任何组件样式中手写未指定字体的裸 `TextStyle`（如 `const TextStyle(...)`）。
+- Windows 平台在遇到未定义字族的粗体或局部文本时，DirectWrite 底层会直接粗暴降级回退至 Windows 远古的“中易宋体 (SimSun)”。
+- 所有全局样式、组件覆写、弹窗（`dialogTheme` 的 `titleTextStyle` 与 `contentTextStyle`）、按钮文字（`FilledButton`、`TextButton`、`ElevatedButton`、`OutlinedButton`）以及提示组件，必须严格显式注入 `fontFamily` 与 `fontFamilyFallback`（安全回退链：`Microsoft YaHei UI`、`微软雅黑`、`Segoe UI` 等），确保全平台统一无死角呈现预设无衬线现代字体。
+
 ## 需要先确认
 - 新增第三方依赖、删除文件或批量移动、破坏性数据库操作、修改 CI/CD 与部署配置。
 - 不主动启动 dev server 或后台长期进程，改完说明，由我自测。

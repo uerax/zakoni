@@ -44,6 +44,27 @@ class M3ExpressiveTheme {
       fontFallback: fontFallback,
     );
 
+    // 全局基础文字样式助手：确保所有按钮、气泡、输入框、菜单与弹窗严格绑定字体与回退链，
+    // 绝不使用未指定字体的裸 TextStyle，彻底封杀 Windows DirectWrite 跌入中易宋体 (SimSun) 的漏洞
+    TextStyle buildStyledText({
+      required double fontSize,
+      FontWeight fontWeight = FontWeight.normal,
+      Color? color,
+      double? height,
+    }) {
+      return TextStyle(
+        fontFamily: currentFont,
+        fontFamilyFallback: fontFallback,
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+        height: height,
+      );
+    }
+
+    final primaryBtnStyle = buildStyledText(fontSize: 14, fontWeight: FontWeight.w700);
+    final secondaryBtnStyle = buildStyledText(fontSize: 14, fontWeight: FontWeight.w600);
+
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -76,16 +97,23 @@ class M3ExpressiveTheme {
         margin: EdgeInsets.zero,
       ),
 
-      // 2. 模态弹窗规范：28dp 大圆角，surfaceContainerHigh 背景
+      // 2. 模态弹窗规范：28dp 大圆角，surfaceContainerHigh 背景，全量注入字体链彻底消灭宋体
       dialogTheme: DialogThemeData(
         elevation: 6,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(28),
         ),
         backgroundColor: colorScheme.surfaceContainerHigh,
-        titleTextStyle: textTheme.headlineSmall?.copyWith(
+        titleTextStyle: buildStyledText(
+          fontSize: 18,
           fontWeight: FontWeight.w700,
           color: colorScheme.onSurface,
+        ),
+        contentTextStyle: buildStyledText(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: colorScheme.onSurfaceVariant,
+          height: 1.5,
         ),
       ),
 
@@ -116,7 +144,7 @@ class M3ExpressiveTheme {
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final isSelected = states.contains(WidgetState.selected);
-          return TextStyle(
+          return buildStyledText(
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
@@ -131,16 +159,17 @@ class M3ExpressiveTheme {
         shape: const WidgetStatePropertyAll(StadiumBorder()),
         padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16)),
         textStyle: WidgetStatePropertyAll(
-          TextStyle(
-            color: colorScheme.onSurface,
+          buildStyledText(
             fontSize: 14,
             fontWeight: FontWeight.normal,
+            color: colorScheme.onSurface,
           ),
         ),
         hintStyle: WidgetStatePropertyAll(
-          TextStyle(
-            color: colorScheme.onSurfaceVariant,
+          buildStyledText(
             fontSize: 14,
+            fontWeight: FontWeight.normal,
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
       ),
@@ -153,12 +182,12 @@ class M3ExpressiveTheme {
         pressElevation: 0,
         backgroundColor: colorScheme.surfaceContainerHigh,
         selectedColor: colorScheme.primary.withValues(alpha: isDark ? 0.22 : 0.14),
-        labelStyle: TextStyle(
+        labelStyle: buildStyledText(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: colorScheme.onSurface,
         ),
-        secondaryLabelStyle: TextStyle(
+        secondaryLabelStyle: buildStyledText(
           fontSize: 12,
           fontWeight: FontWeight.w700,
           color: colorScheme.primary,
@@ -166,12 +195,12 @@ class M3ExpressiveTheme {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),
 
-      // 7. 按钮组全量采用药丸或圆润弧线
+      // 7. 按钮组全量采用药丸或圆润弧线，全量注入字体链消除 Windows 按钮宋体降级
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           shape: const StadiumBorder(),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          textStyle: primaryBtnStyle,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -179,7 +208,7 @@ class M3ExpressiveTheme {
           elevation: 1,
           shape: const StadiumBorder(),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          textStyle: primaryBtnStyle,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -187,7 +216,43 @@ class M3ExpressiveTheme {
           shape: const StadiumBorder(),
           side: BorderSide(color: colorScheme.outline, width: 1.2),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          textStyle: secondaryBtnStyle,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          textStyle: secondaryBtnStyle,
+        ),
+      ),
+
+      // 7.5 全局浮条提示 SnackBar 规范
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentTextStyle: buildStyledText(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: Colors.white,
+        ),
+      ),
+
+      // 7.6 全局弹出菜单 PopupMenu 规范
+      popupMenuTheme: PopupMenuThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        textStyle: buildStyledText(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w500,
+          color: colorScheme.onSurface,
+        ),
+      ),
+
+      // 7.7 全局悬浮气泡 Tooltip 规范
+      tooltipTheme: TooltipThemeData(
+        textStyle: buildStyledText(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: colorScheme.onInverseSurface,
         ),
       ),
 
@@ -196,6 +261,8 @@ class M3ExpressiveTheme {
         filled: true,
         fillColor: colorScheme.surfaceContainerHigh,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        labelStyle: buildStyledText(fontSize: 13, color: colorScheme.onSurfaceVariant),
+        hintStyle: buildStyledText(fontSize: 13, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
