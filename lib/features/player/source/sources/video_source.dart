@@ -15,6 +15,29 @@ Map<String, dynamic>? parseJsonMap(dynamic data) {
   return null;
 }
 
+/// 模拟 JavaScript 原生 unescape() 函数（精准支持 %uXXXX 16位 Unicode 与标准 %XX 百分比解码）
+String jsUnescape(String input) {
+  if (input.isEmpty) return input;
+  // 1. 替换 %uXXXX 为对应的 Unicode 字符
+  final withUnicode = input.replaceAllMapped(
+    RegExp(r'%u([0-9a-fA-F]{4})'),
+    (m) => String.fromCharCode(int.parse(m.group(1)!, radix: 16)),
+  );
+  // 2. 解码标准的百分比编码 (%XX)
+  try {
+    return Uri.decodeQueryComponent(withUnicode);
+  } catch (_) {
+    try {
+      return Uri.decodeComponent(withUnicode);
+    } catch (_) {
+      return withUnicode.replaceAllMapped(
+        RegExp(r'%([0-9a-fA-F]{2})'),
+        (m) => String.fromCharCode(int.parse(m.group(1)!, radix: 16)),
+      );
+    }
+  }
+}
+
 /// 统一视频源抽象接口 (纯原生 Dart，零 QuickJS 损耗)
 abstract class VideoSource {
   String get id;

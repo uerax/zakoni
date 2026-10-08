@@ -135,19 +135,15 @@ class MxdmSource extends VideoSource {
     final encrypt = player['encrypt'] ?? 0;
 
     if (encrypt == 1) {
-      try {
-        directUrl = Uri.decodeQueryComponent(directUrl);
-      } catch (_) {}
+      directUrl = jsUnescape(directUrl);
     } else if (encrypt == 2) {
       try {
         final bytes = base64Decode(directUrl);
         final decoded = utf8.decode(bytes, allowMalformed: true);
-        try {
-          directUrl = Uri.decodeQueryComponent(decoded);
-        } catch (_) {
-          directUrl = decoded;
-        }
-      } catch (_) {}
+        directUrl = jsUnescape(decoded);
+      } catch (_) {
+        directUrl = jsUnescape(directUrl);
+      }
     }
 
     if (!directUrl.startsWith('http')) {

@@ -14,7 +14,9 @@ void main() {
     expect(runtime.bundleMeta.version, contains('native'));
 
     final sources = runtime.availableSources;
-    expect(sources.length, 12);
+    expect(sources.length, 13);
+    expect(sources.first.id, 'sorani');
+    expect(sources.any((s) => s.id == 'sorani'), isTrue);
     expect(sources.any((s) => s.id == 'xifan-next'), isTrue);
     expect(sources.any((s) => s.id == 'girigiri'), isTrue);
     expect(sources.any((s) => s.id == 'mifun'), isTrue);
@@ -66,6 +68,37 @@ void main() {
 
     final cycMedia = await runtime.resolve('cycani', cycRoads.first.episodes.first.url);
     expect(cycMedia.url, startsWith('http'));
+
+    // 4. 验证青空次元原生搜索、分集与解析
+    final soraniHits = await runtime.search('sorani', '从零开始');
+    expect(soraniHits, isNotEmpty);
+    expect(soraniHits.first.name, contains('从零开始'));
+
+    final soraniRoads = await runtime.chapters('sorani', soraniHits.first.url);
+    expect(soraniRoads, isNotEmpty);
+    expect(soraniRoads.first.episodes, isNotEmpty);
+
+    final soraniMedia = await runtime.resolve('sorani', soraniRoads.first.episodes.first.url);
+    expect(soraniMedia.url, startsWith('http'));
+    expect(soraniMedia.format, 'hls');
+    expect(soraniMedia.headers['Referer'], 'https://www.sorani.net/');
+
+    // 5. 验证月之祠原生搜索、分集与解析 (中文偏好 + 嵌套 JSON 正则修复)
+    final moonciHits = await runtime.search('moonci', '葬送的芙莉莲');
+    expect(moonciHits, isNotEmpty);
+    expect(moonciHits.first.name, contains('芙莉莲'));
+
+    final moonciRoads = await runtime.chapters('moonci', moonciHits.first.url);
+    expect(moonciRoads, isNotEmpty);
+    expect(moonciRoads.first.episodes, isNotEmpty);
+
+    final moonciMedia = await runtime.resolve('moonci', moonciRoads.first.episodes.first.url);
+    expect(moonciMedia.url, startsWith('http'));
+
+    // 6. 验证月之祠 %uXXXX Unicode escape 解密 (解决用户报障 URL)
+    final userReportedMedia = await runtime.resolve('moonci', 'https://www.moonci.com/anime/41/play/3-1.html');
+    expect(userReportedMedia.url, startsWith('https://dl.playxf.top/'));
+    expect(userReportedMedia.url, contains('尼古喵喵'));
 
     runtime.dispose();
   });

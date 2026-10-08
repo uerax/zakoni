@@ -13,12 +13,13 @@ import 'package:zakoni/features/player/source/sources/mifun_source.dart';
 import 'package:zakoni/features/player/source/sources/moonci_source.dart';
 import 'package:zakoni/features/player/source/sources/mxdm_source.dart';
 import 'package:zakoni/features/player/source/sources/omofun_source.dart';
+import 'package:zakoni/features/player/source/sources/sorani_source.dart';
 import 'package:zakoni/features/player/source/sources/tvtfun_source.dart';
 import 'package:zakoni/features/player/source/sources/video_source.dart';
 import 'package:zakoni/features/player/source/sources/xifan_next_source.dart';
 
 /// 100% 纯原生 Dart 视频源运行时与统一缓存调度中心
-/// 涵盖 animaku 全部 11 个核心视频源，配备 L1 内存 + L2 硬盘持久化双层缓存体系
+/// 涵盖 animaku 全部 12 个核心视频源，配备 L1 内存 + L2 硬盘持久化双层缓存体系
 class NativeSourceRuntime {
   NativeSourceRuntime({Dio? dio}) : _dio = dio ?? Dio() {
     _registerDefaultSources();
@@ -46,15 +47,16 @@ class NativeSourceRuntime {
   final Map<String, Future<SourceResolveResult>> _inflightResolve = {};
 
   void _registerDefaultSources() {
+    registerSource(SoraniSource(dio: _dio));
     registerSource(XifanNextSource(dio: _dio));
-    registerSource(GirigiriSource(dio: _dio));
-    registerSource(MifunSource(dio: _dio));
-    registerSource(CycaniSource(dio: _dio));
     registerSource(MoonciSource(dio: _dio));
-    registerSource(TvTFunSource(dio: _dio));
+    registerSource(CycaniSource(dio: _dio));
+    registerSource(MifunSource(dio: _dio));
+    registerSource(GirigiriSource(dio: _dio));
     registerSource(LzizySource(dio: _dio));
     registerSource(AnimoeSource(dio: _dio));
     registerSource(MxdmSource(dio: _dio));
+    registerSource(TvTFunSource(dio: _dio));
     registerSource(OmofunSource(dio: _dio));
     registerSource(Anime1Source(dio: _dio));
     registerSource(LibvioSource(dio: _dio));

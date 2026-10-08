@@ -154,7 +154,9 @@ class MoonciSource extends VideoSource {
       }
     }
 
-    return roads;
+    // 特殊处理说明：月之祠通常有 2-3 条线路（如 X.1, X.2, X.3），但 1-2 线路经常不可用/失效，
+    // 逆向排序使得更稳定的后置线路（如 X.3 / X.2）优先作为默认首发线路。
+    return roads.reversed.toList();
   }
 
   @override
@@ -170,8 +172,9 @@ class MoonciSource extends VideoSource {
     );
 
     final html = res.data ?? '';
-    final match = RegExp(r'var\s+player_aaaa\s*=\s*(\{[\s\S]*?\})\s*<').firstMatch(html) ??
-        RegExp(r'player_aaaa\s*=\s*(\{[\s\S]*?\})').firstMatch(html);
+    final match = RegExp(r'player_aaaa\s*=\s*(\{[\s\S]*?\})\s*</script>', caseSensitive: false).firstMatch(html) ??
+        RegExp(r'player_aaaa\s*=\s*(\{[\s\S]*?\})\s*<', caseSensitive: false).firstMatch(html) ??
+        RegExp(r'player_aaaa\s*=\s*(\{[\s\S]*?\})', caseSensitive: false).firstMatch(html);
 
     if (match == null) {
       throw Exception('未在月之祠播放页找到 player_aaaa 配置: $absUrl');
@@ -182,19 +185,15 @@ class MoonciSource extends VideoSource {
     final encrypt = player['encrypt'] ?? 0;
 
     if (encrypt == 1) {
-      try {
-        rawUrl = Uri.decodeQueryComponent(rawUrl);
-      } catch (_) {}
+      rawUrl = jsUnescape(rawUrl);
     } else if (encrypt == 2) {
       try {
         final bytes = base64Decode(rawUrl);
         final decoded = utf8.decode(bytes, allowMalformed: true);
-        try {
-          rawUrl = Uri.decodeQueryComponent(decoded);
-        } catch (_) {
-          rawUrl = decoded;
-        }
-      } catch (_) {}
+        rawUrl = jsUnescape(decoded);
+      } catch (_) {
+        rawUrl = jsUnescape(rawUrl);
+      }
     } else if (encrypt == 3) {
       try {
         rawUrl = Uri.decodeComponent(rawUrl);

@@ -91,7 +91,7 @@ class SourceKeywordMatcher {
     if (sId == 'mifun') {
       return TitlePreference.chineseCompact;
     }
-    if (sId == 'xifan-next' || sId == 'moonci' || sId == 'omofun' || sId == 'libvio') {
+    if (sId == 'xifan-next' || sId == 'omofun' || sId == 'libvio') {
       return TitlePreference.original;
     }
     return TitlePreference.chinese;
