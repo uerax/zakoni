@@ -1,7 +1,7 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../../core/models/bangumi/bangumi_item.dart';
 import '../../../core/theme/m3_surface.dart';
+import '../../../core/utils/fade_scale_page_route.dart';
 import '../../../core/utils/responsive.dart';
 import '../../player/player.dart';
 import 'bouncing_scale_card.dart';
@@ -15,7 +15,7 @@ void navigateToVideoPlayer(
   int? currentEpisode,
 }) {
   Navigator.of(context).push(
-    CupertinoPageRoute(
+    FadeScalePageRoute(
       builder: (context) => VideoPlayPage(
         title: item.preferredName,
         bangumiItem: item,

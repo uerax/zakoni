@@ -1,10 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/bangumi_client.dart';
 import '../core/providers/bangumi_providers.dart';
 import '../core/services/app_prewarm_coordinator.dart';
 import '../core/utils/appearance_manager.dart';
+import '../core/utils/fade_scale_page_route.dart';
 import 'category/pages/category_page.dart';
 import 'common/widgets/app_floating_bottom_bar.dart';
 import 'common/widgets/nav_custom_icons.dart';
@@ -53,7 +53,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
 
   void _navigateToSearch() {
     Navigator.of(context).push(
-      CupertinoPageRoute(
+      FadeScalePageRoute(
         builder: (context) => const SearchPage(),
       ),
     );

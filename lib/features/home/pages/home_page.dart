@@ -8,6 +8,7 @@ import '../../../core/models/home/recommend_item.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/services/daily_recommend_service.dart';
 import '../../../core/services/watch_history_service.dart';
+import '../../../core/utils/fade_scale_page_route.dart';
 import '../../../core/utils/responsive.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
@@ -124,7 +125,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
 
   void _navigateToSearch([String? query]) {
     Navigator.of(context).push(
-      CupertinoPageRoute(
+      FadeScalePageRoute(
         builder: (context) => SearchPage(initialQuery: query),
       ),
     );
