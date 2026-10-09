@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../controllers/category_controller.dart';
+import '../controllers/category_state.dart';
 import '../widgets/category_content_view.dart';
 import '../widgets/category_filter_bar.dart';
 import '../widgets/category_genre_chips.dart';
@@ -10,12 +11,16 @@ import '../widgets/category_genre_chips.dart';
 class CategoryPage extends ConsumerStatefulWidget {
   final BangumiClient? client;
   final String? initialCategory;
+  final int? initialYear;
+  final int? initialMonth;
   final bool isVisible;
 
   const CategoryPage({
     super.key,
     this.client,
     this.initialCategory,
+    this.initialYear,
+    this.initialMonth,
     this.isVisible = false,
   });
 
@@ -31,6 +36,12 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
   final ScrollController _scrollController = ScrollController();
   bool _showBackToTop = false;
 
+  CategoryInitialArgs get _initialArgs => CategoryInitialArgs(
+        category: widget.initialCategory,
+        year: widget.initialYear,
+        month: widget.initialMonth,
+      );
+
   @override
   void initState() {
     super.initState();
@@ -38,7 +49,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
     if (widget.isVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          ref.read(categoryControllerProvider(widget.initialCategory).notifier).ensureLoaded();
+          ref.read(categoryControllerProvider(_initialArgs).notifier).ensureLoaded();
         }
       });
     }
@@ -50,7 +61,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
     if (widget.isVisible && !oldWidget.isVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          ref.read(categoryControllerProvider(widget.initialCategory).notifier).ensureLoaded();
+          ref.read(categoryControllerProvider(_initialArgs).notifier).ensureLoaded();
         }
       });
     }
@@ -75,7 +86,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
     // 触底预加载：距离底部不足 350px 时提前静默拉取下一页
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 350) {
-      ref.read(categoryControllerProvider(widget.initialCategory).notifier).loadMore();
+      ref.read(categoryControllerProvider(_initialArgs).notifier).loadMore();
     }
   }
 
@@ -93,12 +104,12 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final state = ref.watch(categoryControllerProvider(widget.initialCategory));
-    final controller = ref.read(categoryControllerProvider(widget.initialCategory).notifier);
+    final state = ref.watch(categoryControllerProvider(_initialArgs));
+    final controller = ref.read(categoryControllerProvider(_initialArgs).notifier);
 
     // 筛选切换时轻量回滚至列表顶部，保障视觉连贯
     ref.listen(
-      categoryControllerProvider(widget.initialCategory).select((s) => s.filter),
+      categoryControllerProvider(_initialArgs).select((s) => s.filter),
       (prev, next) {
         if (prev != null && prev != next && _scrollController.hasClients) {
           _scrollController.animateTo(
@@ -156,14 +167,14 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
 
                   // 2. 形式分类（单选）与题材分类（多选）
                   SliverToBoxAdapter(
-                    child: CategoryGenreChips(initialCategory: widget.initialCategory),
+                    child: CategoryGenreChips(initialArgs: _initialArgs),
                   ),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
                   // 3. 年份、季度与排序下拉菜单栏（左侧年份季度，右侧排序）
                   SliverToBoxAdapter(
-                    child: CategoryFilterBar(initialCategory: widget.initialCategory),
+                    child: CategoryFilterBar(initialArgs: _initialArgs),
                   ),
 
                   // 4. 动态状态与数量摘要副标题
@@ -198,7 +209,7 @@ class _CategoryPageState extends ConsumerState<CategoryPage>
                   ),
 
                   // 6. 内容主体区域
-                  CategoryContentView(initialCategory: widget.initialCategory),
+                  CategoryContentView(initialArgs: _initialArgs),
 
                   // 7. 底部加载更多或触底提示
                   if (state.isLoadingMore)

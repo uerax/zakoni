@@ -1,21 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../controllers/category_controller.dart';
+import '../controllers/category_state.dart';
 import '../models/category_constants.dart';
 
 class CategoryHeaderBar extends ConsumerWidget {
-  final String? initialCategory;
+  final CategoryInitialArgs initialArgs;
 
-  const CategoryHeaderBar({super.key, this.initialCategory});
+  const CategoryHeaderBar({
+    super.key,
+    this.initialArgs = const CategoryInitialArgs(),
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final isCurrentSeason = ref.watch(
-      categoryControllerProvider(initialCategory).select((s) => s.filter.isCurrentSeason),
+      categoryControllerProvider(initialArgs).select((s) => s.filter.isCurrentSeason),
     );
-    final controller = ref.read(categoryControllerProvider(initialCategory).notifier);
+    final controller = ref.read(categoryControllerProvider(initialArgs).notifier);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),

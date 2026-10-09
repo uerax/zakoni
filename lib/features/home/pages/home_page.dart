@@ -11,6 +11,7 @@ import '../../../core/services/watch_history_service.dart';
 import '../../../core/utils/responsive.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
+import '../../category/models/category_constants.dart';
 import '../../history/pages/history_page.dart';
 import '../../search/pages/search_page.dart';
 import '../widgets/continue_watching_shelf.dart';
@@ -32,7 +33,7 @@ typedef _HomeData = ({
 
 class HomePage extends StatefulWidget {
   final BangumiClient client;
-  final ValueChanged<String>? onNavigateToCategory;
+  final void Function(String category, {int? year, int? month})? onNavigateToCategory;
   final VoidCallback? onOpenSearch;
 
   const HomePage({
@@ -116,10 +117,10 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
     }
   }
 
-  void _onShelfViewAllTap(String category) {
+  void _onShelfViewAllTap(String category, {int? year, int? month}) {
     // 点击“浏览全部”快捷入口：通知外层主壳切换到底栏“分类”标签页并定位分类
     if (widget.onNavigateToCategory != null) {
-      widget.onNavigateToCategory!(category);
+      widget.onNavigateToCategory!(category, year: year, month: month);
     }
   }
 
@@ -626,7 +627,11 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             items: data.tv,
             defaultStatType: 'heat',
             viewAllSubtitle: '浏览全部 TV',
-            onViewAllTap: () => _onShelfViewAllTap('TV'),
+            onViewAllTap: () => _onShelfViewAllTap(
+              'TV',
+              year: CategoryConstants.currentYear,
+              month: CategoryConstants.currentSeasonMonth,
+            ),
           ),
         ),
       ),

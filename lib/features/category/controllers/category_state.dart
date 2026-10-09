@@ -3,12 +3,43 @@ import '../../../core/models/bangumi/bangumi_item.dart';
 import '../models/category_constants.dart';
 
 @immutable
+class CategoryInitialArgs {
+  final String? category;
+  final int? year;
+  final int? month;
+
+  const CategoryInitialArgs({
+    this.category,
+    this.year,
+    this.month,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CategoryInitialArgs &&
+          runtimeType == other.runtimeType &&
+          category == other.category &&
+          year == other.year &&
+          month == other.month;
+
+  @override
+  int get hashCode => Object.hash(category, year, month);
+
+  @override
+  String toString() =>
+      'CategoryInitialArgs(category: $category, year: $year, month: $month)';
+}
+
+@immutable
 class CategoryFilter {
   final Set<String> selectedTags; // 所有选中的标签 (包含 TV/剧场版/OVA 及热血等题材，均无单选限制)
   final int? selectedYear;
   final int? selectedMonth;
   final String selectedSort;
   final String? initialCategory;
+  final int? initialYear;
+  final int? initialMonth;
 
   CategoryFilter({
     Set<String>? selectedTags,
@@ -18,6 +49,8 @@ class CategoryFilter {
     this.selectedMonth,
     this.selectedSort = 'heat',
     this.initialCategory,
+    this.initialYear,
+    this.initialMonth,
   }) : selectedTags = selectedTags ??
             (selectedType != null || selectedGenres != null
                 ? {
@@ -26,22 +59,45 @@ class CategoryFilter {
                   }
                 : const {});
 
-  factory CategoryFilter.fromInitial(String? initialCategory) {
-    if (initialCategory != null && initialCategory.isNotEmpty && initialCategory != '全部') {
+  factory CategoryFilter.fromInitial([Object? initial]) {
+    if (initial is CategoryInitialArgs) {
+      final initialCategory = initial.category;
+      final initialYear = initial.year;
+      final initialMonth = initial.month;
+      final hasCategory = initialCategory != null &&
+          initialCategory.isNotEmpty &&
+          initialCategory != '全部';
+
       return CategoryFilter(
-        selectedTags: {initialCategory},
+        selectedTags: hasCategory ? {initialCategory} : const {},
+        selectedYear: initialYear,
+        selectedMonth: initialMonth,
+        selectedSort: 'heat',
+        initialCategory: initialCategory,
+        initialYear: initialYear,
+        initialMonth: initialMonth,
+      );
+    } else if (initial is String) {
+      final hasCategory = initial.isNotEmpty && initial != '全部';
+      return CategoryFilter(
+        selectedTags: hasCategory ? {initial} : const {},
         selectedYear: null,
         selectedMonth: null,
         selectedSort: 'heat',
-        initialCategory: initialCategory,
+        initialCategory: initial,
+        initialYear: null,
+        initialMonth: null,
       );
     }
+
     return CategoryFilter(
       selectedTags: const {},
       selectedYear: null,
       selectedMonth: null,
       selectedSort: 'heat',
       initialCategory: null,
+      initialYear: null,
+      initialMonth: null,
     );
   }
 
@@ -62,16 +118,16 @@ class CategoryFilter {
 
   /// 是否处于初始默认选项（未被用户二次修改）
   bool get isDefaultState {
-    if (initialCategory != null && initialCategory!.isNotEmpty && initialCategory != '全部') {
-      return selectedTags.length == 1 &&
-          selectedTags.contains(initialCategory) &&
-          selectedYear == null &&
-          selectedMonth == null &&
-          selectedSort == 'heat';
-    }
-    return selectedTags.isEmpty &&
-        selectedYear == null &&
-        selectedMonth == null &&
+    final hasCategory = initialCategory != null &&
+        initialCategory!.isNotEmpty &&
+        initialCategory != '全部';
+    final isCategoryMatch = hasCategory
+        ? (selectedTags.length == 1 && selectedTags.contains(initialCategory))
+        : selectedTags.isEmpty;
+
+    return isCategoryMatch &&
+        selectedYear == initialYear &&
+        selectedMonth == initialMonth &&
         selectedSort == 'heat';
   }
 
@@ -83,6 +139,8 @@ class CategoryFilter {
     Object? selectedMonth = _sentinel,
     String? selectedSort,
     String? initialCategory,
+    Object? initialYear = _sentinel,
+    Object? initialMonth = _sentinel,
   }) {
     Set<String> effectiveTags = selectedTags ?? this.selectedTags;
     if (selectedGenres != null || selectedType != _sentinel) {
@@ -100,6 +158,8 @@ class CategoryFilter {
       selectedMonth: selectedMonth == _sentinel ? this.selectedMonth : selectedMonth as int?,
       selectedSort: selectedSort ?? this.selectedSort,
       initialCategory: initialCategory ?? this.initialCategory,
+      initialYear: initialYear == _sentinel ? this.initialYear : initialYear as int?,
+      initialMonth: initialMonth == _sentinel ? this.initialMonth : initialMonth as int?,
     );
   }
 
@@ -114,7 +174,9 @@ class CategoryFilter {
           selectedYear == other.selectedYear &&
           selectedMonth == other.selectedMonth &&
           selectedSort == other.selectedSort &&
-          initialCategory == other.initialCategory;
+          initialCategory == other.initialCategory &&
+          initialYear == other.initialYear &&
+          initialMonth == other.initialMonth;
 
   @override
   int get hashCode => Object.hash(
@@ -123,6 +185,8 @@ class CategoryFilter {
         selectedMonth,
         selectedSort,
         initialCategory,
+        initialYear,
+        initialMonth,
       );
 }
 

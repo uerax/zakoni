@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../controllers/category_controller.dart';
+import '../controllers/category_state.dart';
 import '../models/category_constants.dart';
 
 class CategoryGenreChips extends ConsumerWidget {
-  final String? initialCategory;
+  final CategoryInitialArgs initialArgs;
 
-  const CategoryGenreChips({super.key, this.initialCategory});
+  const CategoryGenreChips({
+    super.key,
+    this.initialArgs = const CategoryInitialArgs(),
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -16,9 +20,9 @@ class CategoryGenreChips extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final selectedTags = ref.watch(
-      categoryControllerProvider(initialCategory).select((s) => s.filter.selectedTags),
+      categoryControllerProvider(initialArgs).select((s) => s.filter.selectedTags),
     );
-    final controller = ref.read(categoryControllerProvider(initialCategory).notifier);
+    final controller = ref.read(categoryControllerProvider(initialArgs).notifier);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

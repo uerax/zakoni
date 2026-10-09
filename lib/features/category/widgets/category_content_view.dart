@@ -4,11 +4,15 @@ import '../../../core/utils/responsive.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
 import '../controllers/category_controller.dart';
+import '../controllers/category_state.dart';
 
 class CategoryContentView extends ConsumerWidget {
-  final String? initialCategory;
+  final CategoryInitialArgs initialArgs;
 
-  const CategoryContentView({super.key, this.initialCategory});
+  const CategoryContentView({
+    super.key,
+    this.initialArgs = const CategoryInitialArgs(),
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -16,15 +20,15 @@ class CategoryContentView extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final isLoading = ref.watch(
-      categoryControllerProvider(initialCategory).select((s) => s.isLoading),
+      categoryControllerProvider(initialArgs).select((s) => s.isLoading),
     );
     final errorMessage = ref.watch(
-      categoryControllerProvider(initialCategory).select((s) => s.errorMessage),
+      categoryControllerProvider(initialArgs).select((s) => s.errorMessage),
     );
     final items = ref.watch(
-      categoryControllerProvider(initialCategory).select((s) => s.items),
+      categoryControllerProvider(initialArgs).select((s) => s.items),
     );
-    final controller = ref.read(categoryControllerProvider(initialCategory).notifier);
+    final controller = ref.read(categoryControllerProvider(initialArgs).notifier);
 
     // 1. 仅在冷启动且当前内存中完全无数据时：呈现原生 SliverGrid 骨架屏
     // 特殊处理说明：采用原生 SliverGrid 单趟排版，彻底消除 GridView(shrinkWrap: true) 双重排版测算反模式

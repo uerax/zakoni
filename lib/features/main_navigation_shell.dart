@@ -5,6 +5,7 @@ import '../core/network/bangumi_client.dart';
 import '../core/providers/bangumi_providers.dart';
 import '../core/utils/appearance_manager.dart';
 import 'category/controllers/category_controller.dart';
+import 'category/controllers/category_state.dart';
 import 'category/pages/category_page.dart';
 import 'common/widgets/app_floating_bottom_bar.dart';
 import 'common/widgets/nav_custom_icons.dart';
@@ -28,6 +29,8 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
   int _currentIndex = 0;
   int _refreshKey = 0;
   String? _targetCategory;
+  int? _targetYear;
+  int? _targetMonth;
 
   // 预加载搜索覆盖层状态与控制器
   bool _isSearchOpen = false;
@@ -58,7 +61,7 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
     // App 启动首帧完成后，在后台静默预取分类数据，确保用户初次点击时数据已在内存，零延迟
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        ref.read(categoryControllerProvider(null).notifier).ensureLoaded();
+        ref.read(categoryControllerProvider(const CategoryInitialArgs()).notifier).ensureLoaded();
       }
     });
   }
@@ -154,16 +157,22 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell>
                     HomePage(
                       key: ValueKey('home_$_refreshKey'),
                       client: _client,
-                      onNavigateToCategory: (category) {
-                        _targetCategory = category;
+                      onNavigateToCategory: (category, {year, month}) {
+                        setState(() {
+                          _targetCategory = category;
+                          _targetYear = year;
+                          _targetMonth = month;
+                        });
                         _onTabTapped(1);
                       },
                       onOpenSearch: _openSearch,
                     ),
                     CategoryPage(
-                      key: ValueKey('category_${_refreshKey}_$_targetCategory'),
+                      key: ValueKey('category_${_refreshKey}_${_targetCategory}_${_targetYear}_$_targetMonth'),
                       client: _client,
                       initialCategory: _targetCategory,
+                      initialYear: _targetYear,
+                      initialMonth: _targetMonth,
                       isVisible: _currentIndex == 1,
                     ),
                     SettingsPage(

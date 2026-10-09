@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../controllers/category_controller.dart';
+import '../controllers/category_state.dart';
 import '../models/category_constants.dart';
 
 class CategorySeasonRow extends ConsumerWidget {
-  final String? initialCategory;
+  final CategoryInitialArgs initialArgs;
 
-  const CategorySeasonRow({super.key, this.initialCategory});
+  const CategorySeasonRow({
+    super.key,
+    this.initialArgs = const CategoryInitialArgs(),
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -14,12 +18,12 @@ class CategorySeasonRow extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final selectedMonth = ref.watch(
-      categoryControllerProvider(initialCategory).select((s) => s.filter.selectedMonth),
+      categoryControllerProvider(initialArgs).select((s) => s.filter.selectedMonth),
     );
     final selectedYear = ref.watch(
-      categoryControllerProvider(initialCategory).select((s) => s.filter.selectedYear),
+      categoryControllerProvider(initialArgs).select((s) => s.filter.selectedYear),
     );
-    final controller = ref.read(categoryControllerProvider(initialCategory).notifier);
+    final controller = ref.read(categoryControllerProvider(initialArgs).notifier);
 
     return LayoutBuilder(
       builder: (context, constraints) {

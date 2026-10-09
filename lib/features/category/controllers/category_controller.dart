@@ -9,19 +9,19 @@ import '../models/category_constants.dart';
 import 'category_state.dart';
 
 final categoryControllerProvider = NotifierProvider
-    .family<CategoryController, CategoryState, String?>(
+    .family<CategoryController, CategoryState, CategoryInitialArgs?>(
   CategoryController.new,
 );
 
 class CategoryController extends Notifier<CategoryState> {
-  final String? initialCategory;
+  final CategoryInitialArgs? initialArgs;
   int _requestSeq = 0;
   CancelToken? _cancelToken;
   Timer? _debounceTimer;
   bool _isDisposed = false;
   bool _hasStartedInitialFetch = false;
 
-  CategoryController([this.initialCategory]);
+  CategoryController([this.initialArgs]);
 
   @override
   CategoryState build() {
@@ -33,7 +33,7 @@ class CategoryController extends Notifier<CategoryState> {
       _cancelToken?.cancel('notifier_disposed');
     });
 
-    final filter = CategoryFilter.fromInitial(initialCategory);
+    final filter = CategoryFilter.fromInitial(initialArgs);
     // 工业级标准：初始状态只负责渲染极轻量静态骨架屏，绝不自动发起任何网络请求，
     // 杜绝冷启动与页面切换动画期间并发抢占 CPU 与带宽
     return CategoryState(filter: filter, isLoading: true);
@@ -373,11 +373,11 @@ class CategoryController extends Notifier<CategoryState> {
     _triggerFetchWithDebounce(delay: Duration.zero);
   }
 
-  /// 复原到初始默认选项（若有 initialCategory 则恢复该分类，否则复原为当季新番默认选项）
+  /// 复原到初始默认选项（若有初始参数则恢复该分类与年月，否则复原为当季新番默认选项）
   void resetToDefault() {
     if (state.filter.isDefaultState) return;
     state = state.copyWith(
-      filter: CategoryFilter.fromInitial(state.filter.initialCategory),
+      filter: CategoryFilter.fromInitial(initialArgs),
       isTagExpanded: false,
     );
     _triggerFetchWithDebounce(delay: Duration.zero);

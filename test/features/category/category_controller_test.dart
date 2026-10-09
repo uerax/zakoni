@@ -40,6 +40,17 @@ void main() {
       expect(filter.isDefaultState, isTrue);
     });
 
+    test('CategoryFilter.fromInitial with CategoryInitialArgs (TV + year + month)', () {
+      final args = const CategoryInitialArgs(category: 'TV', year: 2026, month: 10);
+      final filter = CategoryFilter.fromInitial(args);
+      expect(filter.selectedType, equals('TV'));
+      expect(filter.selectedGenres, isEmpty);
+      expect(filter.allTags, equals(['TV']));
+      expect(filter.selectedYear, equals(2026));
+      expect(filter.selectedMonth, equals(10));
+      expect(filter.isDefaultState, isTrue);
+    });
+
     test('CategoryFilter combines allTags correctly', () {
       final filter = CategoryFilter(
         selectedType: 'TV',
@@ -129,6 +140,23 @@ void main() {
       // 切换新标签未命中缓存时，保留现有状态平滑过渡，仅标记 isLoading: true
       final state = container.read(categoryControllerProvider(null));
       expect(state.isLoading, isTrue);
+    });
+
+    test('initializes with CategoryInitialArgs correctly', () {
+      final container = ProviderContainer(
+        overrides: [
+          bangumiClientProvider.overrideWithValue(BangumiClient()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      const args = CategoryInitialArgs(category: 'TV', year: 2026, month: 10);
+      final state = container.read(categoryControllerProvider(args));
+
+      expect(state.filter.selectedType, equals('TV'));
+      expect(state.filter.selectedYear, equals(2026));
+      expect(state.filter.selectedMonth, equals(10));
+      expect(state.filter.allTags, equals(['TV']));
     });
   });
 }

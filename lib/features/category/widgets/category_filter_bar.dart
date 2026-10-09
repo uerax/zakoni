@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../common/widgets/instant_dropdown_button.dart';
 import '../controllers/category_controller.dart';
+import '../controllers/category_state.dart';
 import '../models/category_constants.dart';
 
 class CategoryFilterBar extends ConsumerWidget {
-  final String? initialCategory;
+  final CategoryInitialArgs initialArgs;
 
   static final List<int?> _yearList = [
     null,
     for (int y = CategoryConstants.currentYear; y >= 1980; y--) y,
   ];
 
-  const CategoryFilterBar({super.key, this.initialCategory});
+  const CategoryFilterBar({
+    super.key,
+    this.initialArgs = const CategoryInitialArgs(),
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -20,15 +24,15 @@ class CategoryFilterBar extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final selectedYear = ref.watch(
-      categoryControllerProvider(initialCategory).select((s) => s.filter.selectedYear),
+      categoryControllerProvider(initialArgs).select((s) => s.filter.selectedYear),
     );
     final selectedMonth = ref.watch(
-      categoryControllerProvider(initialCategory).select((s) => s.filter.selectedMonth),
+      categoryControllerProvider(initialArgs).select((s) => s.filter.selectedMonth),
     );
     final selectedSort = ref.watch(
-      categoryControllerProvider(initialCategory).select((s) => s.filter.selectedSort),
+      categoryControllerProvider(initialArgs).select((s) => s.filter.selectedSort),
     );
-    final controller = ref.read(categoryControllerProvider(initialCategory).notifier);
+    final controller = ref.read(categoryControllerProvider(initialArgs).notifier);
 
     // 左侧紧凑放置【年份】+【季度】，右侧放置【排序】，中间弹性留白
     return Padding(
