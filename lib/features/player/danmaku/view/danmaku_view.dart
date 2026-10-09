@@ -151,7 +151,7 @@ class _DanmakuViewState extends State<DanmakuView>
   }
 
   void _scheduleWork({bool forceWake = false}) {
-    if (!_controller.playing || !_hasViewport || !mounted) {
+    if (!_controller.playing || !_hasViewport || !mounted || !_controller.settings.enabled) {
       _stopWork();
       return;
     }
@@ -569,11 +569,19 @@ class _DanmakuViewState extends State<DanmakuView>
 
   @override
   void onDanmakuSettingsChanged(DanmakuSettings next, DanmakuSettings previous) {
+    if (!next.enabled) {
+      _clearActive();
+      _stopWork();
+    } else if (!previous.enabled) {
+      _cursor = _lowerBound(_controller.items, _clockMs);
+    }
     if (_hasViewport) {
       _rebuildTracks();
     }
     _repaintNotifier.value++;
-    _scheduleWork(forceWake: true);
+    if (next.enabled) {
+      _scheduleWork(forceWake: true);
+    }
   }
 
   @override
@@ -645,6 +653,8 @@ class _DanmakuPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (!state._controller.settings.enabled) return;
+
     final now = state._clockMs;
     final opacity = state._controller.settings.opacity;
 
