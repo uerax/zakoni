@@ -139,11 +139,6 @@ class _VideoSourceViewState extends State<VideoSourceView> {
 
     final effectiveSources = widget.sources.isEmpty ? getDefaultSourceItems() : widget.sources;
 
-    final currentSource = effectiveSources.firstWhere(
-      (s) => s.id == widget.selectedSourceId,
-      orElse: () => effectiveSources.first,
-    );
-
     final probeStates = widget.aggregator?.states ?? const <String, AggregatedSourceState>{};
     final totalCount = effectiveSources.length;
     final readyCount = probeStates.values.where((s) => s.status == SourceProbeStatus.ready).length;
@@ -171,7 +166,9 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                 Expanded(
                   child: Text(
                     widget.hintMessage!,
-                    style: const TextStyle(
+                    style: TextStyle(
+                      fontFamily: theme.textTheme.bodyMedium?.fontFamily,
+                      fontFamilyFallback: theme.textTheme.bodyMedium?.fontFamilyFallback,
                       fontSize: 12.5,
                       color: Colors.amber,
                       fontWeight: FontWeight.w500,
@@ -183,83 +180,7 @@ class _VideoSourceViewState extends State<VideoSourceView> {
             ),
           ),
 
-        // 2. 当前正在生效的视频源高亮卡片
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: primaryColor.withValues(alpha: isDark ? 0.16 : 0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: primaryColor.withValues(alpha: 0.35),
-              width: 0.5,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: primaryColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.live_tv_rounded, color: primaryColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '当前视频源：${currentSource.name}${widget.currentEpisodeNumber != null ? " · 第 ${widget.currentEpisodeNumber} 话" : ""}',
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.3,
-                        color: primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      currentSource.description,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: theme.textTheme.bodySmall?.color,
-                        letterSpacing: -0.1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle_rounded, color: Colors.green, size: 12),
-                    SizedBox(width: 4),
-                    Text(
-                      '当前生效',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.green,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 18),
-
-        // 3. 标题与状态栏 (展示 X/Y 就绪数)
+        // 2. 标题与状态栏 (展示 X/Y 就绪数)
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -268,6 +189,8 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                 Text(
                   '视频源列表',
                   style: TextStyle(
+                    fontFamily: theme.textTheme.titleMedium?.fontFamily,
+                    fontFamilyFallback: theme.textTheme.titleMedium?.fontFamilyFallback,
                     fontSize: 14.5,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.3,
@@ -278,6 +201,8 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                 Text(
                   '($readyCount/$totalCount 就绪)',
                   style: TextStyle(
+                    fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                    fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
                     fontSize: 11.5,
                     fontWeight: FontWeight.normal,
                     color: theme.textTheme.bodySmall?.color,
@@ -294,6 +219,8 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                   Text(
                     '并发探测中...',
                     style: TextStyle(
+                      fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                      fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
                       fontSize: 11,
                       color: primaryColor,
                       fontWeight: FontWeight.w500,
@@ -357,7 +284,7 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                 ),
               );
               pillButton = _buildPill(
-                label: isSelected ? '当前' : '切换',
+                label: isSelected ? '在播' : '切换',
                 color: isSelected ? primaryColor : Colors.green,
                 isFilled: isSelected,
                 onTap: () {
@@ -366,10 +293,14 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                     setState(() {
                       _expandedSourceId = isExpanded ? null : src.id;
                     });
-                  } else if (state.matchedHit != null) {
-                    widget.onSelectHit != null
-                        ? widget.onSelectHit!(src, state.matchedHit!, state.roads)
-                        : widget.onSourceSelected(src);
+                  } else {
+                    if (state.matchedHit != null) {
+                      widget.onSelectHit != null
+                          ? widget.onSelectHit!(src, state.matchedHit!, state.roads)
+                          : widget.onSourceSelected(src);
+                    } else {
+                      widget.onSourceSelected(src);
+                    }
                   }
                 },
               );
@@ -481,28 +412,12 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                   scaleDown: 0.98,
                   onTap: () {
                     widget.onUserAction?.call();
-                    widget.aggregator?.prioritizeSource(src.id, isUserAction: true);
-                    if (isSelected) {
-                      setState(() {
-                        _expandedSourceId = isExpanded ? null : src.id;
-                      });
-                      return;
-                    }
-
-                    if (state.status == SourceProbeStatus.ready && state.matchedHit != null) {
-                      // 仅绿色状态才切源跳转至选集 Tab
-                      widget.onSelectHit != null
-                          ? widget.onSelectHit!(src, state.matchedHit!, state.roads)
-                          : widget.onSourceSelected(src);
-                    } else if (state.status == SourceProbeStatus.idle) {
-                      // 待探活状态：点击立即发起插队探活，留在当前页面，绝不跳转选集！
+                    if (state.status == SourceProbeStatus.idle) {
                       widget.aggregator?.prioritizeSource(src.id, isUserAction: true);
-                    } else {
-                      // 探活中、需选条目、未收录、异常报错：点击仅展开或收起抽屉，绝不跳转选集！
-                      setState(() {
-                        _expandedSourceId = isExpanded ? null : src.id;
-                      });
                     }
+                    setState(() {
+                      _expandedSourceId = isExpanded ? null : src.id;
+                    });
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -591,6 +506,16 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                         ),
                         const SizedBox(width: 8),
                         pillButton,
+                        const SizedBox(width: 4),
+                        AnimatedRotation(
+                          turns: isExpanded ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 200),
+                          child: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 18,
+                            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+                          ),
+                        ),
                       ],
                     ),
                   ),

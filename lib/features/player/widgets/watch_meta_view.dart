@@ -12,12 +12,14 @@ class WatchMetaView extends StatefulWidget {
     this.bangumiItem,
     this.coverUrl,
     this.episodeCount = 12,
+    this.isLoadingDetails = false,
   });
 
   final String title;
   final BangumiItem? bangumiItem;
   final String? coverUrl;
   final int episodeCount;
+  final bool isLoadingDetails;
 
   @override
   State<WatchMetaView> createState() => _WatchMetaViewState();
@@ -282,6 +284,8 @@ class _WatchMetaViewState extends State<WatchMetaView> {
                 child: Text(
                   t.name,
                   style: TextStyle(
+                    fontFamily: theme.textTheme.bodyMedium?.fontFamily,
+                    fontFamilyFallback: theme.textTheme.bodyMedium?.fontFamilyFallback,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w500,
                     color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
@@ -289,6 +293,23 @@ class _WatchMetaViewState extends State<WatchMetaView> {
                 ),
               );
             }).toList(),
+          ),
+          const SizedBox(height: 18),
+        ] else if (widget.isLoadingDetails) ...[
+          // 骨架屏占位标签
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: List.generate(4, (index) {
+              return Container(
+                width: 48.0 + (index * 16),
+                height: 24,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              );
+            }),
           ),
           const SizedBox(height: 18),
         ],
@@ -348,7 +369,43 @@ class _WatchMetaViewState extends State<WatchMetaView> {
                 ],
               ),
               const SizedBox(height: 8),
-              AnimatedCrossFade(
+              if (widget.isLoadingDetails && (item?.summary.isEmpty ?? true))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 12,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(6),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 12,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(6),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 12,
+                        width: 140,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(6),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                AnimatedCrossFade(
                 firstChild: Text(
                   summary,
                   maxLines: 3,

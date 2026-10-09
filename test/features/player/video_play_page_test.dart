@@ -97,5 +97,70 @@ void main() {
       expect(find.byType(VideoSourceView), findsOneWidget);
       expect(find.byType(EpisodePickerSection), findsNothing);
     });
+
+    testWidgets('5. 多线路选集播放态隔离：线路 1 正在播放第 1 集时，切换查看线路 2 不会把线路 2 的第 1 集标为正在播放', (tester) async {
+      int activeRoad = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                return EpisodePickerSection(
+                  episodeCount: 12,
+                  currentEpisode: 1,
+                  roads: const ['线路 1', '线路 2', '线路 3'],
+                  activeRoadIndex: activeRoad,
+                  playingRoadIndex: 0, // 仅线路 1 处于实际在播态
+                  onRoadSelected: (idx) => setState(() => activeRoad = idx),
+                  onSelectEpisode: (_) {},
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // 验证线路 1 处于在播态（有正在播放音波指示动画图标）
+      expect(find.byType(AnimatedBuilder), findsWidgets);
+
+      // 切换查看线路 2
+      await tester.tap(find.text('线路 2'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // 验证切换到线路 2 后，第 1 集不会被标记为正在播放
+      // 检查当前界面中的第 1 话不是在播高亮
+      final ep1Text = tester.widget<Text>(find.text('第 1 话'));
+      expect(ep1Text.style?.color, isNot(equals(Colors.white)));
+    });
+
+    testWidgets('6. 视频源列表顶部不再渲染冗余的「当前视频源」大卡片', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: VideoSourceView(
+              sources: [
+                VideoSourceItem(
+                  id: 'xifan-next',
+                  name: '稀饭Next',
+                  description: '官方推荐主线',
+                ),
+              ],
+              selectedSourceId: 'xifan-next',
+              onSourceSelected: _dummySelect,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 验证不再有旧版「当前正在生效」或「当前视频源：」大卡片
+      expect(find.textContaining('当前视频源：'), findsNothing);
+      expect(find.textContaining('当前生效'), findsNothing);
+    });
   });
 }
+
+void _dummySelect(VideoSourceItem _) {}

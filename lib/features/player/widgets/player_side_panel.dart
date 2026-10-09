@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:zakoni/features/player/controller/playback_controller.dart';
@@ -30,6 +31,7 @@ class PlayerSidePanel extends StatefulWidget {
     this.currentEpisode,
     this.roads = const ['默认线路'],
     this.activeRoadIndex = 0,
+    this.playingRoadIndex,
     this.episodeTitles = const [],
     required this.onSelectEpisode,
     this.onRoadSelected,
@@ -39,10 +41,12 @@ class PlayerSidePanel extends StatefulWidget {
     required this.sources,
     required this.selectedSourceId,
     required this.onSourceSelected,
+    this.onSelectHit,
     this.aggregator,
     this.danmakuController,
     this.controller,
     this.isLoadingEpisodes = false,
+    this.resolveError,
   });
 
   final bool isOpen;
@@ -55,6 +59,7 @@ class PlayerSidePanel extends StatefulWidget {
   final int? currentEpisode;
   final List<String> roads;
   final int activeRoadIndex;
+  final int? playingRoadIndex;
   final List<String> episodeTitles;
   final List<PlayableSlot>? slots;
   final ValueChanged<int> onSelectEpisode;
@@ -62,11 +67,13 @@ class PlayerSidePanel extends StatefulWidget {
   final ValueChanged<int>? onRoadSelected;
   final VoidCallback? onRefreshEpisodes;
   final bool isLoadingEpisodes;
+  final String? resolveError;
 
   // 视频源相关
   final List<VideoSourceItem> sources;
   final String selectedSourceId;
   final ValueChanged<VideoSourceItem> onSourceSelected;
+  final SourceHitSelectCallback? onSelectHit;
   final SourceAggregator? aggregator;
 
   // 弹幕与播放控制
@@ -347,6 +354,7 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
   // 1. 选集 Tab
   // -------------------------
   Widget _buildEpisodesTab() {
+    final theme = Theme.of(context);
     if (widget.isLoadingEpisodes) {
       return const Center(
         child: Column(
@@ -368,34 +376,78 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
     }
 
     if (widget.episodeCount <= 0) {
+      final isError = widget.resolveError != null && widget.resolveError!.isNotEmpty;
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.video_library_outlined,
-                size: 42, color: Colors.white54),
+            Icon(
+              isError ? Icons.error_outline_rounded : Icons.video_library_outlined,
+              size: 42,
+              color: isError ? Colors.amber : Colors.white54,
+            ),
             const SizedBox(height: 12),
-            const Text(
-              '暂无可用分集',
+            Text(
+              isError ? '分集解析失败' : '暂无可用分集',
               style: TextStyle(
+                fontFamily: theme.textTheme.titleMedium?.fontFamily,
+                fontFamilyFallback: theme.textTheme.titleMedium?.fontFamilyFallback,
                 color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 14),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white.withValues(alpha: 0.18),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+            if (isError) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Text(
+                  widget.resolveError!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                    fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
+                    color: Colors.redAccent.withValues(alpha: 0.85),
+                    fontSize: 12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              icon: const Icon(Icons.swap_horiz_rounded, size: 16),
-              label: const Text('切换其他视频源'),
-              onPressed: () =>
-                  setState(() => _activeTab = PlayerSidePanelTab.sources),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isError && widget.onRefreshEpisodes != null) ...[
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.18),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text('重试'),
+                    onPressed: widget.onRefreshEpisodes,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.18),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+                  label: const Text('切换其他视频源'),
+                  onPressed: () =>
+                      setState(() => _activeTab = PlayerSidePanelTab.sources),
+                ),
+              ],
             ),
           ],
         ),
@@ -414,6 +466,7 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
           currentEpisode: widget.currentEpisode,
           roads: widget.roads,
           activeRoadIndex: widget.activeRoadIndex,
+          playingRoadIndex: widget.playingRoadIndex,
           episodeTitles: widget.episodeTitles,
           slots: widget.slots,
           watchedEpisodes: watched,
@@ -442,7 +495,11 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
         setState(() => _activeTab = PlayerSidePanelTab.episodes);
       },
       onSelectHit: (src, hit, [cachedRoads = const []]) {
-        widget.onSourceSelected(src);
+        if (widget.onSelectHit != null) {
+          widget.onSelectHit!(src, hit, cachedRoads);
+        } else {
+          widget.onSourceSelected(src);
+        }
         setState(() => _activeTab = PlayerSidePanelTab.episodes);
       },
     );
@@ -706,24 +763,10 @@ class _PlayerSidePanelState extends State<PlayerSidePanel> {
               ],
             ),
           ),
-          Switch(
+          CupertinoSwitch(
             value: value,
-            onChanged: onChanged,
             activeTrackColor: primaryColor,
-            thumbColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
-                return Colors.white;
-              }
-              return Colors.white70;
-            }),
-            trackColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
-                return primaryColor;
-              }
-              return Colors.white.withValues(alpha: 0.16);
-            }),
-            trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onChanged: onChanged,
           ),
         ],
       ),

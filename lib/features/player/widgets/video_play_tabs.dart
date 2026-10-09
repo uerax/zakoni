@@ -92,6 +92,7 @@ class VideoPlayTabContentView extends StatelessWidget {
     required this.tabController,
     required this.title,
     required this.bangumiItem,
+    this.isLoadingAuthorityDetails = false,
     required this.coverUrl,
     required this.episodeCount,
     required this.sources,
@@ -103,7 +104,9 @@ class VideoPlayTabContentView extends StatelessWidget {
     required this.keywordOptions,
     required this.onUserAction,
     required this.currentEpisode,
+    this.playingRoadIndex,
     required this.isLoadingChapters,
+    this.resolveError,
     required this.hasEpisodes,
     required this.currentSlots,
     required this.roadNames,
@@ -118,6 +121,7 @@ class VideoPlayTabContentView extends StatelessWidget {
   final TabController tabController;
   final String title;
   final BangumiItem? bangumiItem;
+  final bool isLoadingAuthorityDetails;
   final String coverUrl;
   final int episodeCount;
 
@@ -130,8 +134,10 @@ class VideoPlayTabContentView extends StatelessWidget {
   final List<String> keywordOptions;
   final VoidCallback onUserAction;
   final int? currentEpisode;
+  final int? playingRoadIndex;
 
   final bool isLoadingChapters;
+  final String? resolveError;
   final bool hasEpisodes;
   final List<PlayableSlot> currentSlots;
   final List<String> roadNames;
@@ -150,6 +156,7 @@ class VideoPlayTabContentView extends StatelessWidget {
         WatchMetaView(
           title: title,
           bangumiItem: bangumiItem,
+          isLoadingDetails: isLoadingAuthorityDetails,
           coverUrl: coverUrl,
           episodeCount: episodeCount,
         ),
@@ -192,57 +199,113 @@ class VideoPlayTabContentView extends StatelessWidget {
     }
 
     if (!hasEpisodes) {
+      final isError = resolveError != null && resolveError!.isNotEmpty;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.search_off_rounded, size: 48, color: Colors.grey),
+              Icon(
+                isError ? Icons.error_outline_rounded : Icons.search_off_rounded,
+                size: 48,
+                color: isError ? Colors.amber : Colors.grey,
+              ),
               const SizedBox(height: 12),
               Text(
-                '「$selectedSourceName」暂未检索到该番剧分集',
+                isError
+                    ? '「$selectedSourceName」分集解析失败'
+                    : '「$selectedSourceName」暂未检索到该番剧分集',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
+                  fontFamily: Theme.of(context).textTheme.titleSmall?.fontFamily,
+                  fontFamilyFallback: Theme.of(context).textTheme.titleSmall?.fontFamilyFallback,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.2,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                '建议切换到其他备用视频源查找资源',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+              Text(
+                isError
+                    ? resolveError!
+                    : '建议切换到其他备用视频源查找资源',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: Theme.of(context).textTheme.bodySmall?.fontFamily,
+                  fontFamilyFallback: Theme.of(context).textTheme.bodySmall?.fontFamilyFallback,
+                  fontSize: 12,
+                  color: isError ? Colors.redAccent.withValues(alpha: 0.85) : Colors.grey,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 16),
-              BouncingScaleCard(
-                scaleDown: 0.95,
-                onTap: () {
-                  onUserAction();
-                  tabController.animateTo(1);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.swap_horiz_rounded, size: 17, color: Colors.white),
-                      SizedBox(width: 6),
-                      Text(
-                        '前往「视频源」选择',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isError) ...[
+                    BouncingScaleCard(
+                      scaleDown: 0.95,
+                      onTap: onRefreshEpisodes,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.refresh_rounded, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              '重试',
+                              style: TextStyle(
+                                fontFamily: Theme.of(context).textTheme.labelMedium?.fontFamily,
+                                fontFamilyFallback: Theme.of(context).textTheme.labelMedium?.fontFamilyFallback,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  BouncingScaleCard(
+                    scaleDown: 0.95,
+                    onTap: () {
+                      onUserAction();
+                      tabController.animateTo(1);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.swap_horiz_rounded, size: 17, color: Colors.white),
+                          const SizedBox(width: 6),
+                          Text(
+                            '前往「视频源」选择',
+                            style: TextStyle(
+                              fontFamily: Theme.of(context).textTheme.labelMedium?.fontFamily,
+                              fontFamilyFallback: Theme.of(context).textTheme.labelMedium?.fontFamilyFallback,
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -259,6 +322,7 @@ class VideoPlayTabContentView extends StatelessWidget {
           currentEpisode: currentEpisode,
           roads: roadNames,
           activeRoadIndex: selectedRoadIndex,
+          playingRoadIndex: playingRoadIndex,
           episodeTitles: mappedEpisodeTitles,
           slots: currentSlots,
           watchedEpisodes: watched,

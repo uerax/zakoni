@@ -74,6 +74,7 @@ class EpisodePickerSection extends StatefulWidget {
     this.onRefresh,
     this.roads = const ['官方主线路', '备用线路 2'],
     this.activeRoadIndex = 0,
+    this.playingRoadIndex,
     this.onRoadSelected,
     this.episodeTitles,
     this.watchedEpisodes = const {},
@@ -87,6 +88,7 @@ class EpisodePickerSection extends StatefulWidget {
   final VoidCallback? onRefresh;
   final List<String> roads;
   final int activeRoadIndex;
+  final int? playingRoadIndex;
   final ValueChanged<int>? onRoadSelected;
   final List<String>? episodeTitles;
   final Set<int> watchedEpisodes;
@@ -432,9 +434,12 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
                           slot = slots[itemIdx];
                         }
 
-                        final isPlaying = slot != null
-                            ? (slot.canonicalEp == widget.currentEpisode)
-                            : (ep == widget.currentEpisode);
+                        final isCurrentRoadPlaying = widget.playingRoadIndex == null ||
+                            widget.playingRoadIndex == _activeRoadIndex;
+                        final isPlaying = isCurrentRoadPlaying &&
+                            (slot != null
+                                ? (slot.canonicalEp == widget.currentEpisode)
+                                : (ep == widget.currentEpisode));
                         final isWatched = !isPlaying &&
                             widget.watchedEpisodes.contains(slot?.canonicalEp ?? ep);
                         final cardTitle = slot != null ? slot.cardLabel : _resolveTitle(ep);

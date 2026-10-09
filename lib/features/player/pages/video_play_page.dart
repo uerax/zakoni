@@ -89,6 +89,9 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   PlayerSidePanelTab _sidePanelInitialTab = PlayerSidePanelTab.episodes;
   int? _activeEpisode;
   bool _hasStartedPlayback = false;
+  int? _playingRoadIndex;
+  String? _playingSourceId;
+  bool _isLoadingAuthorityDetails = true;
 
   // 视频源与选集状态
   String _selectedSourceId = 'xifan-next';
@@ -466,22 +469,47 @@ class _VideoPlayPageState extends State<VideoPlayPage>
   /// 异步补全 Bangumi 官方数据 (用于弹幕检索与选集映射)
   Future<void> _fetchBangumiAuthorityData() async {
     final bId = widget.bangumiItem?.id;
-    if (bId == null || bId <= 0) return;
+    if (bId == null || bId <= 0) {
+      if (mounted) setState(() => _isLoadingAuthorityDetails = false);
+      return;
+    }
 
     try {
       final client = BangumiClient();
-      final subject = await client.getSubject(bId);
-      final eps = await client.getEpisodes(bId);
-      final oped = await BangumiOpedService.instance.getOpedData(bId);
+      // 1. 优先并发拉取 subject，获取到简介与标签后即时挂载，毫秒级响应
+      final subjectFuture = client.getSubject(bId);
+      final epsFuture = client.getEpisodes(bId);
+      final opedFuture = BangumiOpedService.instance.getOpedData(bId);
+
+      subjectFuture.then((subject) {
+        if (mounted) {
+          setState(() {
+            _fullBangumiItem = subject;
+            _isLoadingAuthorityDetails = false;
+          });
+        }
+      }).catchError((_) {
+        if (mounted) {
+          setState(() => _isLoadingAuthorityDetails = false);
+        }
+      });
+
+      // 2. 官方分集与 OP/ED 数据后台并行填充
+      final results = await Future.wait([
+        epsFuture.catchError((_) => <BangumiEpisode>[]),
+        opedFuture.catchError((_) => <int, EpisodeOpedSegment>{}),
+      ]);
+
       if (mounted) {
         setState(() {
-          _fullBangumiItem = subject;
-          _officialEpisodes = eps;
-          _opedData = oped;
+          _officialEpisodes = results[0] as List<BangumiEpisode>;
+          _opedData = results[1] as Map<int, EpisodeOpedSegment>;
         });
       }
     } catch (_) {
-      // 失败静默使用传入的 Seed 数据
+      if (mounted) {
+        setState(() => _isLoadingAuthorityDetails = false);
+      }
     }
   }
 
@@ -820,6 +848,8 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       _activeEpisode = slot.canonicalEp;
       _currentPlayingPageUrl = slot.pageUrl;
       _hasStartedPlayback = true;
+      _playingRoadIndex = _selectedRoadIndex;
+      _playingSourceId = _selectedSourceId;
       _resolveError = null;
     });
 
@@ -906,6 +936,8 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       _activeEpisode = ep;
       _currentPlayingPageUrl = targetEp.url;
       _hasStartedPlayback = true;
+      _playingRoadIndex = _selectedRoadIndex;
+      _playingSourceId = _selectedSourceId;
       _resolveError = null;
     });
 
@@ -1162,6 +1194,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
             tabController: _tabController,
             title: widget.title,
             bangumiItem: _effectiveBangumiItem,
+            isLoadingAuthorityDetails: _isLoadingAuthorityDetails,
             coverUrl: _resolvedCoverUrl,
             episodeCount: _displayEpisodeCount,
             sources: _sources,
@@ -1173,13 +1206,21 @@ class _VideoPlayPageState extends State<VideoPlayPage>
             keywordOptions: _keywordOptions,
             onUserAction: _autoPicker.onUserAction,
             currentEpisode: _activeEpisode,
+            playingRoadIndex: _hasStartedPlayback && _selectedSourceId == _playingSourceId ? _playingRoadIndex : null,
             isLoadingChapters: _isLoadingChapters,
+            resolveError: _resolveError,
             hasEpisodes: _currentEpisodes.isNotEmpty,
             currentSlots: _currentSlots,
             roadNames: _roadNames,
             selectedRoadIndex: _selectedRoadIndex,
             mappedEpisodeTitles: _mappedEpisodeTitles,
-            onRoadSelected: (idx) => setState(() => _selectedRoadIndex = idx),
+            onRoadSelected: (idx) {
+              if (_selectedRoadIndex == idx) return;
+              setState(() => _selectedRoadIndex = idx);
+              if (_hasStartedPlayback && _currentEpisodes.isNotEmpty) {
+                _selectEpisode(_activeEpisode ?? 1);
+              }
+            },
             onRefreshEpisodes: () =>
                 _startDefaultSourceSearch(autoPlayFirst: false),
             onSelectEpisode: _selectEpisode,
@@ -1203,18 +1244,27 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         currentEpisode: _activeEpisode,
         roads: _roadNames,
         activeRoadIndex: _selectedRoadIndex,
+        playingRoadIndex: _hasStartedPlayback && _selectedSourceId == _playingSourceId ? _playingRoadIndex : null,
         episodeTitles: _mappedEpisodeTitles,
         slots: _currentSlots,
         isLoadingEpisodes: _isLoadingChapters,
+        resolveError: _resolveError,
         onSelectEpisode: (ep) => _selectEpisode(ep),
         onSelectSlot: (slot) => _selectSlot(slot),
-        onRoadSelected: (idx) => setState(() => _selectedRoadIndex = idx),
+        onRoadSelected: (idx) {
+          if (_selectedRoadIndex == idx) return;
+          setState(() => _selectedRoadIndex = idx);
+          if (_hasStartedPlayback && _currentEpisodes.isNotEmpty) {
+            _selectEpisode(_activeEpisode ?? 1);
+          }
+        },
         onRefreshEpisodes: () =>
             _startDefaultSourceSearch(autoPlayFirst: false),
         sources: _sources,
         selectedSourceId: _selectedSourceId,
         aggregator: _aggregator,
         onSourceSelected: (src) => _handleSourceSelected(src),
+        onSelectHit: (src, hit, [roads]) => _handleSourceSelected(src, hit, roads),
         danmakuController: _danmakuController,
         controller: _playbackController,
       ),
