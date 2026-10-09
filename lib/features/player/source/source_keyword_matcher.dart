@@ -176,7 +176,7 @@ class SourceKeywordMatcher {
     final variants = <String>[];
 
     void push(String s) {
-      final t = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+      final t = s.replaceAll(RegExp(r'[\s　 ]+'), ' ').trim();
       if (t.length < 2) return;
       if (t.length < 4 && _shortPrefixBlacklist.contains(t.toLowerCase())) return;
       if (t.length > 60) return;
@@ -191,7 +191,7 @@ class SourceKeywordMatcher {
 
       // 2. 紧凑季数 (Tier 2/3)
       final compactSeason = title.replaceAllMapped(
-        RegExp(r'\s+(第\s*[一二三四五六七八九十\d]+\s*[季期部])'),
+        RegExp(r'[\s　 ]+(第\s*[一二三四五六七八九十\d]+\s*[季期部])'),
         (m) => m.group(1)!,
       );
       if (compactSeason != title) {

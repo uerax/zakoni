@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import 'package:zakoni/core/network/player_media_disk_cache_manager.dart';
@@ -99,7 +100,8 @@ class NativeSourceRuntime {
     if (kw.isEmpty) return const [];
 
     final cacheKey = '$sourceId:${kw.toLowerCase()}';
-    final diskCacheKey = 'src_search_${sourceId}_${kw.toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')}';
+    final safeKw = base64Url.encode(utf8.encode(kw.toLowerCase()));
+    final diskCacheKey = 'src_search_${sourceId}_$safeKw';
 
     if (!bypassCache) {
       // 1. L1 内存缓存

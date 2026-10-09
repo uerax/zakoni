@@ -117,7 +117,10 @@ class VideoSourceView extends StatefulWidget {
 
 class _VideoSourceViewState extends State<VideoSourceView> {
   String? _expandedSourceId;
+  final Set<String> _showAdvancedSearch = {};
   final Map<String, TextEditingController> _controllers = {};
+
+  static const Color _kOrangeColor = Color(0xFFF97316);
 
   @override
   void dispose() {
@@ -146,22 +149,22 @@ class _VideoSourceViewState extends State<VideoSourceView> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        // 1. 顶部提示条 (默认源未搜到或全灭时的醒目提示)
+        // 1. 顶部提示条 (默认源未搜到或全灭时的醒目提示，使用柔和橙色)
         if (widget.hintMessage != null)
           Container(
             margin: const EdgeInsets.only(bottom: 14),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.12),
+              color: _kOrangeColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: Colors.amber.withValues(alpha: 0.28),
+                color: _kOrangeColor.withValues(alpha: 0.3),
                 width: 0.5,
               ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 18),
+                const Icon(Icons.info_outline_rounded, color: _kOrangeColor, size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -170,7 +173,7 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                       fontFamily: theme.textTheme.bodyMedium?.fontFamily,
                       fontFamilyFallback: theme.textTheme.bodyMedium?.fontFamilyFallback,
                       fontSize: 12.5,
-                      color: Colors.amber,
+                      color: _kOrangeColor,
                       fontWeight: FontWeight.w500,
                       letterSpacing: -0.2,
                     ),
@@ -233,7 +236,7 @@ class _VideoSourceViewState extends State<VideoSourceView> {
         ),
         const SizedBox(height: 10),
 
-        // 4. 视频源卡片列表 (含可展开抽屉 Drawer)
+        // 3. 视频源卡片列表 (含硬件加速丝滑展开抽屉 Drawer)
         ...effectiveSources.map((src) {
           final isSelected = src.id == widget.selectedSourceId;
           final state = probeStates[src.id] ??
@@ -260,6 +263,7 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                 ),
               );
               pillButton = _buildPill(
+                context: context,
                 label: '探活中',
                 color: primaryColor,
                 isLoading: true,
@@ -284,6 +288,7 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                 ),
               );
               pillButton = _buildPill(
+                context: context,
                 label: isSelected ? '在播' : '切换',
                 color: isSelected ? primaryColor : Colors.green,
                 isFilled: isSelected,
@@ -311,13 +316,14 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                 width: 8,
                 height: 8,
                 decoration: const BoxDecoration(
-                  color: Colors.amber,
+                  color: _kOrangeColor,
                   shape: BoxShape.circle,
                 ),
               );
               pillButton = _buildPill(
-                label: '选条目',
-                color: Colors.amber,
+                context: context,
+                label: '选版本',
+                color: _kOrangeColor,
                 onTap: () {
                   widget.onUserAction?.call();
                   setState(() {
@@ -338,6 +344,7 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                 ),
               );
               pillButton = _buildPill(
+                context: context,
                 label: '换词',
                 color: Colors.redAccent,
                 onTap: () {
@@ -359,6 +366,7 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                 ),
               );
               pillButton = _buildPill(
+                context: context,
                 label: '探活',
                 color: theme.textTheme.bodySmall?.color ?? Colors.grey,
                 onTap: () {
@@ -380,8 +388,8 @@ class _VideoSourceViewState extends State<VideoSourceView> {
             statusDescription = matchedTitle.isNotEmpty ? matchedTitle : '已命中番剧条目';
             statusDescriptionColor = isSelected ? primaryColor : Colors.green;
           } else if (state.status == SourceProbeStatus.needsPick) {
-            statusDescription = '搜到 ${state.items.length} 条候选 (点击展开选条目)';
-            statusDescriptionColor = Colors.amber;
+            statusDescription = '搜到 ${state.items.length} 个候选版本 · 点击挑选';
+            statusDescriptionColor = _kOrangeColor;
           } else if (state.status == SourceProbeStatus.empty) {
             statusDescription = '未搜到结果 (点击展开换词)';
           } else if (state.status == SourceProbeStatus.error) {
@@ -440,6 +448,8 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                               child: Text(
                                 (src.name.isNotEmpty ? src.name[0] : '?').toUpperCase(),
                                 style: TextStyle(
+                                  fontFamily: theme.textTheme.titleMedium?.fontFamily,
+                                  fontFamilyFallback: theme.textTheme.titleMedium?.fontFamilyFallback,
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                   color: isSelected ? Colors.white : theme.textTheme.bodySmall?.color,
@@ -464,6 +474,8 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                                   Text(
                                     src.name,
                                     style: TextStyle(
+                                      fontFamily: theme.textTheme.titleMedium?.fontFamily,
+                                      fontFamilyFallback: theme.textTheme.titleMedium?.fontFamilyFallback,
                                       fontSize: 14,
                                       fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                                       letterSpacing: -0.2,
@@ -481,6 +493,8 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                                       child: Text(
                                         '默认',
                                         style: TextStyle(
+                                          fontFamily: theme.textTheme.labelSmall?.fontFamily,
+                                          fontFamilyFallback: theme.textTheme.labelSmall?.fontFamilyFallback,
                                           fontSize: 9.5,
                                           fontWeight: FontWeight.w700,
                                           color: primaryColor,
@@ -496,6 +510,8 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
+                                  fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                                  fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
                                   fontSize: 11.5,
                                   color: statusDescriptionColor,
                                   letterSpacing: -0.1,
@@ -521,256 +537,35 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                   ),
                 ),
 
-                // 抽屉展开区域 (Expandable Drawer)
-                if (isExpanded)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.black.withAlpha(25) : Colors.white.withAlpha(120),
-                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
-                      border: Border(
-                        top: BorderSide(
-                          color: isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(8),
-                          width: 0.5,
-                        ),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // A: 探测中状态条
-                        if (state.status == SourceProbeStatus.probing) ...[
-                          Row(
-                            children: [
-                              const CupertinoActivityIndicator(radius: 6),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '正在使用「${state.keyword ?? "关键词"}」检索 ${src.name}...',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: primaryColor,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-
-                        // B: 候选条目列表 (供用户点选绑定)
-                        if (state.items.isNotEmpty) ...[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                state.status == SourceProbeStatus.needsPick
-                                    ? '请点选匹配的番剧条目以绑定：'
-                                    : '搜到 ${state.items.length} 条候选条目：',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: state.status == SourceProbeStatus.needsPick
-                                      ? Colors.amber
-                                      : theme.textTheme.bodySmall?.color,
-                                ),
-                              ),
-                              if (state.keyword != null)
-                                Text(
-                                  '搜索词: ${state.keyword}',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: theme.disabledColor,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxHeight: 160),
-                            child: ListView.separated(
-                              shrinkWrap: true,
-                              itemCount: state.items.length,
-                              separatorBuilder: (_, _) => const SizedBox(height: 4),
-                              itemBuilder: (context, idx) {
-                                final hit = state.items[idx];
-                                final isHitActive = isSelected && state.matchedHit?.url == hit.url;
-                                return InkWell(
-                                  onTap: () {
-                                    widget.onUserAction?.call();
-                                    widget.onSelectHit != null
-                                        ? widget.onSelectHit!(src, hit, isHitActive ? state.roads : const [])
-                                        : widget.onSourceSelected(src);
-                                  },
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: isHitActive
-                                          ? primaryColor.withValues(alpha: 0.16)
-                                          : (isDark ? Colors.white.withAlpha(8) : Colors.black.withAlpha(4)),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: isHitActive
-                                            ? primaryColor.withValues(alpha: 0.5)
-                                            : Colors.transparent,
-                                        width: 0.5,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            hit.name,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: isHitActive ? FontWeight.w600 : FontWeight.normal,
-                                              color: isHitActive ? primaryColor : theme.colorScheme.onSurface,
-                                            ),
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: isHitActive ? primaryColor : (isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(8)),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            isHitActive ? '在播' : '选用',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
-                                              color: isHitActive ? Colors.white : theme.textTheme.bodySmall?.color,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-
-                        // C: 候选关键词变体胶囊 (最多 8 个)
-                        if (widget.keywordOptions.isNotEmpty) ...[
-                          Text(
-                            '推荐候选关键词：',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: theme.textTheme.bodySmall?.color,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: widget.keywordOptions.take(8).map((kw) {
-                              final isCurrentKw = state.keyword == kw;
-                              return InkWell(
-                                onTap: () {
-                                  widget.onUserAction?.call();
-                                  _getController(src.id).text = kw;
-                                  widget.aggregator?.reProbeSource(src.id, kw);
-                                },
-                                borderRadius: BorderRadius.circular(6),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: isCurrentKw
-                                        ? primaryColor.withValues(alpha: 0.16)
-                                        : (isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5)),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: isCurrentKw ? primaryColor : (isDark ? Colors.white.withAlpha(16) : Colors.black.withAlpha(10)),
-                                      width: 0.5,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        kw,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: isCurrentKw ? primaryColor : theme.colorScheme.onSurface,
-                                          fontWeight: isCurrentKw ? FontWeight.w600 : FontWeight.normal,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Icon(
-                                        Icons.search_rounded,
-                                        size: 11,
-                                        color: isCurrentKw ? primaryColor : theme.disabledColor,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-
-                        // D: 自定义关键词手动输入框
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 32,
-                                child: TextField(
-                                  controller: _getController(src.id),
-                                  style: const TextStyle(fontSize: 12),
-                                  decoration: InputDecoration(
-                                    hintText: '输入针对 ${src.name} 的关键词...',
-                                    hintStyle: TextStyle(fontSize: 11, color: theme.disabledColor),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                                    filled: true,
-                                    fillColor: isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                  ),
-                                  onSubmitted: (val) {
-                                    if (val.trim().isNotEmpty) {
-                                      widget.onUserAction?.call();
-                                      widget.aggregator?.reProbeSource(src.id, val.trim());
-                                    }
-                                  },
-                                ),
+                // 抽屉展开区域 (带硬件加速平滑展开动效，无嵌套 ListView)
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.fastOutSlowIn,
+                  alignment: Alignment.topCenter,
+                  child: isExpanded
+                      ? Container(
+                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.black.withAlpha(25) : Colors.white.withAlpha(120),
+                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+                            border: Border(
+                              top: BorderSide(
+                                color: isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(8),
+                                width: 0.5,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              height: 32,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  final val = _getController(src.id).text.trim();
-                                  if (val.isNotEmpty) {
-                                    widget.onUserAction?.call();
-                                    widget.aggregator?.reProbeSource(src.id, val);
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: primaryColor,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                child: const Text('重搜', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                          ),
+                          child: _buildDrawerContent(
+                            context: context,
+                            src: src,
+                            state: state,
+                            isSelected: isSelected,
+                            isDark: isDark,
+                            primaryColor: primaryColor,
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
               ],
             ),
           );
@@ -779,13 +574,366 @@ class _VideoSourceViewState extends State<VideoSourceView> {
     );
   }
 
+  Widget _buildDrawerContent({
+    required BuildContext context,
+    required VideoSourceItem src,
+    required AggregatedSourceState state,
+    required bool isSelected,
+    required bool isDark,
+    required Color primaryColor,
+  }) {
+    final theme = Theme.of(context);
+    final isShowManual = _showAdvancedSearch.contains(src.id) ||
+        state.status == SourceProbeStatus.empty ||
+        state.status == SourceProbeStatus.error;
+
+    final uniqueKeywords = widget.keywordOptions
+        .map((k) => k.replaceAll(RegExp(r'[\s　 ]+'), ' ').trim())
+        .where((k) => k.isNotEmpty)
+        .toSet()
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. 正在检索中
+        if (state.status == SourceProbeStatus.probing) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                CupertinoActivityIndicator(radius: 6, color: primaryColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '正在检索 ${src.name}...',
+                    style: TextStyle(
+                      fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                      fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
+                      fontSize: 12,
+                      color: primaryColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
+
+        // 2. 候选版本列表 (针对 needsPick 或多条候选)
+        if (state.items.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.video_library_rounded,
+                  size: 13,
+                  color: state.status == SourceProbeStatus.needsPick
+                      ? _kOrangeColor
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  state.status == SourceProbeStatus.needsPick
+                      ? '请挑选匹配的番剧版本：'
+                      : '可用播放版本 (${state.items.length})：',
+                  style: TextStyle(
+                    fontFamily: theme.textTheme.titleSmall?.fontFamily,
+                    fontFamilyFallback: theme.textTheme.titleSmall?.fontFamilyFallback,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: state.status == SourceProbeStatus.needsPick
+                        ? _kOrangeColor
+                        : theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 纯轻量紧凑卡片 (无嵌套 ListView)，展开极速 60fps
+          ...state.items.take(4).map((hit) {
+            final isHitActive = isSelected && state.matchedHit?.url == hit.url;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: isHitActive
+                    ? primaryColor.withValues(alpha: isDark ? 0.2 : 0.1)
+                    : (isDark ? Colors.white.withAlpha(8) : Colors.black.withAlpha(4)),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isHitActive
+                      ? primaryColor.withValues(alpha: 0.5)
+                      : Colors.transparent,
+                  width: 0.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isHitActive ? Icons.play_circle_fill_rounded : Icons.movie_outlined,
+                    size: 15,
+                    color: isHitActive ? primaryColor : theme.textTheme.bodySmall?.color,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      hit.name,
+                      style: TextStyle(
+                        fontFamily: theme.textTheme.bodyMedium?.fontFamily,
+                        fontFamilyFallback: theme.textTheme.bodyMedium?.fontFamilyFallback,
+                        fontSize: 12,
+                        fontWeight: isHitActive ? FontWeight.w700 : FontWeight.w500,
+                        color: isHitActive ? primaryColor : theme.colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  BouncingScaleCard(
+                    scaleDown: 0.94,
+                    onTap: () {
+                      widget.onUserAction?.call();
+                      widget.onSelectHit != null
+                          ? widget.onSelectHit!(src, hit, isHitActive ? state.roads : const [])
+                          : widget.onSourceSelected(src);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isHitActive
+                            ? primaryColor
+                            : (state.status == SourceProbeStatus.needsPick
+                                ? _kOrangeColor
+                                : primaryColor.withValues(alpha: 0.14)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        isHitActive ? '在播' : '选用',
+                        style: TextStyle(
+                          fontFamily: theme.textTheme.labelSmall?.fontFamily,
+                          fontFamilyFallback: theme.textTheme.labelSmall?.fontFamilyFallback,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: isHitActive || state.status == SourceProbeStatus.needsPick
+                              ? Colors.white
+                              : primaryColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 6),
+        ],
+
+        // 3. 针对就绪/点选状态的“换词检索”折叠开关 (默认收敛，不干扰看剧)
+        if (state.status != SourceProbeStatus.empty && state.status != SourceProbeStatus.error) ...[
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                if (_showAdvancedSearch.contains(src.id)) {
+                  _showAdvancedSearch.remove(src.id);
+                } else {
+                  _showAdvancedSearch.add(src.id);
+                }
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _showAdvancedSearch.contains(src.id)
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.tune_rounded,
+                    size: 13,
+                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _showAdvancedSearch.contains(src.id) ? '收起自定义换词' : '未找到想要的版本？换词重搜',
+                    style: TextStyle(
+                      fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                      fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
+                      fontSize: 11,
+                      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isShowManual) const SizedBox(height: 8),
+        ],
+
+        // 4. 手动换词与自定义搜索面板 (在未搜到、报错、或用户手动展开时展示)
+        if (isShowManual) ...[
+          if (uniqueKeywords.isNotEmpty) ...[
+            Text(
+              '推荐片名别名：',
+              style: TextStyle(
+                fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.85),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: uniqueKeywords.take(6).map((kw) {
+                final isCurrentKw = state.keyword == kw;
+                return InkWell(
+                  onTap: () {
+                    widget.onUserAction?.call();
+                    _getController(src.id).text = kw;
+                    widget.aggregator?.reProbeSource(src.id, kw);
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                    decoration: BoxDecoration(
+                      color: isCurrentKw
+                          ? primaryColor.withValues(alpha: 0.16)
+                          : (isDark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5)),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isCurrentKw
+                            ? primaryColor.withValues(alpha: 0.6)
+                            : (isDark ? Colors.white.withAlpha(14) : Colors.black.withAlpha(8)),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          kw,
+                          style: TextStyle(
+                            fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                            fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
+                            fontSize: 11,
+                            color: isCurrentKw ? primaryColor : theme.colorScheme.onSurface,
+                            fontWeight: isCurrentKw ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.search_rounded,
+                          size: 11,
+                          color: isCurrentKw ? primaryColor : theme.disabledColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // 现代 iOS 胶囊搜索框
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(6),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: [
+                      Icon(Icons.search_rounded, size: 15, color: theme.disabledColor),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: TextField(
+                          controller: _getController(src.id),
+                          style: TextStyle(
+                            fontFamily: theme.textTheme.bodyMedium?.fontFamily,
+                            fontFamilyFallback: theme.textTheme.bodyMedium?.fontFamilyFallback,
+                            fontSize: 12,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: '输入在 ${src.name} 检索的片名...',
+                            hintStyle: TextStyle(
+                              fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                              fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
+                              fontSize: 11,
+                              color: theme.disabledColor,
+                            ),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          onSubmitted: (val) {
+                            if (val.trim().isNotEmpty) {
+                              widget.onUserAction?.call();
+                              widget.aggregator?.reProbeSource(src.id, val.trim());
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              BouncingScaleCard(
+                scaleDown: 0.94,
+                onTap: () {
+                  final val = _getController(src.id).text.trim();
+                  if (val.isNotEmpty) {
+                    widget.onUserAction?.call();
+                    widget.aggregator?.reProbeSource(src.id, val);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7.5),
+                  decoration: BoxDecoration(
+                    color: primaryColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '重搜',
+                    style: TextStyle(
+                      fontFamily: theme.textTheme.labelSmall?.fontFamily,
+                      fontFamilyFallback: theme.textTheme.labelSmall?.fontFamilyFallback,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildPill({
+    required BuildContext context,
     required String label,
     required Color color,
     bool isFilled = false,
     bool isLoading = false,
     VoidCallback? onTap,
   }) {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -795,7 +943,7 @@ class _VideoSourceViewState extends State<VideoSourceView> {
           color: isFilled ? color : color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: color.withValues(alpha: isFilled ? 1.0 : 0.3),
+            color: color.withValues(alpha: isFilled ? 1.0 : 0.35),
             width: 0.5,
           ),
         ),
@@ -813,6 +961,8 @@ class _VideoSourceViewState extends State<VideoSourceView> {
             Text(
               label,
               style: TextStyle(
+                fontFamily: theme.textTheme.labelSmall?.fontFamily,
+                fontFamilyFallback: theme.textTheme.labelSmall?.fontFamilyFallback,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: isFilled ? Colors.white : color,
