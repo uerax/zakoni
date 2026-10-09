@@ -415,9 +415,11 @@ class _VideoSourceViewState extends State<VideoSourceView> {
             ),
             child: Column(
               children: [
-                // 卡片主行
-                BouncingScaleCard(
-                  scaleDown: 0.98,
+                // 卡片主行：采用即时响应的 InkWell，消除按压回弹等待锁（~300ms），实现 0ms 极速触发展开
+                InkWell(
+                  borderRadius: isExpanded
+                      ? const BorderRadius.vertical(top: Radius.circular(14))
+                      : BorderRadius.circular(14),
                   onTap: () {
                     widget.onUserAction?.call();
                     if (state.status == SourceProbeStatus.idle) {
@@ -525,7 +527,7 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                         const SizedBox(width: 4),
                         AnimatedRotation(
                           turns: isExpanded ? 0.5 : 0,
-                          duration: const Duration(milliseconds: 200),
+                          duration: const Duration(milliseconds: 140),
                           child: Icon(
                             Icons.keyboard_arrow_down_rounded,
                             size: 18,
@@ -537,10 +539,10 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                   ),
                 ),
 
-                // 抽屉展开区域 (带硬件加速平滑展开动效，无嵌套 ListView)
+                // 抽屉展开区域：采用 140ms + Curves.easeOutCubic，消除 Curves.fastOutSlowIn 尾部拖沓感
                 AnimatedSize(
-                  duration: const Duration(milliseconds: 240),
-                  curve: Curves.fastOutSlowIn,
+                  duration: const Duration(milliseconds: 140),
+                  curve: Curves.easeOutCubic,
                   alignment: Alignment.topCenter,
                   child: isExpanded
                       ? Container(
