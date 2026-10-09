@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/bangumi_client.dart';
 import '../core/providers/bangumi_providers.dart';
+import '../core/services/app_prewarm_coordinator.dart';
 import '../core/utils/appearance_manager.dart';
-import 'category/controllers/category_controller.dart';
-import 'category/controllers/category_state.dart';
 import 'category/pages/category_page.dart';
 import 'common/widgets/app_floating_bottom_bar.dart';
 import 'common/widgets/nav_custom_icons.dart';
 import 'home/pages/home_page.dart';
 import 'search/pages/search_page.dart';
+import 'search/widgets/search_shader_prewarm.dart';
 import 'settings/pages/settings_page.dart';
 
 class MainNavigationShell extends ConsumerStatefulWidget {
@@ -36,10 +36,10 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
     super.initState();
     _client = widget.client ?? ref.read(bangumiClientProvider);
 
-    // App 启动首帧完成后，在后台静默预取分类数据，确保用户初次点击时数据已在内存，零延迟
+    // App 启动首帧完成后，由 AppPrewarmCoordinator 统一在空闲期启动后台静默预热队列（分类、搜索、设置）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        ref.read(categoryControllerProvider(const CategoryInitialArgs()).notifier).ensureLoaded();
+        AppPrewarmCoordinator.instance.startBackgroundPrewarm(ref, _client);
       }
     });
   }
@@ -85,7 +85,19 @@ class _MainNavigationShellState extends ConsumerState<MainNavigationShell> {
               ),
               // 1. 全局或页面专属自定义背景壁纸（支持各页面单独覆盖与视窗裁剪）
               AppearanceManager.instance.buildWallpaperLayer(pageKey: pageKey),
-              // 2. 工业级顶级标准：IndexedStack 架构
+              // 2. 离屏静默预热：在视口外渲染微型占位组件，提前触发 GPU/Impeller 对毛玻璃模糊与径向渐变着色器的编译，消除搜索页面转场首帧卡顿
+              Positioned(
+                left: -100,
+                top: -100,
+                width: 2,
+                height: 2,
+                child: const ExcludeSemantics(
+                  child: IgnorePointer(
+                    child: SearchShaderPrewarm(),
+                  ),
+                ),
+              ),
+              // 3. 工业级顶级标准：IndexedStack 架构
               // - 0 丢帧、0 毫秒秒开响应、0 CPU 与 GPU 物理位移负担；
               // - 页面状态与滚动位置 100% 永久保活；
               // - 底部高亮药丸保持 300ms 物理弹性滑动（Curves.easeOutBack）与果冻微交互，

@@ -3,6 +3,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../../../core/network/anime_image_cache_manager.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/network/player_media_disk_cache_manager.dart';
+import '../../../core/services/app_prewarm_coordinator.dart';
 import '../../player/danmaku/source/bilibili_danmaku_client.dart';
 import '../../player/danmaku/source/dandan_client.dart';
 import '../../player/source/source_bundle_manager.dart';
@@ -25,44 +26,24 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
   @override
   void initState() {
     super.initState();
+    final cached = AppPrewarmCoordinator.instance.getCachedSizeStrings();
+    if (cached != null) {
+      _imageCacheSizeStr = cached.image;
+      _dataCacheSizeStr = cached.data;
+    }
     _updateCacheSizes();
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0.0 MB';
-    if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    }
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-
-  Future<void> _updateCacheSizes() async {
-    int imgBytes = 0;
-    try {
-      imgBytes += await DefaultCacheManager().store.getCacheSize();
-      imgBytes += await AnimeImageCacheManager.instance.store.getCacheSize();
-    } catch (_) {}
-
-    int dataBytes = widget.client.dataCacheSizeBytes;
-    try {
-      dataBytes += await widget.client.getDiskDataCacheSizeBytes();
-    } catch (_) {}
-
-    try {
-      final playerDisk = PlayerMediaDiskCacheManager.instance;
-      if (playerDisk != null) {
-        dataBytes += await playerDisk.getDiskSizeBytes();
-      }
-    } catch (_) {}
-
-    dataBytes += SourceBundleManager.instance.runtime.memoryCacheSizeBytes;
-    dataBytes += DandanClient.instance.memoryCacheSizeBytes;
-    dataBytes += BilibiliDanmakuClient.instance.memoryCacheSizeBytes;
+  Future<void> _updateCacheSizes({bool forceRefresh = false}) async {
+    final result = await AppPrewarmCoordinator.instance.prewarmSettings(
+      widget.client,
+      forceRefresh: forceRefresh,
+    );
 
     if (!mounted) return;
     setState(() {
-      _imageCacheSizeStr = _formatBytes(imgBytes);
-      _dataCacheSizeStr = _formatBytes(dataBytes);
+      _imageCacheSizeStr = AppPrewarmCoordinator.formatBytes(result.imgBytes);
+      _dataCacheSizeStr = AppPrewarmCoordinator.formatBytes(result.dataBytes);
     });
   }
 
@@ -74,7 +55,8 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
       } catch (_) {}
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
-      await _updateCacheSizes();
+      AppPrewarmCoordinator.instance.invalidateCacheSizes();
+      await _updateCacheSizes(forceRefresh: true);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -102,7 +84,8 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
       SourceBundleManager.instance.runtime.clearMemoryCache();
       DandanClient.instance.clearMemoryCache();
       BilibiliDanmakuClient.instance.clearMemoryCache();
-      await _updateCacheSizes();
+      AppPrewarmCoordinator.instance.invalidateCacheSizes();
+      await _updateCacheSizes(forceRefresh: true);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
