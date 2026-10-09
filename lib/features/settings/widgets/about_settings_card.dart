@@ -25,7 +25,7 @@ class AboutSettingsCard extends StatelessWidget {
               title: '版本号',
               showDivider: false,
               trailing: Text(
-                'v${AppConstants.appVersion} (${AppConstants.buildNumber})',
+                'v${AppConstants.appVersion}',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
                   fontWeight: FontWeight.normal,
