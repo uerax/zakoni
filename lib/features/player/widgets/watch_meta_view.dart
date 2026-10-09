@@ -25,7 +25,7 @@ class WatchMetaView extends StatefulWidget {
 
 class _WatchMetaViewState extends State<WatchMetaView> {
   bool _isSummaryExpanded = false;
-  String _collectStatus = '在看';
+  String? _collectStatus;
 
   static const List<String> _collectOptions = ['想看', '在看', '看过', '搁置', '抛弃'];
 
@@ -220,7 +220,9 @@ class _WatchMetaViewState extends State<WatchMetaView> {
                   scaleDown: 0.94,
                   onTap: () {
                     HapticFeedback.selectionClick();
-                    setState(() => _collectStatus = opt);
+                    setState(() {
+                      _collectStatus = _collectStatus == opt ? null : opt;
+                    });
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -244,6 +246,7 @@ class _WatchMetaViewState extends State<WatchMetaView> {
                     child: Text(
                       opt,
                       style: TextStyle(
+                        fontFamily: theme.textTheme.bodyMedium?.fontFamily,
                         fontSize: 12.5,
                         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                         color: isSelected
