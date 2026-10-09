@@ -96,6 +96,7 @@ class SourceAggregator extends ChangeNotifier {
   final List<String> _queue = [];
   final Map<String, CancelToken> _cancelTokens = {};
   final Map<String, Timer> _timeoutTimers = {};
+  final Map<String, int> _probeActionIds = {};
   final Set<String> _probeDone = {};
   final Set<String> _activeAutoJobs = {};
   final Set<String> _autoProbedSources = {};
@@ -148,6 +149,7 @@ class SourceAggregator extends ChangeNotifier {
     _queue.clear();
     _cancelTokens.clear();
     _timeoutTimers.clear();
+    _probeActionIds.clear();
     _probeDone.clear();
     _activeAutoJobs.clear();
     _autoProbedSources.clear();
@@ -293,7 +295,8 @@ class SourceAggregator extends ChangeNotifier {
     final sId = sourceId.trim();
     if (sId.isEmpty) return;
 
-    // 取消当前该源自身的旧请求 (若有)，必须先清除定时器并检查 isCancelled，规避 Dio 重复取消警告
+    // 取消当前该源自身的旧请求 (若有)，必须先清除定时器并递增 actionId 使旧任务失效
+    _probeActionIds[sId] = (_probeActionIds[sId] ?? 0) + 1;
     _timeoutTimers.remove(sId)?.cancel();
     final oldToken = _cancelTokens.remove(sId);
     if (oldToken != null && !oldToken.isCancelled) {
@@ -301,10 +304,12 @@ class SourceAggregator extends ChangeNotifier {
     }
     _probeDone.remove(sId);
 
-    // 核心抢占逻辑：若并发已满且用户发起了手动操作，抢占并取消一个后台自动任务
+    // 核心抢占逻辑：若并发已满且用户发起了手动操作，抢占并废弃一个后台自动任务
     if (isUserAction && _activeJobs >= concurrencyLimit) {
       for (final autoJobId in _activeAutoJobs.toList()) {
         if (autoJobId != sId && _cancelTokens.containsKey(autoJobId)) {
+          // 废弃旧任务代数，防止后续慢网络返回时脏写
+          _probeActionIds[autoJobId] = (_probeActionIds[autoJobId] ?? 0) + 1;
           _timeoutTimers.remove(autoJobId)?.cancel();
           final autoToken = _cancelTokens.remove(autoJobId);
           if (autoToken != null && !autoToken.isCancelled) {
@@ -312,6 +317,8 @@ class SourceAggregator extends ChangeNotifier {
           }
           _activeAutoJobs.remove(autoJobId);
           _probeDone.remove(autoJobId);
+          // 关键：立即扣减 activeJobs 释放并发槽位，让队首的用户任务能够立即启动消费
+          _activeJobs--;
           // 将被挤掉的后台任务推回队尾，后续空闲时恢复
           if (!_queue.contains(autoJobId)) {
             _queue.add(autoJobId);
@@ -403,6 +410,10 @@ class SourceAggregator extends ChangeNotifier {
     final sourceId = source.id as String;
     final meta = source.toMeta() as SourceMeta;
 
+    // 每次单源探测启动均生成唯一 actionId；若超时或被抢占，后续底层异步返回将因 actionId 失效而被安全丢弃
+    final actionId = (_probeActionIds[sourceId] ?? 0) + 1;
+    _probeActionIds[sourceId] = actionId;
+
     // 检查熔断器冷却
     final breakerCheck = PluginCircuitBreaker.instance.checkBeforeRequest(sourceId);
     if (!breakerCheck.allowed) {
@@ -438,81 +449,25 @@ class SourceAggregator extends ChangeNotifier {
           searched: true,
           keyword: kw,
         );
-        _finishJob(sourceId);
         return;
       }
 
-      final runtime = SourceBundleManager.instance.runtime;
-      final rawHits = await runtime.search(sourceId, kw, bypassCache: isCustomKw);
-      _timeoutTimers.remove(sourceId)?.cancel();
-
-      // 请求成功，记录熔断器成功状态
-      PluginCircuitBreaker.instance.recordSuccess(sourceId);
-
-      // 对搜索结果按标题相似度打分排序
-      final ranked = SourceKeywordMatcher.rankSearchHits(rawHits, [
-        ..._titleRefs,
-        kw,
-      ]);
-
-      if (ranked.isEmpty) {
-        _states[sourceId] = AggregatedSourceState(
-          meta: meta,
-          status: SourceProbeStatus.empty,
-          searched: true,
-          keyword: kw,
-        );
-      } else {
-        final top = ranked.first;
-        final score = SourceKeywordMatcher.bestSimilarity(top.name, [
-          ..._titleRefs,
-          kw,
-        ]);
-
-        if (score >= autoPickMinSimilarity) {
-          // 深度验活：调用 chapters 验证分集是否真实可用，杜绝“假绿灯”
-          List<SourceChapterRoad> validatedRoads = const [];
-          try {
-            validatedRoads = await runtime.chapters(sourceId, top.url, bypassCache: isCustomKw);
-          } catch (_) {}
-
-          if (validatedRoads.isNotEmpty &&
-              validatedRoads.any((r) => r.episodes.isNotEmpty)) {
-            // 真实有效分集 -> 进入就绪态 (真正绿灯)，并直接缓存分集线路
-            _states[sourceId] = AggregatedSourceState(
-              meta: meta,
-              status: SourceProbeStatus.ready,
-              items: ranked,
-              matchedHit: top,
-              roads: validatedRoads,
-              searched: true,
-              keyword: kw,
-            );
-          } else {
-            // 搜到了名称但分集为空或解析失败 -> 绝不标绿，标为未收录有效分集
-            _states[sourceId] = AggregatedSourceState(
-              meta: meta,
-              status: SourceProbeStatus.empty,
-              items: ranked,
-              errorMsg: '未收录有效播放分集',
-              searched: true,
-              keyword: kw,
-            );
-          }
-        } else {
-          // 相似度低于 0.55，进入需人工点选态 (黄灯)，绝不盲目误起播
-          _states[sourceId] = AggregatedSourceState(
-            meta: meta,
-            status: SourceProbeStatus.needsPick,
-            items: ranked,
-            searched: true,
-            keyword: kw,
-          );
-        }
-      }
+      // 核心熔断设计：将搜索 + 相似度排序 + 分集深度验活 (chapters) 整体包裹于 5s 严格 Future 超时中，
+      // 彻底解决 Dio CancelToken 难以深层传递导致的底层网络挂死，以及 chapters 阶段脱离超时保护的问题。
+      await _executeProbeFlow(
+        sourceId: sourceId,
+        meta: meta,
+        kw: kw,
+        isCustomKw: isCustomKw,
+        actionId: actionId,
+      ).timeout(const Duration(milliseconds: probeTimeoutMs));
     } catch (e) {
+      // 若该任务已被抢占或页面已销毁，直接返回，不写状态也不重复上报
+      if (_disposed || _probeActionIds[sourceId] != actionId) return;
+
       _timeoutTimers.remove(sourceId)?.cancel();
-      final isTimeout = cancelToken.isCancelled ||
+      final isTimeout = e is TimeoutException ||
+          cancelToken.isCancelled ||
           e.toString().contains('probe_timeout_5s') ||
           e.toString().toLowerCase().contains('timeout');
 
@@ -527,7 +482,93 @@ class SourceAggregator extends ChangeNotifier {
         keyword: kw,
       );
     } finally {
-      _finishJob(sourceId);
+      _timeoutTimers.remove(sourceId)?.cancel();
+      // 仅当当前 actionId 依然生效时才由本次流程负责释放并发槽位 (被抢占的任务在抢占时刻已立即扣减)
+      if (!_disposed && _probeActionIds[sourceId] == actionId) {
+        _finishJob(sourceId);
+      }
+    }
+  }
+
+  /// 封装单源完整探测与深度验活链路
+  Future<void> _executeProbeFlow({
+    required String sourceId,
+    required SourceMeta meta,
+    required String kw,
+    required bool isCustomKw,
+    required int actionId,
+  }) async {
+    final runtime = SourceBundleManager.instance.runtime;
+    final rawHits = await runtime.search(sourceId, kw, bypassCache: isCustomKw);
+
+    if (_disposed || _probeActionIds[sourceId] != actionId) return;
+
+    // 请求成功，记录熔断器成功状态
+    PluginCircuitBreaker.instance.recordSuccess(sourceId);
+
+    // 对搜索结果按标题相似度打分排序
+    final ranked = SourceKeywordMatcher.rankSearchHits(rawHits, [
+      ..._titleRefs,
+      kw,
+    ]);
+
+    if (ranked.isEmpty) {
+      _states[sourceId] = AggregatedSourceState(
+        meta: meta,
+        status: SourceProbeStatus.empty,
+        searched: true,
+        keyword: kw,
+      );
+      return;
+    }
+
+    final top = ranked.first;
+    final score = SourceKeywordMatcher.bestSimilarity(top.name, [
+      ..._titleRefs,
+      kw,
+    ]);
+
+    if (score >= autoPickMinSimilarity) {
+      // 深度验活：调用 chapters 验证分集是否真实可用，杜绝“假绿灯”
+      List<SourceChapterRoad> validatedRoads = const [];
+      try {
+        validatedRoads = await runtime.chapters(sourceId, top.url, bypassCache: isCustomKw);
+      } catch (_) {}
+
+      if (_disposed || _probeActionIds[sourceId] != actionId) return;
+
+      if (validatedRoads.isNotEmpty &&
+          validatedRoads.any((r) => r.episodes.isNotEmpty)) {
+        // 真实有效分集 -> 进入就绪态 (真正绿灯)，并直接缓存分集线路
+        _states[sourceId] = AggregatedSourceState(
+          meta: meta,
+          status: SourceProbeStatus.ready,
+          items: ranked,
+          matchedHit: top,
+          roads: validatedRoads,
+          searched: true,
+          keyword: kw,
+        );
+      } else {
+        // 搜到了名称但分集为空或解析失败 -> 绝不标绿，标为未收录有效分集
+        _states[sourceId] = AggregatedSourceState(
+          meta: meta,
+          status: SourceProbeStatus.empty,
+          items: ranked,
+          errorMsg: '未收录有效播放分集',
+          searched: true,
+          keyword: kw,
+        );
+      }
+    } else {
+      // 相似度低于 0.55，进入需人工点选态 (黄灯)，绝不盲目误起播
+      _states[sourceId] = AggregatedSourceState(
+        meta: meta,
+        status: SourceProbeStatus.needsPick,
+        items: ranked,
+        searched: true,
+        keyword: kw,
+      );
     }
   }
 
@@ -542,6 +583,7 @@ class SourceAggregator extends ChangeNotifier {
   }
 
   void _cancelAll() {
+    _probeActionIds.clear();
     for (final timer in _timeoutTimers.values) {
       timer.cancel();
     }

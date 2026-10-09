@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zakoni/core/models/bangumi/bangumi_episode.dart';
@@ -7,7 +8,9 @@ import 'package:zakoni/features/player/source/models/source_models.dart';
 import 'package:zakoni/features/player/source/services/plugin_circuit_breaker.dart';
 import 'package:zakoni/features/player/source/services/source_binding_service.dart';
 import 'package:zakoni/features/player/source/source_aggregator.dart';
+import 'package:zakoni/features/player/source/source_bundle_manager.dart';
 import 'package:zakoni/features/player/source/source_keyword_matcher.dart';
+import 'package:zakoni/features/player/source/sources/video_source.dart';
 import 'package:zakoni/features/player/source/utils/chinese_s2t_converter.dart';
 import 'package:zakoni/features/player/source/utils/playable_slot_engine.dart';
 
@@ -403,4 +406,53 @@ void main() {
       expect(slots[1].canonicalEp, 2);
     });
   });
+
+  group('8. 探活超时熔断与并发死锁解除测试', () {
+    test('模拟底层网络卡死挂起时，5秒准时触发熔断，状态置为 error 并释放并发槽位', () async {
+      SourceBundleManager.instance.runtime.registerSource(_HangingMockSource());
+      final aggregator = SourceAggregator();
+      aggregator.syncAndProbe(
+        bangumiId: 1001,
+        defaultTitle: '测试番剧',
+        isOpen: true,
+      );
+
+      aggregator.prioritizeSource('hanging-mock');
+      expect(aggregator.activeJobsCount, greaterThan(0));
+      expect(aggregator.states['hanging-mock']?.status, equals(SourceProbeStatus.probing));
+
+      // 等待 5.3 秒超过 5s 探活超时阈值
+      await Future.delayed(const Duration(milliseconds: 5300));
+
+      expect(aggregator.states['hanging-mock']?.status, equals(SourceProbeStatus.error));
+      expect(aggregator.states['hanging-mock']?.errorMsg, contains('超时'));
+
+      aggregator.dispose();
+    }, timeout: const Timeout(Duration(seconds: 12)));
+  });
+}
+
+class _HangingMockSource extends VideoSource {
+  @override
+  String get id => 'hanging-mock';
+  @override
+  String get name => '卡死挂起源';
+  @override
+  String get version => '1.0';
+  @override
+  String get description => '测试超时挂起源';
+
+  @override
+  Future<List<SourceSearchResult>> search(String keyword) async {
+    // 模拟底层网络请求无限挂起，永不返回
+    await Completer<void>().future;
+    return [];
+  }
+
+  @override
+  Future<List<SourceChapterRoad>> chapters(String animeUrl) async => [];
+
+  @override
+  Future<SourceResolveResult> resolve(String episodeUrl) async =>
+      const SourceResolveResult(url: '');
 }

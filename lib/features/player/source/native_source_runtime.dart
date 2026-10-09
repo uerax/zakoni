@@ -22,7 +22,16 @@ import 'package:zakoni/features/player/source/sources/xifan_next_source.dart';
 /// 100% 纯原生 Dart 视频源运行时与统一缓存调度中心
 /// 涵盖 animaku 全部 12 个核心视频源，配备 L1 内存 + L2 硬盘持久化双层缓存体系
 class NativeSourceRuntime {
-  NativeSourceRuntime({Dio? dio}) : _dio = dio ?? Dio() {
+  // 默认 Dio 显式注入 connectTimeout 与 receiveTimeout，防止境外源在 TCP 握手时陷入系统底层 20~60 秒假死
+  NativeSourceRuntime({Dio? dio})
+      : _dio = dio ??
+            Dio(
+              BaseOptions(
+                connectTimeout: const Duration(seconds: 5),
+                receiveTimeout: const Duration(seconds: 8),
+                sendTimeout: const Duration(seconds: 5),
+              ),
+            ) {
     _registerDefaultSources();
   }
 
