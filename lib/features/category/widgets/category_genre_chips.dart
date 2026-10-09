@@ -47,33 +47,31 @@ class CategoryGenreChips extends ConsumerWidget {
 
     return SizedBox(
       height: 28,
-      child: ListView.separated(
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14),
-        itemCount: types.length + 1, // +1 for "全部"
-        separatorBuilder: (_, _) => const SizedBox(width: 6),
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return _buildChip(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildChip(
               label: '全部',
               isSelected: !hasAnyTypeSelected,
               theme: theme,
               isDark: isDark,
               onTap: () => controller.setType(null),
-            );
-          }
-
-          final type = types[index - 1];
-          final isSelected = selectedTags.contains(type);
-
-          return _buildChip(
-            label: type,
-            isSelected: isSelected,
-            theme: theme,
-            isDark: isDark,
-            onTap: () => controller.toggleTag(type),
-          );
-        },
+            ),
+            for (final type in types) ...[
+              const SizedBox(width: 6),
+              _buildChip(
+                label: type,
+                isSelected: selectedTags.contains(type),
+                theme: theme,
+                isDark: isDark,
+                onTap: () => controller.toggleTag(type),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

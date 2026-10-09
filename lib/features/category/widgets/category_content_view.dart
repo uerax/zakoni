@@ -26,9 +26,8 @@ class CategoryContentView extends ConsumerWidget {
     );
     final controller = ref.read(categoryControllerProvider(initialCategory).notifier);
 
-    // 1. 仅在冷启动且当前内存中完全无数据时：呈现单层高性能流光骨架屏
-    // 特殊处理说明：外层显式包裹单根 Shimmer，让内部十余个骨架卡片共享同一个 ShaderMask 离屏通道，
-    // 彻底消除每个卡片独立启动 ShaderMask 导致的严重 GPU 显存过载与主线程掉帧卡顿。
+    // 1. 仅在冷启动且当前内存中完全无数据时：呈现原生 SliverGrid 骨架屏
+    // 特殊处理说明：采用原生 SliverGrid 单趟排版，彻底消除 GridView(shrinkWrap: true) 双重排版测算反模式
     if (isLoading && items.isEmpty) {
       return SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -37,20 +36,16 @@ class CategoryContentView extends ConsumerWidget {
             final width = constraints.crossAxisExtent;
             final count = AppBreakpoints.gridColumns(width);
             final skeletonCount = count * 2;
-            return SliverToBoxAdapter(
-              child: Shimmer(
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: count,
-                    childAspectRatio: 0.58,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: skeletonCount,
-                  itemBuilder: (context, index) => const ShimmerAnimeCard(),
-                ),
+            return SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: count,
+                childAspectRatio: 0.58,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => const ShimmerAnimeCard(),
+                childCount: skeletonCount,
               ),
             );
           },

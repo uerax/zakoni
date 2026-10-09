@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme_color.dart';
 import '../../../core/utils/appearance_manager.dart';
 import 'm3_settings_card.dart';
+import 'tg_form_sheet.dart';
 
 /// 主题颜色设置项与交互面板
 class ThemeColorTile extends StatelessWidget {
@@ -14,9 +15,9 @@ class ThemeColorTile extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: theme.colorScheme.surfaceContainerLow,
+      backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       showDragHandle: true,
       builder: (modalContext) {
@@ -47,9 +48,9 @@ class ThemeColorTile extends StatelessWidget {
                             children: [
                               Text(
                                 '个性化主题色',
-                                style: TextStyle(
+                                style: theme.textTheme.titleMedium?.copyWith(
                                   fontSize: 17,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.normal,
                                   color: isDark ? Colors.white : Colors.black87,
                                 ),
                               ),
@@ -62,9 +63,9 @@ class ThemeColorTile extends StatelessWidget {
                                 ),
                                 child: Text(
                                   activePreset.name,
-                                  style: TextStyle(
+                                  style: theme.textTheme.bodySmall?.copyWith(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.normal,
                                     color: activePreset.color,
                                   ),
                                 ),
@@ -332,13 +333,20 @@ class ThemeColorTile extends StatelessWidget {
     );
   }
 
-  /// 弹出自定义调色盘对话框
+  /// 弹出自定义调色盘面板
   void _showCustomColorDialog(BuildContext context) {
     final currentColor = AppearanceManager.instance.primaryColor;
+    final pickerKey = GlobalKey<_CustomColorPickerBodyState>();
 
-    showDialog(
+    TgFormSheet.show(
       context: context,
-      builder: (dialogCtx) => _CustomColorPickerDialog(initialColor: currentColor),
+      title: '自定义主题色',
+      onConfirm: () => pickerKey.currentState?._applyColor(),
+      bodyBuilder: (sheetCtx) => _CustomColorPickerBody(
+        key: pickerKey,
+        initialColor: currentColor,
+        onColorApplied: () => Navigator.of(sheetCtx).pop(),
+      ),
     );
   }
 
@@ -353,10 +361,9 @@ class ThemeColorTile extends StatelessWidget {
         final currentPreset = appMgr.currentThemePreset;
 
         return M3SettingsTile(
-          leading: M3SettingsIconBox(
+          leading: const M3SettingsIconBox(
             icon: Icons.palette_rounded,
-            bg: currentPreset.color.withValues(alpha: 0.22),
-            iconColor: currentPreset.color,
+            bg: Color(0xFFFF2D55),
           ),
           title: '主题颜色',
           trailing: Row(
@@ -377,13 +384,18 @@ class ThemeColorTile extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 currentPreset.name,
-                style: TextStyle(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: 14,
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+                  fontWeight: FontWeight.normal,
                 ),
               ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                size: 18,
+              ),
             ],
           ),
           onTap: () => _showColorPickerModal(context),
@@ -393,17 +405,22 @@ class ThemeColorTile extends StatelessWidget {
   }
 }
 
-/// 自定义颜色选择器对话框（全角色相滑轨 + 亮度微调 + 16进制输入）
-class _CustomColorPickerDialog extends StatefulWidget {
+/// 自定义颜色选择器面板组件（Telegram Inset 卡片风格）
+class _CustomColorPickerBody extends StatefulWidget {
   final Color initialColor;
+  final VoidCallback onColorApplied;
 
-  const _CustomColorPickerDialog({required this.initialColor});
+  const _CustomColorPickerBody({
+    super.key,
+    required this.initialColor,
+    required this.onColorApplied,
+  });
 
   @override
-  State<_CustomColorPickerDialog> createState() => _CustomColorPickerDialogState();
+  State<_CustomColorPickerBody> createState() => _CustomColorPickerBodyState();
 }
 
-class _CustomColorPickerDialogState extends State<_CustomColorPickerDialog> {
+class _CustomColorPickerBodyState extends State<_CustomColorPickerBody> {
   late double _hue;
   late double _saturation;
   late double _value;
@@ -414,7 +431,6 @@ class _CustomColorPickerDialogState extends State<_CustomColorPickerDialog> {
     super.initState();
     final hsv = HSVColor.fromColor(widget.initialColor);
     _hue = hsv.hue;
-    // 限制初始饱和度和明度在合理且有活力的视觉区间
     _saturation = hsv.saturation < 0.2 ? 0.8 : hsv.saturation;
     _value = hsv.value < 0.3 ? 0.85 : hsv.value;
 
@@ -452,261 +468,192 @@ class _CustomColorPickerDialogState extends State<_CustomColorPickerDialog> {
     }
   }
 
+  void _applyColor() {
+    HapticFeedback.mediumImpact();
+    AppearanceManager.instance.setCustomColor(_currentColor);
+    widget.onColorApplied();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final color = _currentColor;
+    final cardBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: isDark ? const Color(0xFF242426) : Colors.white,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 1. 预览大色块 + Hex 16进制输入 (Telegram Inset Group)
+        const TgInputSectionHeader(title: 'HEX 颜色代码'),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
             children: [
-              // 标题与关闭
-              Row(
-                children: [
-                  const Text(
-                    '自定义主题颜色',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // 预览大色块 + Hex 16进制输入
-              Container(
-                padding: const EdgeInsets.all(12),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withAlpha(12) : Colors.black.withAlpha(6),
-                  borderRadius: BorderRadius.circular(14),
+                  color: color,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                    width: 1,
+                  ),
                 ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
                 child: Row(
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
+                    Text(
+                      '#',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.normal,
                         color: color,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withAlpha(120),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                        border: Border.all(
-                          color: isDark ? Colors.white24 : Colors.black12,
-                          width: 1,
-                        ),
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 6),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'HEX 颜色代码',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
-                            ),
+                      child: TextField(
+                        controller: _hexController,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.normal,
+                          letterSpacing: 1.2,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 2),
+                          border: InputBorder.none,
+                          hintText: 'RRGGBB',
+                          hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                           ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Text(
-                                '#',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: color,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: TextField(
-                                  controller: _hexController,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.0,
-                                  ),
-                                  decoration: const InputDecoration(
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(vertical: 2),
-                                    border: InputBorder.none,
-                                    hintText: 'RRGGBB',
-                                  ),
-                                  onChanged: _onHexSubmitted,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                        ),
+                        onChanged: _onHexSubmitted,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // 色相彩虹滑轨
-              Text(
-                '色相调节',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                height: 28,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFFFF0000),
-                      Color(0xFFFFFF00),
-                      Color(0xFF00FF00),
-                      Color(0xFF00FFFF),
-                      Color(0xFF0000FF),
-                      Color(0xFFFF00FF),
-                      Color(0xFFFF0000),
-                    ],
-                  ),
-                ),
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 28,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 14,
-                      elevation: 2,
-                    ),
-                    overlayShape: SliderComponentShape.noOverlay,
-                    activeTrackColor: Colors.transparent,
-                    inactiveTrackColor: Colors.transparent,
-                    thumbColor: Colors.white,
-                  ),
-                  child: Slider(
-                    value: _hue,
-                    min: 0.0,
-                    max: 360.0,
-                    onChanged: (newHue) {
-                      setState(() {
-                        _hue = newHue;
-                        _hexController.text = _colorToHex(_currentColor);
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 明度/纯度调节
-              Text(
-                '明暗调节',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                height: 28,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.black,
-                      HSVColor.fromAHSV(1.0, _hue, _saturation, 1.0).toColor(),
-                    ],
-                  ),
-                ),
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 28,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 14,
-                      elevation: 2,
-                    ),
-                    overlayShape: SliderComponentShape.noOverlay,
-                    activeTrackColor: Colors.transparent,
-                    inactiveTrackColor: Colors.transparent,
-                    thumbColor: Colors.white,
-                  ),
-                  child: Slider(
-                    value: _value,
-                    min: 0.25,
-                    max: 1.0,
-                    onChanged: (newVal) {
-                      setState(() {
-                        _value = newVal;
-                        _hexController.text = _colorToHex(_currentColor);
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // 底部确认与应用
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('取消'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        HapticFeedback.mediumImpact();
-                        AppearanceManager.instance.setCustomColor(_currentColor);
-                        Navigator.of(context).pop(); // 关闭调色对话框
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: color,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('确认应用', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
-      ),
+        const SizedBox(height: 12),
+
+        // 2. 色相彩虹滑轨
+        const TgInputSectionHeader(title: '色相调节'),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Container(
+            height: 28,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFFFF0000),
+                  Color(0xFFFFFF00),
+                  Color(0xFF00FF00),
+                  Color(0xFF00FFFF),
+                  Color(0xFF0000FF),
+                  Color(0xFFFF00FF),
+                  Color(0xFFFF0000),
+                ],
+              ),
+            ),
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 28,
+                thumbShape: const RoundSliderThumbShape(
+                  enabledThumbRadius: 14,
+                  elevation: 2,
+                ),
+                overlayShape: SliderComponentShape.noOverlay,
+                activeTrackColor: Colors.transparent,
+                inactiveTrackColor: Colors.transparent,
+                thumbColor: Colors.white,
+              ),
+              child: Slider(
+                value: _hue,
+                min: 0.0,
+                max: 360.0,
+                onChanged: (newHue) {
+                  setState(() {
+                    _hue = newHue;
+                    _hexController.text = _colorToHex(_currentColor);
+                  });
+                },
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 3. 明度/纯度调节
+        const TgInputSectionHeader(title: '明暗调节'),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Container(
+            height: 28,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black,
+                  HSVColor.fromAHSV(1.0, _hue, _saturation, 1.0).toColor(),
+                ],
+              ),
+            ),
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 28,
+                thumbShape: const RoundSliderThumbShape(
+                  enabledThumbRadius: 14,
+                  elevation: 2,
+                ),
+                overlayShape: SliderComponentShape.noOverlay,
+                activeTrackColor: Colors.transparent,
+                inactiveTrackColor: Colors.transparent,
+                thumbColor: Colors.white,
+              ),
+              child: Slider(
+                value: _value,
+                min: 0.25,
+                max: 1.0,
+                onChanged: (newVal) {
+                  setState(() {
+                    _value = newVal;
+                    _hexController.text = _colorToHex(_currentColor);
+                  });
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

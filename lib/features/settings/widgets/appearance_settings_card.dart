@@ -15,6 +15,7 @@ class AppearanceSettingsCard extends StatelessWidget {
       children: [
         M3SettingsSectionHeader(title: '个性化外观'),
         M3SettingsCard(
+          footerText: '支持对首页、分类与设置页单独覆盖立绘壁纸与裁剪视野。',
           children: [
             ThemeColorTile(),
             AppIconTile(),

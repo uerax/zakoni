@@ -33,11 +33,13 @@ typedef _HomeData = ({
 class HomePage extends StatefulWidget {
   final BangumiClient client;
   final ValueChanged<String>? onNavigateToCategory;
+  final VoidCallback? onOpenSearch;
 
   const HomePage({
     super.key,
     required this.client,
     this.onNavigateToCategory,
+    this.onOpenSearch,
   });
 
   @override
@@ -122,6 +124,10 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   }
 
   void _navigateToSearch([String? query]) {
+    if (query == null && widget.onOpenSearch != null) {
+      widget.onOpenSearch!();
+      return;
+    }
     Navigator.of(context).push(
       CupertinoPageRoute(
         builder: (context) => SearchPage(initialQuery: query),

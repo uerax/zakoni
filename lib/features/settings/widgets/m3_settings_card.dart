@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/m3_surface.dart';
 
-/// Material 3 Expressive 设置分组标题
+/// Telegram/iOS 风格设置分组标题（轻量克制、不特意加粗）
 class M3SettingsSectionHeader extends StatelessWidget {
   final String title;
 
@@ -12,30 +12,36 @@ class M3SettingsSectionHeader extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 20, 10, 8),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
       child: Text(
         title,
-        style: theme.textTheme.titleSmall?.copyWith(
-          color: theme.colorScheme.primary,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.1,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+          fontWeight: FontWeight.normal,
+          fontSize: 13,
+          letterSpacing: -0.1,
         ),
       ),
     );
   }
 }
 
-/// Material 3 Expressive 设置分组卡片容器（24dp 大圆角，色调表面）
+/// Telegram/iOS Inset Grouped 风格设置分组卡片（16dp 紧凑圆角、支持底部注脚）
 class M3SettingsCard extends StatelessWidget {
   final List<Widget> children;
+  final String? footerText;
+  final Widget? footer;
 
   const M3SettingsCard({
     super.key,
     required this.children,
+    this.footerText,
+    this.footer,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final containerColor = M3Surface.container(
       context,
       level: M3ContainerLevel.low,
@@ -46,22 +52,42 @@ class M3SettingsCard extends StatelessWidget {
       pageKey: 'settings',
     );
 
-    return Container(
-      decoration: BoxDecoration(
-        color: containerColor,
-        borderRadius: BorderRadius.circular(24),
-        border: border,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: children,
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: containerColor,
+            borderRadius: BorderRadius.circular(16),
+            border: border,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: children,
+          ),
+        ),
+        if (footerText != null || footer != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+            child: footer ??
+                Text(
+                  footerText!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.65),
+                    fontSize: 12.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+          ),
+      ],
     );
   }
 }
 
-/// Material 3 Expressive 风格图标背景容器（36dp 圆形/药丸高对比色托）
+/// Telegram/iOS 风格 30dp 彩色平滑圆角图标方块
 class M3SettingsIconBox extends StatelessWidget {
   final IconData icon;
   final Color? bg;
@@ -73,33 +99,33 @@ class M3SettingsIconBox extends StatelessWidget {
     required this.icon,
     this.bg,
     this.iconColor,
-    this.size = 36,
+    this.size = 30,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final effectiveBg = bg ?? theme.colorScheme.primaryContainer;
-    final effectiveIconColor = iconColor ?? theme.colorScheme.onPrimaryContainer;
+    final effectiveBg = bg ?? theme.colorScheme.primary;
+    final effectiveIconColor = iconColor ?? Colors.white;
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         color: effectiveBg,
-        borderRadius: BorderRadius.circular(size * 0.34),
+        borderRadius: BorderRadius.circular(size * 0.24),
       ),
       alignment: Alignment.center,
       child: Icon(
         icon,
         color: effectiveIconColor,
-        size: size * 0.56,
+        size: size * 0.58,
       ),
     );
   }
 }
 
-/// Material 3 Expressive 列表设置项
+/// Telegram/iOS 风格列表设置项（常规非粗体排版、内缩避开图标的精准分割线）
 class M3SettingsTile extends StatelessWidget {
   final Widget? leading;
   final String title;
@@ -121,24 +147,25 @@ class M3SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        splashColor: theme.colorScheme.primary.withValues(alpha: 0.12),
-        highlightColor: theme.colorScheme.primary.withValues(alpha: 0.06),
+        splashColor: theme.colorScheme.primary.withValues(alpha: 0.10),
+        highlightColor: theme.colorScheme.primary.withValues(alpha: 0.05),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
               child: Row(
                 children: [
                   if (leading != null) ...[
                     SizedBox(
-                      width: 36,
-                      height: 36,
+                      width: 30,
+                      height: 30,
                       child: Center(child: leading!),
                     ),
                     const SizedBox(width: 14),
@@ -151,8 +178,9 @@ class M3SettingsTile extends StatelessWidget {
                         Text(
                           title,
                           style: theme.textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
+                            fontWeight: FontWeight.normal,
+                            fontSize: 15.5,
+                            letterSpacing: -0.1,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -162,8 +190,9 @@ class M3SettingsTile extends StatelessWidget {
                           Text(
                             subtitle!,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                               fontSize: 12.5,
+                              fontWeight: FontWeight.normal,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -181,11 +210,15 @@ class M3SettingsTile extends StatelessWidget {
             ),
             if (showDivider)
               Padding(
-                padding: EdgeInsets.only(left: leading != null ? 66 : 16, right: 16),
+                // 特殊处理说明：内缩 60dp（16dp 外边距 + 30dp 图标 + 14dp 间距），
+                // 确保分割线避开左侧彩色图标，从文本起点起笔，严格对齐 Telegram/iOS 规范。
+                padding: EdgeInsets.only(left: leading != null ? 60 : 16),
                 child: Divider(
-                  height: 1,
-                  thickness: 0.8,
-                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.22),
+                  height: 0.5,
+                  thickness: 0.5,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.10)
+                      : Colors.black.withValues(alpha: 0.08),
                 ),
               ),
           ],

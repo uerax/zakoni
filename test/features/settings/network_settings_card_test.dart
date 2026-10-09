@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -77,12 +76,12 @@ void main() {
     await tester.pumpAndSettle();
 
     // 手动输入反代 URL 和名称
-    await tester.enterText(find.widgetWithText(CupertinoTextField, '线路名称（选填）'), '自建代理');
-    await tester.enterText(find.widgetWithText(CupertinoTextField, '反代 URL 或仓库链接'), 'https://my-proxy.anime');
+    await tester.enterText(find.widgetWithText(TextField, '线路名称（选填）'), '自建代理');
+    await tester.enterText(find.widgetWithText(TextField, '反代 URL 或仓库链接'), 'https://my-proxy.anime');
     await tester.pumpAndSettle();
 
-    // 点击确认添加
-    await tester.tap(find.text('确认添加'));
+    // 点击确认添加（顶栏 ✓ 圆纽）
+    await tester.tap(find.byKey(const ValueKey('tg_form_confirm_btn')));
     await tester.pump();
     expect(find.text('已添加线路【自建代理】'), findsOneWidget);
     await tester.pumpAndSettle();
@@ -118,8 +117,8 @@ void main() {
     expect(find.text(AppConstants.defaultRoutesRepoUrl), findsOneWidget);
     expect(find.text('内置仓库线路'), findsOneWidget);
 
-    // 点击确认添加（走 JSON 仓库分支，未联网时安全回退占位）
-    await tester.tap(find.text('确认添加'));
+    // 点击确认添加（顶栏 ✓ 圆纽，走 JSON 仓库分支，未联网时安全回退占位）
+    await tester.tap(find.byKey(const ValueKey('tg_form_confirm_btn')));
     await tester.pumpAndSettle();
     expect(find.text('已成功从仓库导入 1 条线路'), findsOneWidget);
 

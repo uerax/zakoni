@@ -11,20 +11,47 @@ import '../widgets/search_result_view.dart';
 /// 搜索页面（遵循 Animaku 规范增强移植：集成 0ms 内存缓存、物理熔断、持久化历史记录、多维筛选排序与壁纸穿透）
 class SearchPage extends ConsumerStatefulWidget {
   final String? initialQuery;
+  final VoidCallback? onClose;
+  final bool autoFocus;
 
   const SearchPage({
     super.key,
     this.initialQuery,
+    this.onClose,
+    this.autoFocus = true,
   });
 
   @override
-  ConsumerState<SearchPage> createState() => _SearchPageState();
+  ConsumerState<SearchPage> createState() => SearchPageState();
 }
 
-class _SearchPageState extends ConsumerState<SearchPage> {
+class SearchPageState extends ConsumerState<SearchPage> {
   late final TextEditingController _textController;
   late final FocusNode _focusNode;
   late final ScrollController _scrollController;
+
+  void focusInput() {
+    if (!_focusNode.hasFocus) {
+      _focusNode.requestFocus();
+    }
+  }
+
+  void unfocusInput() {
+    if (_focusNode.hasFocus) {
+      _focusNode.unfocus();
+    }
+  }
+
+  void search(String query) {
+    _textController.text = query;
+    _handleSearch(query);
+  }
+
+  void reset() {
+    _textController.clear();
+    ref.read(searchControllerProvider.notifier).clear();
+    unfocusInput();
+  }
 
   @override
   void initState() {
@@ -37,8 +64,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       if (!mounted) return;
       if (widget.initialQuery != null && widget.initialQuery!.trim().isNotEmpty) {
         ref.read(searchControllerProvider.notifier).executeSearch(widget.initialQuery!);
-      } else {
-        // 无初始搜索词时自动聚焦唤起键盘，提升操作效率
+      } else if (widget.autoFocus) {
         _focusNode.requestFocus();
       }
     });
@@ -124,7 +150,14 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                     focusNode: _focusNode,
                     onSearch: () => _handleSearch(_textController.text),
                     onClear: _handleClear,
-                    onBack: () => Navigator.of(context).pop(),
+                    onBack: () {
+                      _focusNode.unfocus();
+                      if (widget.onClose != null) {
+                        widget.onClose!();
+                      } else {
+                        Navigator.of(context).pop();
+                      }
+                    },
                   ),
 
                   // 内容主体：有搜索词时呈现结果流；无搜索词时展示历史记录与空状态

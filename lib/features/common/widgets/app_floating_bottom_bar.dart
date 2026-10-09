@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../core/theme/m3_surface.dart';
 
 typedef NavItemWidgetBuilder = Widget Function(
   BuildContext context,
@@ -40,22 +39,22 @@ class AppFloatingNavItem {
   }
 }
 
-/// Material 3 Expressive 悬浮药丸导航底栏（M3 Expressive Floating Dock）：
-/// 1. 外层悬浮弥散微光，支持背景壁纸时 Material You 色相通透折射；
-/// 2. 58px 黄金悬浮高度，29px 饱满全药丸轮廓 (StadiumBorder)；
-/// 3. 采用 Material 3 标志性的横向活动药丸指示器（Active Pill Indicator），
-///    以 theme.colorScheme.secondaryContainer 配合平滑物理过冲定格；
-/// 4. 激活项采用 onSecondaryContainer 高对比度强调色，未激活项使用 onSurfaceVariant。
+/// Material 3 Expressive & Telegram 动态悬浮底栏（对齐 [Image #6] 实机规范）：
+/// 1. 左侧主胶囊：纯白高透晶莹玻璃（浅色）/ 深曜石微透（深色），配 0.8dp 物理发丝高光边框与双层景深投影；
+/// 2. 右侧独立浮动搜索圆钮：同材质高斯模糊微透玻璃，直通搜索，解决单手大屏拇指黄金热区触达；
+/// 3. 原生动效：完全恢复最新提交官方 AnimatedAlign(300ms Curves.easeOutBack) 与果冻弹簧微交互。
 class AppFloatingBottomBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
   final List<AppFloatingNavItem> items;
+  final VoidCallback? onSearchTap;
 
   const AppFloatingBottomBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
     required this.items,
+    this.onSearchTap,
   });
 
   @override
@@ -65,8 +64,34 @@ class AppFloatingBottomBar extends StatelessWidget {
     final primaryColor = theme.colorScheme.primary;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
 
-    final dockBg = M3Surface.container(context, level: M3ContainerLevel.highest);
-    final dockBorder = M3Surface.border(context);
+    final dockBg = isDark
+        ? const Color(0xFF1E1E22).withValues(alpha: 0.80)
+        : Colors.white.withValues(alpha: 0.82);
+
+    final dockBorder = Border.all(
+      color: isDark
+          ? Colors.white.withValues(alpha: 0.16)
+          : theme.colorScheme.outlineVariant.withValues(alpha: 0.40),
+      width: 0.8,
+    );
+
+    final compoundShadow = [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.06),
+        blurRadius: 8,
+        offset: const Offset(0, 2),
+      ),
+      BoxShadow(
+        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+        blurRadius: 20,
+        offset: const Offset(0, 6),
+        spreadRadius: -1,
+      ),
+    ];
+
+    const double barHeight = 54.0;
+    const double dockRadius = 27.0;
+    const double dockWidth = 220.0;
 
     return SafeArea(
       top: false,
@@ -75,109 +100,139 @@ class AppFloatingBottomBar extends StatelessWidget {
       bottom: false,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          20,
+          16,
           0,
-          20,
+          16,
           safeBottom < 10 ? 12 : safeBottom + 2,
         ),
         child: Center(
           heightFactor: 1,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 290,
-              minHeight: 58,
-              maxHeight: 58,
-            ),
-            // 外层：提供悬浮弥散阴影
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(29),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              // 内层：高斯模糊毛玻璃裁剪与 M3 表现力底色
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(29),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: dockBg,
-                      borderRadius: BorderRadius.circular(29),
-                      border: dockBorder,
-                    ),
-                    child: Stack(
-                      children: [
-                        // 活动药丸滑块：采用纯正 primary 衍生的高透表现力药丸与微外发光，
-                        // 100% 呼应用户选中的主题色彩，让 300ms Curves.easeOutBack 物理回弹滑动极其鲜明丝滑
-                        AnimatedAlign(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutBack,
-                          alignment: items.length > 1
-                              ? AlignmentDirectional(
-                                  -1 + 2 * currentIndex / (items.length - 1),
-                                  0,
-                                )
-                              : Alignment.center,
-                          child: FractionallySizedBox(
-                            widthFactor: 1 / items.length,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: Container(
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(19),
-                                  color: isDark
-                                      ? primaryColor.withValues(alpha: 0.22)
-                                      : primaryColor.withValues(alpha: 0.14),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: primaryColor.withValues(alpha: isDark ? 0.30 : 0.16),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 1. 主导航胶囊（包含首页、分类、设置三大核心功能）
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(dockRadius),
+                  boxShadow: compoundShadow,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(dockRadius),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                    child: Container(
+                      width: dockWidth,
+                      height: barHeight,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: dockBg,
+                        borderRadius: BorderRadius.circular(dockRadius),
+                        border: dockBorder,
+                      ),
+                      child: Stack(
+                        children: [
+                          // 恢复原版 AnimatedAlign (300ms Curves.easeOutBack) 弹性滑块动效
+                          AnimatedAlign(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOutBack,
+                            alignment: items.length > 1
+                                ? AlignmentDirectional(
+                                    -1 + 2 * currentIndex / (items.length - 1),
+                                    0,
+                                  )
+                                : Alignment.center,
+                            child: FractionallySizedBox(
+                              widthFactor: 1 / items.length,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: Container(
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(19),
+                                    color: isDark
+                                        ? primaryColor.withValues(alpha: 0.22)
+                                        : primaryColor.withValues(alpha: 0.14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: primaryColor.withValues(alpha: isDark ? 0.30 : 0.16),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
 
-                        // 各导航项图标（选中态 100% 呈现用户自定义的纯正 primary 主题色）
-                        Row(
-                          children: List.generate(items.length, (i) {
-                            final isSelected = currentIndex == i;
-                            final item = items[i];
-                            final itemColor = isSelected
-                                ? primaryColor
-                                : theme.colorScheme.onSurfaceVariant;
+                          // 各导航项图标（选中态 100% 呈现用户自定义的纯正 primary 主题色）
+                          Row(
+                            children: List.generate(items.length, (i) {
+                              final isSelected = currentIndex == i;
+                              final item = items[i];
+                              final itemColor = isSelected
+                                  ? primaryColor
+                                  : theme.colorScheme.onSurfaceVariant;
 
-                            return Expanded(
-                              child: _BouncingNavItem(
-                                isSelected: isSelected,
-                                item: item,
-                                color: itemColor,
-                                onTap: () {
-                                  if (currentIndex == i) return;
-                                  HapticFeedback.lightImpact();
-                                  onTap(i);
-                                },
-                              ),
-                            );
-                          }),
-                        ),
-                      ],
+                              return Expanded(
+                                child: _BouncingNavItem(
+                                  isSelected: isSelected,
+                                  item: item,
+                                  color: itemColor,
+                                  onTap: () {
+                                    if (currentIndex == i) return;
+                                    HapticFeedback.lightImpact();
+                                    onTap(i);
+                                  },
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+
+              // 2. 右侧独立悬浮搜索圆钮（对齐 [Image #6] Telegram 专属圆钮）
+              if (onSearchTap != null) ...[
+                const SizedBox(width: 10),
+                Container(
+                  width: barHeight,
+                  height: barHeight,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: compoundShadow,
+                  ),
+                  child: ClipOval(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                      child: Material(
+                        color: dockBg,
+                        shape: CircleBorder(side: dockBorder.top),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: onSearchTap,
+                          splashColor: primaryColor.withValues(alpha: 0.15),
+                          highlightColor: primaryColor.withValues(alpha: 0.08),
+                          child: Center(
+                            child: Icon(
+                              Icons.search_rounded,
+                              size: 23,
+                              color: isDark
+                                  ? Colors.white
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),

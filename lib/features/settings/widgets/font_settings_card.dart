@@ -4,6 +4,7 @@ import '../../../core/theme/m3_surface.dart';
 import '../../../core/utils/font_manager.dart';
 import '../../common/widgets/ios_swipe_action_tile.dart';
 import 'm3_settings_card.dart';
+import 'tg_action_sheet.dart';
 
 class FontSettingsCard extends StatefulWidget {
   const FontSettingsCard({super.key});
@@ -55,45 +56,23 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
     }
   }
 
-  void _confirmDeleteCustomFont(FontManager fontMgr) {
-    final theme = Theme.of(context);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.delete_outline_rounded,
-          color: theme.colorScheme.error,
-          size: 28,
-        ),
-        title: const Text('移除自定义字体'),
-        content: Text('确定要移除【${fontMgr.customFontName}】吗？字体将恢复为默认 MiSans。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: theme.colorScheme.error,
-              foregroundColor: theme.colorScheme.onError,
-            ),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              fontMgr.clearCustomFont();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('已移除自定义字体'),
-                  duration: Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            child: const Text('确认移除'),
-          ),
-        ],
-      ),
+  Future<void> _confirmDeleteCustomFont(FontManager fontMgr) async {
+    final confirmed = await TgActionSheet.showDestructive(
+      context,
+      title: '确定要移除【${fontMgr.customFontName}】吗？字体将恢复为默认 MiSans。',
+      destructiveLabel: '移除自定义字体',
     );
+    if (confirmed) {
+      fontMgr.clearCustomFont();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已移除自定义字体'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
@@ -107,12 +86,12 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
       children: [
         const M3SettingsSectionHeader(title: '字体设置'),
         M3SettingsCard(
+          footerText: '字体设置全端实时生效，Windows 平台已全量锁定防中易宋体降级保护。',
           children: [
             M3SettingsTile(
-              leading: M3SettingsIconBox(
+              leading: const M3SettingsIconBox(
                 icon: Icons.font_download_rounded,
-                bg: theme.colorScheme.primaryContainer,
-                iconColor: theme.colorScheme.onPrimaryContainer,
+                bg: Color(0xFFAF52DE),
               ),
               title: 'MiSans',
               trailing: fontMgr.currentType == AppFontType.misans
@@ -121,10 +100,9 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
               onTap: () => fontMgr.setFontType(AppFontType.misans),
             ),
             M3SettingsTile(
-              leading: M3SettingsIconBox(
+              leading: const M3SettingsIconBox(
                 icon: Icons.text_fields_rounded,
-                bg: theme.colorScheme.secondaryContainer,
-                iconColor: theme.colorScheme.onSecondaryContainer,
+                bg: Color(0xFF5856D6),
               ),
               title: '系统默认',
               trailing: fontMgr.currentType == AppFontType.system
@@ -136,10 +114,9 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
               IosSwipeActionTile(
                 onDelete: () => _confirmDeleteCustomFont(fontMgr),
                 child: M3SettingsTile(
-                  leading: M3SettingsIconBox(
+                  leading: const M3SettingsIconBox(
                     icon: Icons.dashboard_customize_rounded,
-                    bg: theme.colorScheme.tertiaryContainer,
-                    iconColor: theme.colorScheme.onTertiaryContainer,
+                    bg: Color(0xFFBF5AF2),
                   ),
                   title: fontMgr.customFontName,
                   trailing: fontMgr.currentType == AppFontType.custom
@@ -149,18 +126,17 @@ class _FontSettingsCardState extends State<FontSettingsCard> {
                 ),
               ),
             M3SettingsTile(
-              leading: M3SettingsIconBox(
+              leading: const M3SettingsIconBox(
                 icon: Icons.file_upload_outlined,
-                bg: theme.colorScheme.surfaceContainerHighest,
-                iconColor: theme.colorScheme.onSurfaceVariant,
+                bg: Color(0xFF8E8E93),
               ),
               title: fontMgr.customFontPath != null ? '更换字体文件' : '导入字体文件',
               subtitle: '支持 .ttf / .otf 格式',
               showDivider: false,
               trailing: Icon(
                 Icons.chevron_right_rounded,
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                size: 20,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                size: 18,
               ),
               onTap: _pickAndLoadCustomFont,
             ),

@@ -110,11 +110,13 @@ class CategoryController extends Notifier<CategoryState> {
     }
 
     // 2. 关键体验优化（平滑过渡）：未命中缓存时坚决保留现有 items，绝不物理清空，
-    // 仅标记 isLoading 配合视图层微弱透明度过渡；仅在首屏冷加载完全无数据时才呈现骨架屏。
-    state = state.copyWith(
-      isLoading: true,
-      errorMessage: null,
-    );
+    // 仅在非加载状态时标记 isLoading，避免初始状态下重复广播变更导致全页多余重构
+    if (!state.isLoading) {
+      state = state.copyWith(
+        isLoading: true,
+        errorMessage: null,
+      );
+    }
 
     try {
       final result = await client.searchWithTotal(

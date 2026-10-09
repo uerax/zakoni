@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/utils/appearance_manager.dart';
 import '../../common/widgets/wallpaper_crop_dialog.dart';
 import 'm3_settings_card.dart';
+import 'tg_action_sheet.dart';
 
 class WallpaperSettingsTile extends StatefulWidget {
   const WallpaperSettingsTile({super.key});
@@ -96,8 +97,7 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
     }
   }
 
-  void _confirmClearWallpaper() {
-    final theme = Theme.of(context);
+  Future<void> _confirmClearWallpaper() async {
     final scopeName = switch (_wallpaperScope) {
       'all' => '全局壁纸',
       'home' => '首页专属壁纸',
@@ -105,35 +105,14 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
       _ => '背景壁纸',
     };
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.delete_outline_rounded,
-          color: theme.colorScheme.error,
-          size: 28,
-        ),
-        title: const Text('清除背景壁纸'),
-        content: Text('确定要清除【$scopeName】吗？'),
-        actions: [
-          TextButton(
-            child: const Text('取消'),
-            onPressed: () => Navigator.of(ctx).pop(),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: theme.colorScheme.error,
-              foregroundColor: theme.colorScheme.onError,
-            ),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _performClearWallpaper(scopeName);
-            },
-            child: const Text('确认清除'),
-          ),
-        ],
-      ),
+    final confirmed = await TgActionSheet.showDestructive(
+      context,
+      title: '确定要清除【$scopeName】吗？',
+      destructiveLabel: '清除壁纸',
     );
+    if (confirmed) {
+      _performClearWallpaper(scopeName);
+    }
   }
 
   void _performClearWallpaper(String scopeName) {
@@ -196,9 +175,9 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
                   child: Center(
                     child: Text(
                       item.$2,
-                      style: TextStyle(
+                      style: theme.textTheme.bodySmall?.copyWith(
                         fontSize: 11.5,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                         color: isSelected
                             ? Colors.white
                             : (isDark ? Colors.white70 : Colors.black87),
@@ -256,10 +235,10 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
             M3SettingsTile(
               leading: hasWallpaperImg
                   ? Container(
-                      width: 36,
-                      height: 36,
+                      width: 30,
+                      height: 30,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(7.2),
                         border: Border.all(
                           color: theme.colorScheme.primary.withValues(alpha: 0.5),
                           width: 1.0,
@@ -270,17 +249,15 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
                         activeWallpaperFile,
                         fit: BoxFit.cover,
                         cacheWidth: 64,
-                        errorBuilder: (context, error, stackTrace) => M3SettingsIconBox(
+                        errorBuilder: (context, error, stackTrace) => const M3SettingsIconBox(
                           icon: Icons.wallpaper_rounded,
-                          bg: theme.colorScheme.tertiaryContainer,
-                          iconColor: theme.colorScheme.onTertiaryContainer,
+                          bg: Color(0xFF30B0C7),
                         ),
                       ),
                     )
-                  : M3SettingsIconBox(
+                  : const M3SettingsIconBox(
                       icon: Icons.wallpaper_rounded,
-                      bg: theme.colorScheme.tertiaryContainer,
-                      iconColor: theme.colorScheme.onTertiaryContainer,
+                      bg: Color(0xFF30B0C7),
                     ),
               title: '背景壁纸',
               showDivider: false,
@@ -290,7 +267,11 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
                   if (hasCurrentScopeImg)
                     Icon(Icons.check_rounded, color: theme.colorScheme.primary, size: 18),
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                    size: 18,
+                  ),
                 ],
               ),
               onTap: _pickCustomWallpaper,
@@ -356,11 +337,19 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
                       children: [
                         Text(
                           '不透明度',
-                          style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.normal,
+                          ),
                         ),
                         Text(
                           '${(appMgr.wallpaperOpacity * 100).toInt()}%',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.normal,
+                            color: theme.colorScheme.onSurface,
+                          ),
                         ),
                       ],
                     ),
@@ -380,11 +369,19 @@ class _WallpaperSettingsTileState extends State<WallpaperSettingsTile> {
                       children: [
                         Text(
                           '高斯模糊',
-                          style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.normal,
+                          ),
                         ),
                         Text(
                           '${appMgr.wallpaperBlur.toStringAsFixed(1)} px',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.normal,
+                            color: theme.colorScheme.onSurface,
+                          ),
                         ),
                       ],
                     ),

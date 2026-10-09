@@ -7,6 +7,7 @@ import '../../player/danmaku/source/bilibili_danmaku_client.dart';
 import '../../player/danmaku/source/dandan_client.dart';
 import '../../player/source/source_bundle_manager.dart';
 import 'm3_settings_card.dart';
+import 'tg_action_sheet.dart';
 
 class CacheSettingsCard extends StatefulWidget {
   final BangumiClient client;
@@ -122,72 +123,26 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
     }
   }
 
-  void _confirmClearImageCache() {
-    final theme = Theme.of(context);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.delete_sweep_rounded,
-          color: theme.colorScheme.error,
-          size: 28,
-        ),
-        title: const Text('清空图片缓存'),
-        content: Text('当前图片缓存占用 $_imageCacheSizeStr，确认清空？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: theme.colorScheme.error,
-              foregroundColor: theme.colorScheme.onError,
-            ),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _performClearImageCache();
-            },
-            child: const Text('确认清空'),
-          ),
-        ],
-      ),
+  Future<void> _confirmClearImageCache() async {
+    final confirmed = await TgActionSheet.showDestructive(
+      context,
+      title: '当前图片缓存占用 $_imageCacheSizeStr，确认清空？',
+      destructiveLabel: '清空图片缓存',
     );
+    if (confirmed) {
+      _performClearImageCache();
+    }
   }
 
-  void _confirmClearDataCache() {
-    final theme = Theme.of(context);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.cleaning_services_rounded,
-          color: theme.colorScheme.error,
-          size: 28,
-        ),
-        title: const Text('清空数据缓存'),
-        content: Text('当前数据缓存占用 $_dataCacheSizeStr，确认清空？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: theme.colorScheme.error,
-              foregroundColor: theme.colorScheme.onError,
-            ),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _performClearDataCache();
-            },
-            child: const Text('确认清空'),
-          ),
-        ],
-      ),
+  Future<void> _confirmClearDataCache() async {
+    final confirmed = await TgActionSheet.showDestructive(
+      context,
+      title: '当前数据缓存占用 $_dataCacheSizeStr，确认清空？',
+      destructiveLabel: '清空数据缓存',
     );
+    if (confirmed) {
+      _performClearDataCache();
+    }
   }
 
   @override
@@ -198,14 +153,14 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const M3SettingsSectionHeader(title: '存储与缓存'),
+        const M3SettingsSectionHeader(title: '数据与缓存'),
         M3SettingsCard(
+          footerText: '清空缓存释放存储空间，不会影响历史记录与收藏状态。',
           children: [
             M3SettingsTile(
-              leading: M3SettingsIconBox(
+              leading: const M3SettingsIconBox(
                 icon: Icons.image_outlined,
-                bg: theme.colorScheme.errorContainer,
-                iconColor: theme.colorScheme.onErrorContainer,
+                bg: Color(0xFFFF9500),
               ),
               title: '图片缓存',
               showDivider: true,
@@ -214,26 +169,26 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
                 children: [
                   Text(
                     _imageCacheSizeStr,
-                    style: TextStyle(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       fontSize: 14,
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+                      fontWeight: FontWeight.normal,
                     ),
                   ),
                   const SizedBox(width: 4),
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                    size: 18,
                   ),
                 ],
               ),
               onTap: _confirmClearImageCache,
             ),
             M3SettingsTile(
-              leading: M3SettingsIconBox(
+              leading: const M3SettingsIconBox(
                 icon: Icons.storage_rounded,
-                bg: theme.colorScheme.secondaryContainer,
-                iconColor: theme.colorScheme.onSecondaryContainer,
+                bg: Color(0xFFFF9F0A),
               ),
               title: '数据缓存',
               showDivider: false,
@@ -242,16 +197,17 @@ class _CacheSettingsCardState extends State<CacheSettingsCard> {
                 children: [
                   Text(
                     _dataCacheSizeStr,
-                    style: TextStyle(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       fontSize: 14,
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+                      fontWeight: FontWeight.normal,
                     ),
                   ),
                   const SizedBox(width: 4),
                   Icon(
                     Icons.chevron_right_rounded,
-                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                    size: 18,
                   ),
                 ],
               ),

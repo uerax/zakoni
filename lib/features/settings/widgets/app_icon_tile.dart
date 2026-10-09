@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/utils/appearance_manager.dart';
 import 'm3_settings_card.dart';
+import 'tg_action_sheet.dart';
 
 class AppIconTile extends StatelessWidget {
   const AppIconTile({super.key});
@@ -32,71 +33,28 @@ class AppIconTile extends StatelessWidget {
 
   void _showIconModalSheet(BuildContext context) {
     final appMgr = AppearanceManager.instance;
-    final theme = Theme.of(context);
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: theme.colorScheme.surfaceContainerLow,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Text(
-                  '应用图标设置',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              ListTile(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                leading: Icon(
-                  Icons.upload_file_rounded,
-                  color: theme.colorScheme.primary,
-                ),
-                title: const Text('上传自定义图标'),
-                subtitle: const Text('支持 png / jpg / webp 格式图片'),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  _pickCustomIcon(context);
-                },
-              ),
-              if (appMgr.hasCustomIcon) ...[
-                const SizedBox(height: 4),
-                ListTile(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  leading: Icon(
-                    Icons.restart_alt_rounded,
-                    color: theme.colorScheme.error,
-                  ),
-                  title: Text(
-                    '恢复默认图标',
-                    style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.w600),
-                  ),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _resetDefaultIcon(context);
-                  },
-                ),
-              ],
-            ],
-          ),
+    TgActionSheet.show(
+      context,
+      title: '应用图标设置（支持 png / jpg / webp 格式）',
+      actions: [
+        TgActionItem(
+          label: '上传自定义图标',
+          onTap: () {
+            Navigator.of(context).pop();
+            _pickCustomIcon(context);
+          },
         ),
-      ),
+        if (appMgr.hasCustomIcon)
+          TgActionItem(
+            label: '恢复默认图标',
+            isDestructive: true,
+            onTap: () {
+              Navigator.of(context).pop();
+              _resetDefaultIcon(context);
+            },
+          ),
+      ],
     );
   }
 
@@ -110,8 +68,8 @@ class AppIconTile extends StatelessWidget {
       builder: (context, _) {
         return M3SettingsTile(
           leading: appMgr.buildAppLogoWidget(
-            size: 36,
-            borderRadius: 12,
+            size: 30,
+            borderRadius: 7.2,
           ),
           title: '应用图标',
           trailing: Row(
@@ -119,16 +77,17 @@ class AppIconTile extends StatelessWidget {
             children: [
               Text(
                 appMgr.hasCustomIcon ? '自定义' : '默认',
-                style: TextStyle(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: 14,
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+                  fontWeight: FontWeight.normal,
                 ),
               ),
               const SizedBox(width: 4),
               Icon(
                 Icons.chevron_right_rounded,
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                size: 20,
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                size: 18,
               ),
             ],
           ),

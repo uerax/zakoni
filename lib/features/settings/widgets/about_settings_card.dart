@@ -15,19 +15,21 @@ class AboutSettingsCard extends StatelessWidget {
       children: [
         const M3SettingsSectionHeader(title: '关于应用'),
         M3SettingsCard(
+          footerText: 'Zakoni - 跨平台动漫流媒体播放与番剧追踪客户端',
           children: [
             M3SettingsTile(
-              leading: M3SettingsIconBox(
+              leading: const M3SettingsIconBox(
                 icon: Icons.info_outline_rounded,
-                bg: theme.colorScheme.surfaceContainerHighest,
-                iconColor: theme.colorScheme.onSurfaceVariant,
+                bg: Color(0xFF8E8E93),
               ),
               title: '版本号',
               showDivider: false,
               trailing: Text(
-                'v${AppConstants.appVersion} (Build ${AppConstants.buildNumber})',
+                'v${AppConstants.appVersion} (${AppConstants.buildNumber})',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+                  fontWeight: FontWeight.normal,
+                  fontSize: 14,
                 ),
               ),
             ),

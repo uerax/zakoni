@@ -7,6 +7,11 @@ import '../models/category_constants.dart';
 class CategoryFilterBar extends ConsumerWidget {
   final String? initialCategory;
 
+  static final List<int?> _yearList = [
+    null,
+    for (int y = CategoryConstants.currentYear; y >= 1980; y--) y,
+  ];
+
   const CategoryFilterBar({super.key, this.initialCategory});
 
   @override
@@ -55,13 +60,8 @@ class CategoryFilterBar extends ConsumerWidget {
     final label = selectedYear == null ? '全部年份' : '$selectedYear年';
     final isHighlight = selectedYear != null;
 
-    final years = <int?>[null];
-    for (int y = CategoryConstants.currentYear; y >= 1980; y--) {
-      years.add(y);
-    }
-
     return InstantDropdownButton<int?>(
-      items: years,
+      items: _yearList,
       selectedValue: selectedYear,
       menuWidth: 110,
       maxMenuHeight: 280,
