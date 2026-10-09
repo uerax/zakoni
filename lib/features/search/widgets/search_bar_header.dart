@@ -26,7 +26,7 @@ class SearchBarHeader extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.88),
+        color: theme.scaffoldBackgroundColor.withValues(alpha: 0.88),
         border: Border(
           bottom: BorderSide(
             color: theme.colorScheme.outlineVariant.withValues(alpha: 0.25),

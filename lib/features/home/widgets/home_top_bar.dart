@@ -46,7 +46,7 @@ class HomeTopBar extends StatelessWidget {
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withValues(alpha: 0.88 * progress),
+            color: theme.scaffoldBackgroundColor.withValues(alpha: 0.88 * progress),
             border: Border(
               bottom: BorderSide(
                 color: theme.colorScheme.outlineVariant.withValues(alpha: 0.22 * progress),

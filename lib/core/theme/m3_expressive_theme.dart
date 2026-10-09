@@ -73,7 +73,7 @@ class M3ExpressiveTheme {
       fontFamily: currentFont,
       fontFamilyFallback: fontFallback,
       textTheme: textTheme,
-      scaffoldBackgroundColor: isDark ? colorScheme.surface : colorScheme.surface,
+      scaffoldBackgroundColor: isDark ? colorScheme.surface : colorScheme.surfaceContainer,
 
       // 全平台统一采用 iOS 丝滑平滑推入视差转场（CupertinoPageTransitionsBuilder），移动端保留边缘右滑返回手势
       pageTransitionsTheme: const PageTransitionsTheme(
@@ -86,13 +86,13 @@ class M3ExpressiveTheme {
         },
       ),
 
-      // 1. 卡片规范：20dp 圆角，surfaceContainerLow 表面，去除旧版 1px 细边框与外阴影
+      // 1. 卡片规范：20dp 圆角，对齐主流地台体系（浅色纯白 surfaceContainerLowest / 深色 surfaceContainerLow）
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        color: colorScheme.surfaceContainerLow,
+        color: isDark ? colorScheme.surfaceContainerLow : colorScheme.surfaceContainerLowest,
         clipBehavior: Clip.antiAlias,
         margin: EdgeInsets.zero,
       ),
@@ -122,7 +122,7 @@ class M3ExpressiveTheme {
         elevation: 2,
         showDragHandle: true,
         dragHandleColor: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-        backgroundColor: colorScheme.surfaceContainerLow,
+        backgroundColor: isDark ? colorScheme.surfaceContainerLow : colorScheme.surfaceContainerLowest,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),

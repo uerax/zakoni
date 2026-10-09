@@ -25,9 +25,15 @@ class M3Surface {
     final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
 
+    // 特殊处理说明：对齐 Apple HIG 与视听流媒体主流地台体系（Scheme 1: 地台沉降 + 纯白高光卡片）。
+    // 在深色模式下，背景为深暗 surface (Tone 6)，卡片采用 surfaceContainerLow (Tone 10) 向上提亮；
+    // 在浅色模式下，背景沉降为地台 surfaceContainer (Tone 94)，卡片则采用纯白 surfaceContainerLowest (Tone 100) 向上提亮。
+    // 这保证了深浅两端保持一致的感知层级：内容卡片永远比背景画布更加高光凸显，彻底杜绝浅色下融为一体。
     final Color baseColor = switch (level) {
       M3ContainerLevel.lowest => colorScheme.surfaceContainerLowest,
-      M3ContainerLevel.low => colorScheme.surfaceContainerLow,
+      M3ContainerLevel.low => isDark
+          ? colorScheme.surfaceContainerLow
+          : colorScheme.surfaceContainerLowest,
       M3ContainerLevel.standard => colorScheme.surfaceContainer,
       M3ContainerLevel.high => colorScheme.surfaceContainerHigh,
       M3ContainerLevel.highest => colorScheme.surfaceContainerHighest,
