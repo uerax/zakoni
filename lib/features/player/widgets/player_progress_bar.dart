@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:zakoni/core/services/bangumi_oped_service.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
 
-/// 复合型多功能播放进度条
+/// 复合型多功能流体播放进度条
 /// 整合了：
-/// 1. 弹幕高能热力波形图 (Danmaku Heatmap)
+/// 1. 弹幕高能雾光波形图 (Danmaku Heatmap Mist)
 /// 2. OP 片头 (薄荷绿 #65D1C5) 与 ED 片尾 (暖橙色 #F2BA72) 彩色区间刻度
 /// 3. 网络分级预读缓冲进度
-/// 4. iOS 风格拟物流体进度条与拖拽感知
+/// 4. 现代流体交互感知（常态纤细收敛，悬停/拖拽丝滑膨胀与滑块弹出）
 class PlayerProgressBar extends StatefulWidget {
   const PlayerProgressBar({
     super.key,
@@ -40,6 +40,7 @@ class PlayerProgressBar extends StatefulWidget {
 
 class _PlayerProgressBarState extends State<PlayerProgressBar> {
   bool _isDragging = false;
+  bool _isHovered = false;
   double _dragRatio = 0.0;
 
   List<double>? _cachedHeatmap;
@@ -129,134 +130,152 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
             ? (widget.buffer.inMilliseconds / totalMs).clamp(0.0, 1.0)
             : 0.0;
 
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onHorizontalDragStart: (details) {
-            setState(() {
-              _isDragging = true;
-              _dragRatio = _getRatioFromPosition(details.localPosition.dx, totalWidth);
-            });
-            widget.onChangeStart(_getDurationFromRatio(_dragRatio));
-          },
-          onHorizontalDragUpdate: (details) {
-            setState(() {
-              _dragRatio = _getRatioFromPosition(details.localPosition.dx, totalWidth);
-            });
-            widget.onChanged(_getDurationFromRatio(_dragRatio));
-          },
-          onHorizontalDragEnd: (details) {
-            final finalRatio = _dragRatio;
-            setState(() => _isDragging = false);
-            widget.onChangeEnd(_getDurationFromRatio(finalRatio));
-          },
-          onTapDown: (details) {
-            final tapRatio = _getRatioFromPosition(details.localPosition.dx, totalWidth);
-            final target = _getDurationFromRatio(tapRatio);
-            widget.onChangeStart(target);
-            widget.onChangeEnd(target);
-          },
-          child: SizedBox(
-            height: 22,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.bottomLeft,
-              children: [
-                // 1. 弹幕高能波形图 (Danmaku Heatmap Wave)
-                // 无缝衔接：底边缘定位在 bottom: 5.0（微量覆盖 0.5px 至底轨顶沿 bottom: 5.5），
-                // 彻底消除由于顶置绝对定位导致的 2.5px 空白裂隙
-                if (_cachedHeatmap != null)
+        final isInteracting = _isDragging || _isHovered;
+        final trackHeight = isInteracting ? 4.5 : 2.5;
+
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() => _isHovered = false),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragStart: (details) {
+              setState(() {
+                _isDragging = true;
+                _dragRatio = _getRatioFromPosition(details.localPosition.dx, totalWidth);
+              });
+              widget.onChangeStart(_getDurationFromRatio(_dragRatio));
+            },
+            onHorizontalDragUpdate: (details) {
+              setState(() {
+                _dragRatio = _getRatioFromPosition(details.localPosition.dx, totalWidth);
+              });
+              widget.onChanged(_getDurationFromRatio(_dragRatio));
+            },
+            onHorizontalDragEnd: (details) {
+              final finalRatio = _dragRatio;
+              setState(() => _isDragging = false);
+              widget.onChangeEnd(_getDurationFromRatio(finalRatio));
+            },
+            onTapDown: (details) {
+              final tapRatio = _getRatioFromPosition(details.localPosition.dx, totalWidth);
+              final target = _getDurationFromRatio(tapRatio);
+              widget.onChangeStart(target);
+              widget.onChangeEnd(target);
+            },
+            child: SizedBox(
+              height: 22,
+              child: Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.bottomLeft,
+                children: [
+                  // 1. 弹幕高能波形图 (轻盈银白雾光微光波形，告别浓艳青色色块)
+                  if (_cachedHeatmap != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 4.5,
+                      height: 12,
+                      child: CustomPaint(
+                        painter: _DanmakuHeatmapPainter(
+                          heatmap: _cachedHeatmap!,
+                          isInteracting: isInteracting,
+                        ),
+                      ),
+                    ),
+
+                  // 2. 底层未播放底轨（常态 2.5px，交互态膨胀至 4.5px）
                   Positioned(
                     left: 0,
                     right: 0,
-                    bottom: 5.0,
-                    height: 16,
-                    child: CustomPaint(
-                      painter: _DanmakuHeatmapPainter(
-                        heatmap: _cachedHeatmap!,
-                        color: primary,
-                      ),
-                    ),
-                  ),
-
-                // 2. 底层未播放底轨
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 2,
-                  child: Container(
-                    height: _isDragging ? 5.5 : 3.5,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(2.5),
-                    ),
-                  ),
-                ),
-
-                // 3. 网络缓冲进度轨
-                if (bufferRatio > 0)
-                  Positioned(
-                    left: 0,
                     bottom: 2,
-                    width: totalWidth * bufferRatio,
-                    child: Container(
-                      height: _isDragging ? 5.5 : 3.5,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      curve: Curves.easeOutCubic,
+                      height: trackHeight,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.38),
+                        color: Colors.white.withValues(alpha: 0.20),
                         borderRadius: BorderRadius.circular(2.5),
                       ),
                     ),
                   ),
 
-                // 4. OP / ED 彩色区间高亮刻度
-                if (widget.opedSegment != null && totalMs > 0)
-                  ..._buildOpedMarkers(totalWidth, totalMs),
-
-                // 5. 当前播放进度轨
-                Positioned(
-                  left: 0,
-                  bottom: 2,
-                  width: totalWidth * currentRatio,
-                  child: Container(
-                    height: _isDragging ? 5.5 : 3.5,
-                    decoration: BoxDecoration(
-                      color: primary,
-                      borderRadius: BorderRadius.circular(2.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: primary.withValues(alpha: 0.45),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
+                  // 3. 网络缓冲进度轨
+                  if (bufferRatio > 0)
+                    Positioned(
+                      left: 0,
+                      bottom: 2,
+                      width: totalWidth * bufferRatio,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        curve: Curves.easeOutCubic,
+                        height: trackHeight,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(2.5),
                         ),
-                      ],
+                      ),
+                    ),
+
+                  // 4. OP / ED 彩色区间高亮刻度
+                  if (widget.opedSegment != null && totalMs > 0)
+                    ..._buildOpedMarkers(totalWidth, totalMs, trackHeight),
+
+                  // 5. 当前播放进度轨
+                  Positioned(
+                    left: 0,
+                    bottom: 2,
+                    width: totalWidth * currentRatio,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      curve: Curves.easeOutCubic,
+                      height: trackHeight,
+                      decoration: BoxDecoration(
+                        color: primary,
+                        borderRadius: BorderRadius.circular(2.5),
+                        boxShadow: isInteracting
+                            ? [
+                                BoxShadow(
+                                  color: primary.withValues(alpha: 0.45),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ]
+                            : null,
+                      ),
                     ),
                   ),
-                ),
 
-                // 6. 可拖动滑块 Thumb
-                Positioned(
-                  bottom: _isDragging ? -3.0 : -2.0,
-                  left: (totalWidth * currentRatio - (_isDragging ? 7.5 : 5.0)).clamp(
-                    0.0,
-                    math.max(0.0, totalWidth - (_isDragging ? 15.0 : 10.0)),
-                  ),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    width: _isDragging ? 15.0 : 10.0,
-                    height: _isDragging ? 15.0 : 10.0,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          blurRadius: _isDragging ? 6.0 : 3.0,
-                          offset: const Offset(0, 1.5),
+                  // 6. 可拖动滑块 Thumb（常态完全收缩隐藏，悬停/拖拽时丝滑弹出）
+                  Positioned(
+                    bottom: _isDragging ? -3.0 : -2.0,
+                    left: (totalWidth * currentRatio - (_isDragging ? 7.0 : 5.5)).clamp(
+                      0.0,
+                      math.max(0.0, totalWidth - (_isDragging ? 14.0 : 11.0)),
+                    ),
+                    child: AnimatedScale(
+                      duration: const Duration(milliseconds: 140),
+                      curve: Curves.easeOutBack,
+                      scale: isInteracting ? 1.0 : 0.0,
+                      child: Container(
+                        width: _isDragging ? 14.0 : 11.0,
+                        height: _isDragging ? 14.0 : 11.0,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.35),
+                              blurRadius: _isDragging ? 5.0 : 3.0,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -264,7 +283,7 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
     );
   }
 
-  List<Widget> _buildOpedMarkers(double totalWidth, double totalMs) {
+  List<Widget> _buildOpedMarkers(double totalWidth, double totalMs, double trackHeight) {
     final seg = widget.opedSegment!;
     final totalSec = totalMs / 1000.0;
     final widgets = <Widget>[];
@@ -281,8 +300,10 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
           left: left,
           bottom: 2,
           width: width,
-          child: Container(
-            height: _isDragging ? 5.5 : 3.5,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            height: trackHeight,
             decoration: BoxDecoration(
               color: const Color(0xFF65D1C5).withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(2.5),
@@ -304,8 +325,10 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
           left: left,
           bottom: 2,
           width: width,
-          child: Container(
-            height: _isDragging ? 5.5 : 3.5,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            height: trackHeight,
             decoration: BoxDecoration(
               color: const Color(0xFFF2BA72).withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(2.5),
@@ -319,15 +342,15 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
   }
 }
 
-/// 弹幕高能波形图绘制器
+/// 弹幕高能波形图绘制器（银白微光通透雾态波形）
 class _DanmakuHeatmapPainter extends CustomPainter {
   const _DanmakuHeatmapPainter({
     required this.heatmap,
-    required this.color,
+    required this.isInteracting,
   });
 
   final List<double> heatmap;
-  final Color color;
+  final bool isInteracting;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -336,18 +359,26 @@ class _DanmakuHeatmapPainter extends CustomPainter {
     final h = size.height;
     final w = size.width;
 
-    final paint = Paint()
+    // 半透明极度轻盈优雅的银白雾光渐变，绝不遮蔽视频画面与字幕
+    final fillPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          color.withValues(alpha: 0.42),
-          color.withValues(alpha: 0.12),
+          Colors.white.withValues(alpha: isInteracting ? 0.20 : 0.09),
+          Colors.white.withValues(alpha: 0.01),
         ],
       ).createShader(Rect.fromLTWH(0, 0, w, h))
       ..style = PaintingStyle.fill;
 
+    // 波形脊线极细微光勾勒
+    final strokePaint = Paint()
+      ..color = Colors.white.withValues(alpha: isInteracting ? 0.32 : 0.16)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
     final path = Path();
+    final topCurvePath = Path();
     final count = heatmap.length;
     final stepX = w / (count - 1);
 
@@ -361,23 +392,26 @@ class _DanmakuHeatmapPainter extends CustomPainter {
 
       if (i == 0) {
         path.lineTo(x, y);
+        topCurvePath.moveTo(x, y);
       } else {
         final prevX = (i - 1) * stepX;
         final prevNorm = math.pow(heatmap[i - 1], 0.85).toDouble();
         final prevY = h - prevNorm * (h - 2.0);
         final cx = (prevX + x) / 2.0;
         path.cubicTo(cx, prevY, cx, y, x, y);
+        topCurvePath.cubicTo(cx, prevY, cx, y, x, y);
       }
     }
 
     path.lineTo(w, h);
     path.close();
 
-    canvas.drawPath(path, paint);
+    canvas.drawPath(path, fillPaint);
+    canvas.drawPath(topCurvePath, strokePaint);
   }
 
   @override
   bool shouldRepaint(covariant _DanmakuHeatmapPainter oldDelegate) {
-    return oldDelegate.heatmap != heatmap || oldDelegate.color != color;
+    return oldDelegate.heatmap != heatmap || oldDelegate.isInteracting != isInteracting;
   }
 }

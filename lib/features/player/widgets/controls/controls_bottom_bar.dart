@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:zakoni/core/services/bangumi_oped_service.dart';
+import 'package:zakoni/core/utils/font_manager.dart';
 import 'package:zakoni/features/player/controller/playback_controller.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
 import 'package:zakoni/features/player/danmaku/danmaku.dart';
@@ -12,11 +13,8 @@ class _BottomBarMetrics {
   const _BottomBarMetrics({
     required this.buttonSize,
     required this.iconSize,
-    required this.playBtnWidth,
-    required this.playBtnHeight,
     required this.playIconSize,
     required this.danmakuToggleSize,
-    required this.danmakuSettingsSize,
     required this.timeFontSize,
     required this.speedFontSize,
     required this.speedPadding,
@@ -28,11 +26,8 @@ class _BottomBarMetrics {
 
   final double buttonSize;
   final double iconSize;
-  final double playBtnWidth;
-  final double playBtnHeight;
   final double playIconSize;
   final double danmakuToggleSize;
-  final double danmakuSettingsSize;
   final double timeFontSize;
   final double speedFontSize;
   final EdgeInsets speedPadding;
@@ -58,67 +53,55 @@ class _BottomBarMetrics {
     switch (effectiveScale) {
       case PlayerControlBarScale.compact:
         return _BottomBarMetrics(
-          buttonSize: 20.0,
-          iconSize: 14.5,
-          playBtnWidth: 20.0,
-          playBtnHeight: 20.0,
-          playIconSize: 15.0,
-          danmakuToggleSize: 15.0,
-          danmakuSettingsSize: 15.0,
-          timeFontSize: 10.0,
-          speedFontSize: 10.0,
-          speedPadding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 1.5),
-          spacing: 1.0,
-          leftSpacing: 3.0,
+          buttonSize: 26.0,
+          iconSize: 16.5,
+          playIconSize: 18.5,
+          danmakuToggleSize: 18.0,
+          timeFontSize: 11.0,
+          speedFontSize: 11.0,
+          speedPadding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+          spacing: 3.0,
+          leftSpacing: 6.0,
           bottomPadding: 6.0,
-          horizontalPadding: totalWidth < 400 ? 3.0 : 12.0,
+          horizontalPadding: totalWidth < 400 ? 6.0 : 12.0,
         );
       case PlayerControlBarScale.standard:
         return _BottomBarMetrics(
           buttonSize: 32.0,
           iconSize: 20.0,
-          playBtnWidth: 34.0,
-          playBtnHeight: 30.0,
           playIconSize: 22.0,
-          danmakuToggleSize: 20.0,
-          danmakuSettingsSize: 20.0,
-          timeFontSize: 12.5,
-          speedFontSize: 12.5,
-          speedPadding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 3.5),
+          danmakuToggleSize: 22.0,
+          timeFontSize: 12.0,
+          speedFontSize: 12.0,
+          speedPadding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.0),
           spacing: 6.0,
           leftSpacing: 8.0,
           bottomPadding: 10.0,
-          horizontalPadding: totalWidth < 600 ? 8.0 : 16.0,
+          horizontalPadding: totalWidth < 600 ? 10.0 : 16.0,
         );
       case PlayerControlBarScale.large:
         return _BottomBarMetrics(
           buttonSize: 38.0,
           iconSize: 24.0,
-          playBtnWidth: 40.0,
-          playBtnHeight: 36.0,
           playIconSize: 26.0,
-          danmakuToggleSize: 24.0,
-          danmakuSettingsSize: 24.0,
-          timeFontSize: 14.0,
-          speedFontSize: 14.0,
-          speedPadding: const EdgeInsets.symmetric(horizontal: 7.0, vertical: 4.5),
+          danmakuToggleSize: 26.0,
+          timeFontSize: 13.5,
+          speedFontSize: 13.5,
+          speedPadding: const EdgeInsets.symmetric(horizontal: 7.0, vertical: 4.0),
           spacing: 8.0,
           leftSpacing: 10.0,
           bottomPadding: 12.0,
-          horizontalPadding: totalWidth < 600 ? 10.0 : 20.0,
+          horizontalPadding: totalWidth < 600 ? 12.0 : 20.0,
         );
       case PlayerControlBarScale.auto:
         return const _BottomBarMetrics(
           buttonSize: 32.0,
           iconSize: 20.0,
-          playBtnWidth: 34.0,
-          playBtnHeight: 30.0,
           playIconSize: 22.0,
-          danmakuToggleSize: 20.0,
-          danmakuSettingsSize: 20.0,
-          timeFontSize: 12.5,
-          speedFontSize: 12.5,
-          speedPadding: EdgeInsets.symmetric(horizontal: 5.5, vertical: 3.5),
+          danmakuToggleSize: 22.0,
+          timeFontSize: 12.0,
+          speedFontSize: 12.0,
+          speedPadding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.0),
           spacing: 6.0,
           leftSpacing: 8.0,
           bottomPadding: 10.0,
@@ -192,8 +175,9 @@ class PlayerControlsBottomBar extends StatelessWidget {
     final button = Material(
       key: key,
       color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(size * 0.18),
+      child: InkResponse(
+        radius: size * 0.58,
+        highlightShape: BoxShape.circle,
         onTap: onTap,
         child: SizedBox(
           width: size,
@@ -235,7 +219,7 @@ class PlayerControlsBottomBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 1. 复合型全宽进度条（弹幕波形图 + OP/ED 彩色区间 + 缓冲条 + 流体滑块）
+                    // 1. 复合型全宽进度条（弹幕高能雾光波形 + OP/ED 彩色区间 + 缓冲条 + 悬停流体滑块）
                     ValueListenableBuilder<PlaybackTimelineState>(
                       valueListenable: controller.timeline,
                       builder: (context, timelineState, _) {
@@ -263,45 +247,37 @@ class PlayerControlsBottomBar extends StatelessWidget {
                       },
                     ),
 
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 2),
 
                     // 2. 现代经典通栏控制行：左侧 2 个元素（播放键 + 时间）靠左，其余全部靠右
                     Row(
                       children: [
-                        // (1) 播放 / 暂停按钮（左1）
+                        // (1) 播放 / 暂停按钮（左1，与右侧按钮视觉重量完全一致的干净透明交互键）
                         ValueListenableBuilder<PlaybackCoreState>(
                           valueListenable: controller.core,
                           builder: (context, coreState, _) {
-                            return Material(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(metrics.buttonSize * 0.16),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(metrics.buttonSize * 0.16),
-                                onTap: () {
-                                  onUserInteraction();
-                                  controller.togglePlay();
-                                },
-                                child: Container(
-                                  width: metrics.playBtnWidth,
-                                  height: metrics.playBtnHeight,
-                                  alignment: Alignment.center,
-                                  child: Icon(
-                                    coreState.playing
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
-                                    key: ValueKey(coreState.playing),
-                                    color: Colors.white,
-                                    size: metrics.playIconSize,
-                                  ),
-                                ),
+                            return _buildBarButton(
+                              icon: Icon(
+                                coreState.playing
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                key: ValueKey(coreState.playing),
+                                color: Colors.white,
+                                size: metrics.playIconSize,
                               ),
+                              size: metrics.buttonSize,
+                              tooltip: coreState.playing ? '暂停 (Space)' : '播放 (Space)',
+                              onTap: () {
+                                onUserInteraction();
+                                controller.togglePlay();
+                              },
                             );
                           },
                         ),
 
                         SizedBox(width: metrics.leftSpacing),
 
-                        // (2) 时间戳展示：00:03 / 23:42（左2）
+                        // (2) 时间戳展示：当前时间(加粗纯白) / 总时长(柔和白)（左2）
                         ValueListenableBuilder<PlaybackTimelineState>(
                           valueListenable: controller.timeline,
                           builder: (context, timelineState, _) {
@@ -311,19 +287,46 @@ class PlayerControlsBottomBar extends StatelessWidget {
                                 showHours: hasHours);
                             final total = _formatDuration(timelineState.duration,
                                 showHours: hasHours);
-                            return Text(
-                              '$pos / $total',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: metrics.timeFontSize,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: -0.2,
-                                fontFeatures: const [FontFeature.tabularFigures()],
-                                shadows: const [
-                                  Shadow(
-                                    color: Colors.black54,
-                                    blurRadius: 4,
-                                    offset: Offset(0, 1),
+                            return Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: pos,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: metrics.timeFontSize,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: -0.2,
+                                      fontFamily: 'MiSans',
+                                      fontFamilyFallback: FontManager.fallbackFontFamilies,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                      shadows: const [
+                                        Shadow(
+                                          color: Colors.black54,
+                                          blurRadius: 4,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: ' / $total',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.68),
+                                      fontSize: metrics.timeFontSize,
+                                      fontWeight: FontWeight.w400,
+                                      letterSpacing: -0.2,
+                                      fontFamily: 'MiSans',
+                                      fontFamilyFallback: FontManager.fallbackFontFamilies,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                      shadows: const [
+                                        Shadow(
+                                          color: Colors.black54,
+                                          blurRadius: 4,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -334,7 +337,7 @@ class PlayerControlsBottomBar extends StatelessWidget {
                         // 中间弹性空间，把后面全部元素顶到最右端
                         const Spacer(),
 
-                        // (3) 弹幕开关 [自绘圆角矩形，关闭带斜杠划线]
+                        // (3) 猫耳弹幕开关 [开启带主题色微光小对勾，关闭带状态斜线]
                         if (danmakuController != null) ...[
                           ListenableBuilder(
                             listenable: danmakuController!,
@@ -345,13 +348,11 @@ class PlayerControlsBottomBar extends StatelessWidget {
                                 icon: DanmakuToggleIcon(
                                   enabled: isEnabled,
                                   size: metrics.danmakuToggleSize,
-                                  color: isEnabled
-                                      ? Colors.white
-                                      : Colors.white.withValues(alpha: 0.40),
-                                  slashColor: Colors.white.withValues(alpha: 0.85),
+                                  color: Colors.white,
+                                  checkColor: primaryColor,
                                 ),
                                 size: metrics.buttonSize,
-                                tooltip: isEnabled ? '关闭弹幕' : '开启弹幕',
+                                tooltip: isEnabled ? '关闭弹幕 (D)' : '开启弹幕 (D)',
                                 onTap: () {
                                   onUserInteraction();
                                   final current = danmakuController!.settings;
@@ -364,10 +365,10 @@ class PlayerControlsBottomBar extends StatelessWidget {
                           ),
                           SizedBox(width: metrics.spacing),
 
-                          // (4) 弹幕设置面板按钮 [自绘 animaku 专属图标]
+                          // (4) 猫耳弹幕设置面板按钮 [带高精工六角倒角螺母]
                           _buildBarButton(
                             icon: DanmakuSettingsIcon(
-                              size: metrics.danmakuSettingsSize,
+                              size: metrics.danmakuToggleSize,
                               color: Colors.white,
                             ),
                             size: metrics.buttonSize,
@@ -377,36 +378,42 @@ class PlayerControlsBottomBar extends StatelessWidget {
                           SizedBox(width: metrics.spacing),
                         ],
 
-                        // (5) 倍速选择 [1x / 1.25x ...]
+                        // (5) 倍速选择 [1x / 1.25x ... 圆润微光胶囊]
                         ValueListenableBuilder<PlaybackCoreState>(
                           valueListenable: controller.core,
                           builder: (context, coreState, _) {
                             final isSpeedHighlighted =
                                 showSpeedPopup || coreState.playbackRate != 1.0;
 
-                            return GestureDetector(
-                              key: speedButtonKey,
-                              behavior: HitTestBehavior.opaque,
-                              onTap: onToggleSpeedPopup,
-                              child: Container(
-                                padding: metrics.speedPadding,
-                                decoration: BoxDecoration(
-                                  color: isSpeedHighlighted
-                                      ? Colors.white.withValues(alpha: 0.20)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  coreState.playbackRate == 1.0
-                                      ? '1x'
-                                      : '${coreState.playbackRate}x',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: metrics.speedFontSize,
-                                    fontWeight: isSpeedHighlighted
-                                        ? FontWeight.w700
-                                        : FontWeight.w600,
-                                    letterSpacing: -0.2,
+                            return Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: onToggleSpeedPopup,
+                                child: Container(
+                                  key: speedButtonKey,
+                                  padding: metrics.speedPadding,
+                                  decoration: BoxDecoration(
+                                    color: isSpeedHighlighted
+                                        ? Colors.white.withValues(alpha: 0.20)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    coreState.playbackRate == 1.0
+                                        ? '1x'
+                                        : '${coreState.playbackRate}x',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: metrics.speedFontSize,
+                                      fontWeight: isSpeedHighlighted
+                                          ? FontWeight.w700
+                                          : FontWeight.w600,
+                                      letterSpacing: -0.2,
+                                      fontFamily: 'MiSans',
+                                      fontFamilyFallback: FontManager.fallbackFontFamilies,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -416,10 +423,10 @@ class PlayerControlsBottomBar extends StatelessWidget {
 
                         SizedBox(width: metrics.spacing),
 
-                        // (6) 播放设置按钮 [⚙]
+                        // (6) 播放设置按钮 [统一 Rounded 圆润风格]
                         _buildBarButton(
                           icon: Icon(
-                            Icons.settings_outlined,
+                            Icons.settings_rounded,
                             color: Colors.white,
                             size: metrics.iconSize,
                           ),
@@ -448,7 +455,7 @@ class PlayerControlsBottomBar extends StatelessWidget {
                                 size: metrics.iconSize,
                               ),
                               size: metrics.buttonSize,
-                              tooltip: isMuted ? '取消静音' : '音量调节',
+                              tooltip: isMuted ? '取消静音 (M)' : '音量调节',
                               onTap: onToggleVolumeSlider,
                             );
                           },
@@ -466,7 +473,7 @@ class PlayerControlsBottomBar extends StatelessWidget {
                               size: metrics.iconSize,
                             ),
                             size: metrics.buttonSize,
-                            tooltip: isFullscreen ? '退出全屏' : '进入全屏',
+                            tooltip: isFullscreen ? '退出全屏 (F)' : '进入全屏 (F)',
                             onTap: () {
                               onUserInteraction();
                               onToggleFullscreen?.call();
@@ -485,4 +492,3 @@ class PlayerControlsBottomBar extends StatelessWidget {
     );
   }
 }
-

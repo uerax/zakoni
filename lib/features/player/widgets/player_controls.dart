@@ -836,7 +836,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                       top: 0,
                       left: 0,
                       right: 0,
-                      height: 100,
+                      height: 86,
                       child: IgnorePointer(
                         child: Container(
                           decoration: BoxDecoration(
@@ -844,10 +844,12 @@ class _PlayerControlsState extends State<PlayerControls> {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.black.withValues(alpha: 0.72),
-                                Colors.black.withValues(alpha: 0.28),
+                                Colors.black.withValues(alpha: 0.54),
+                                Colors.black.withValues(alpha: 0.26),
+                                Colors.black.withValues(alpha: 0.06),
                                 Colors.transparent,
                               ],
+                              stops: const [0.0, 0.35, 0.70, 1.0],
                             ),
                           ),
                         ),
@@ -859,7 +861,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                       bottom: 0,
                       left: 0,
                       right: 0,
-                      height: 120,
+                      height: 96,
                       child: IgnorePointer(
                         child: Container(
                           decoration: BoxDecoration(
@@ -867,10 +869,12 @@ class _PlayerControlsState extends State<PlayerControls> {
                               begin: Alignment.bottomCenter,
                               end: Alignment.topCenter,
                               colors: [
-                                Colors.black.withValues(alpha: 0.78),
-                                Colors.black.withValues(alpha: 0.32),
+                                Colors.black.withValues(alpha: 0.56),
+                                Colors.black.withValues(alpha: 0.30),
+                                Colors.black.withValues(alpha: 0.08),
                                 Colors.transparent,
                               ],
+                              stops: const [0.0, 0.35, 0.70, 1.0],
                             ),
                           ),
                         ),
