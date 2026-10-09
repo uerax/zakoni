@@ -46,13 +46,14 @@ class SearchController extends Notifier<SearchState> {
     final client = ref.read(bangumiClientProvider);
 
     // 1. 核心工程优化：优先同步探测内存缓存，若命中且非强制刷新，则 0ms 瞬间上屏，彻底消除白屏与骨架屏闪烁
+    // 特殊处理说明：限定 types 为 [2, 6]（2=动画, 6=三次元/特摄/真人影视），源头排除书籍(漫画)、音乐与游戏条目
     if (!forceRefresh) {
       final cached = client.peekSearchCache(
         trimmed,
         limit: searchLimit,
         offset: 0,
         type: null,
-        types: null,
+        types: const [2, 6],
       );
       if (cached != null) {
         _cancelToken?.cancel('cache_hit');
@@ -89,7 +90,7 @@ class SearchController extends Notifier<SearchState> {
         limit: searchLimit,
         offset: 0,
         type: null,
-        types: null,
+        types: const [2, 6],
         forceRefresh: forceRefresh,
         cancelToken: cancelToken,
       );

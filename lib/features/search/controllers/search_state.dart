@@ -23,7 +23,7 @@ class SearchState {
   List<BangumiItem> get animeItems =>
       allItems.where((item) => item.type == 2).toList();
 
-  /// 非动漫分类列表（type != 2，涵盖特摄、真人影视、游戏、书籍等）
+  /// 非动漫分类列表（type != 2，在接口限定 [2, 6] 视频范围下包含特摄与真人影视，彻底排除漫画与游戏）
   List<BangumiItem> get nonAnimeItems =>
       allItems.where((item) => item.type != 2).toList();
 

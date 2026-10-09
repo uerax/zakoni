@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/appearance_manager.dart';
 import '../controllers/search_controller.dart';
 import '../controllers/search_history_notifier.dart';
-import '../widgets/search_bar_header.dart';
+import '../widgets/search_bottom_bar.dart';
 import '../widgets/search_filter_bar.dart';
 import '../widgets/search_history_view.dart';
 import '../widgets/search_result_view.dart';
@@ -115,17 +115,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 ),
               ),
 
-              // 3. 页面内容流
+              // 3. 页面内容流：顶部内容流与底部 iOS Safari 风格搜索栏结合
               Column(
                 children: [
-                  // 顶部返回与搜索胶囊栏
-                  SearchBarHeader(
-                    controller: _textController,
-                    focusNode: _focusNode,
-                    onSearch: () => _handleSearch(_textController.text),
-                    onClear: _handleClear,
-                    onBack: () => Navigator.of(context).pop(),
-                  ),
+                  // 顶部留出状态栏高度与微弱呼吸边距
+                  SizedBox(height: MediaQuery.paddingOf(context).top + 6),
 
                   // 内容主体：有搜索词时呈现结果流；无搜索词时展示历史记录与空状态
                   Expanded(
@@ -196,11 +190,20 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                                 ),
 
                                 const SliverToBoxAdapter(
-                                  child: SizedBox(height: 36),
+                                  child: SizedBox(height: 16),
                                 ),
                               ],
                             ),
                           ),
+                  ),
+
+                  // 底部 iOS Safari 风格悬浮毛玻璃搜索栏
+                  SearchBottomBar(
+                    controller: _textController,
+                    focusNode: _focusNode,
+                    onSearch: () => _handleSearch(_textController.text),
+                    onClear: _handleClear,
+                    onBack: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

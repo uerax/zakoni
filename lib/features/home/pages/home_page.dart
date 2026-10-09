@@ -8,17 +8,14 @@ import '../../../core/models/home/recommend_item.dart';
 import '../../../core/network/bangumi_client.dart';
 import '../../../core/services/daily_recommend_service.dart';
 import '../../../core/services/watch_history_service.dart';
-import '../../../core/utils/fade_scale_page_route.dart';
 import '../../../core/utils/responsive.dart';
 import '../../common/widgets/anime_card.dart';
 import '../../common/widgets/shimmer_loading.dart';
 import '../../category/models/category_constants.dart';
 import '../../history/pages/history_page.dart';
-import '../../search/pages/search_page.dart';
 import '../widgets/continue_watching_shelf.dart';
 import '../widgets/daily_spotlight_card.dart';
 import '../widgets/home_desktop_hero.dart';
-import '../widgets/home_top_bar.dart';
 import '../widgets/rank_horizontal_section.dart';
 import '../widgets/today_anime_shelf.dart';
 
@@ -56,11 +53,6 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
   bool _isLoading = false;
   Object? _error;
 
-  final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier<double>(0.0);
-  bool _isTopBarVisible = true;
-  double _downScrollAccumulator = 0.0;
-  double _upScrollAccumulator = 0.0;
-
   // 保证页面切走后状态保活不被销毁，切回 0ms 瞬间呈现，不重复请求网络
   @override
   bool get wantKeepAlive => true;
@@ -70,12 +62,6 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
     super.initState();
     WatchHistoryService.instance.getHistory();
     _loadData();
-  }
-
-  @override
-  void dispose() {
-    _scrollOffsetNotifier.dispose();
-    super.dispose();
   }
 
   Future<void> _loadData({bool forceRefresh = false}) async {
@@ -121,14 +107,6 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
     if (widget.onNavigateToCategory != null) {
       widget.onNavigateToCategory!(category, year: year, month: month);
     }
-  }
-
-  void _navigateToSearch([String? query]) {
-    Navigator.of(context).push(
-      FadeScalePageRoute(
-        builder: (context) => SearchPage(initialQuery: query),
-      ),
-    );
   }
 
   /// 货架响应式对齐容器：
@@ -327,74 +305,9 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
             ),
           ),
 
-          // 1. 底层：内容流区域（包裹滚动通知监听，驱动顶部栏毛玻璃与 Quick-Return 平滑显隐）
+          // 1. 底层：内容流区域
           Positioned.fill(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                if (notification.metrics.axis == Axis.vertical) {
-                  _scrollOffsetNotifier.value = notification.metrics.pixels;
-
-                  final isDesktop = context.isDesktop;
-
-                  if (isDesktop) {
-                    // 桌面端无条件常驻吸顶显示，绝不执行上下收起动画
-                    if (!_isTopBarVisible) {
-                      setState(() {
-                        _isTopBarVisible = true;
-                      });
-                    }
-                  } else if (notification is ScrollUpdateNotification) {
-                    final currentPixels = notification.metrics.pixels;
-                    final delta = notification.scrollDelta ?? 0.0;
-
-                    // 1. 顶部零点保护：距离顶部 10px 以内无条件强制显现
-                    if (currentPixels <= 10) {
-                      if (!_isTopBarVisible) {
-                        setState(() {
-                          _isTopBarVisible = true;
-                        });
-                      }
-                      _downScrollAccumulator = 0.0;
-                      _upScrollAccumulator = 0.0;
-                    }
-                    // 2. 向下滑动（内容向上走，阅读浏览模式）：累积下滚超过 20px 触发平滑收起
-                    else if (delta > 1.5) {
-                      _downScrollAccumulator += delta;
-                      _upScrollAccumulator = 0.0;
-                      if (_downScrollAccumulator > 20.0 && _isTopBarVisible) {
-                        setState(() {
-                          _isTopBarVisible = false;
-                        });
-                      }
-                    }
-                    // 3. 向上滑动（内容向下走，意图回滚或搜索）：累积上滚超过 12px 触发快速召回显现
-                    else if (delta < -1.5) {
-                      _upScrollAccumulator += delta.abs();
-                      _downScrollAccumulator = 0.0;
-                      if (_upScrollAccumulator > 12.0 && !_isTopBarVisible) {
-                        setState(() {
-                          _isTopBarVisible = true;
-                        });
-                      }
-                    }
-                  }
-                }
-                return false;
-              },
-              child: _buildAnimeContent(context, theme, safeTop),
-            ),
-          ),
-
-          // 2. 顶层：B 站式全宽平滑延伸沉浸顶部导航栏（支持下滑收起上滑显现）
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: HomeTopBar(
-              isVisible: _isTopBarVisible,
-              scrollOffsetNotifier: _scrollOffsetNotifier,
-              onSearchTap: _navigateToSearch,
-            ),
+            child: _buildAnimeContent(context, theme, safeTop),
           ),
         ],
       ),
@@ -494,9 +407,9 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
       physics: const AlwaysScrollableScrollPhysics(),
       scrollCacheExtent: const ScrollCacheExtent.pixels(250),
       slivers: [
-        // 顶部预留安全高度（状态栏 + 顶栏高度 42px），首屏内容在滚动时穿透并呈现高斯模糊磨砂效果
+        // 顶部预留状态栏安全高度与自然留白
         SliverToBoxAdapter(
-          child: SizedBox(height: safeTop + 42),
+          child: SizedBox(height: safeTop + 10),
         ),
 
         // 移动端：继续追番置顶
@@ -558,9 +471,9 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
       physics: const AlwaysScrollableScrollPhysics(),
       scrollCacheExtent: const ScrollCacheExtent.pixels(250),
       slivers: [
-        // 顶部预留安全高度（状态栏 + 顶栏高度 42px）
+        // 顶部预留安全高度与自然留白
         SliverToBoxAdapter(
-          child: SizedBox(height: safeTop + 42),
+          child: SizedBox(height: safeTop + 16),
         ),
 
         // 桌面端：Hero 大屏门面（智能推荐轮播 + 全周新番 6 宫格矩阵）
@@ -765,7 +678,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin 
         physics: const NeverScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
-            child: SizedBox(height: safeTop + 42),
+            child: SizedBox(height: safeTop + 10),
           ),
           SliverToBoxAdapter(
             child: LayoutBuilder(

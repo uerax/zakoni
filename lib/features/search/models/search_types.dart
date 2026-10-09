@@ -1,4 +1,4 @@
-/// 搜索过滤类型（对齐 Animaku 规范：全部、动漫 type=2、非动漫 type!=2）
+/// 搜索过滤类型（全部、动漫 type=2、非动漫 type!=2，接口已严格限定仅视频类型 [2, 6]）
 enum SearchFilterType {
   all,
   anime,
