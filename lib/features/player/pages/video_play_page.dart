@@ -1214,12 +1214,10 @@ class _VideoPlayPageState extends State<VideoPlayPage>
             roadNames: _roadNames,
             selectedRoadIndex: _selectedRoadIndex,
             mappedEpisodeTitles: _mappedEpisodeTitles,
+            // 切换线路仅更新查看视图与集数列表，绝不自动切换起播，保持当前正在播放的线路和集数不被打断
             onRoadSelected: (idx) {
               if (_selectedRoadIndex == idx) return;
               setState(() => _selectedRoadIndex = idx);
-              if (_hasStartedPlayback && _currentEpisodes.isNotEmpty) {
-                _selectEpisode(_activeEpisode ?? 1);
-              }
             },
             onRefreshEpisodes: () =>
                 _startDefaultSourceSearch(autoPlayFirst: false),
@@ -1251,12 +1249,10 @@ class _VideoPlayPageState extends State<VideoPlayPage>
         resolveError: _resolveError,
         onSelectEpisode: (ep) => _selectEpisode(ep),
         onSelectSlot: (slot) => _selectSlot(slot),
+        // 切换线路仅更新查看视图与集数列表，绝不自动切换起播
         onRoadSelected: (idx) {
           if (_selectedRoadIndex == idx) return;
           setState(() => _selectedRoadIndex = idx);
-          if (_hasStartedPlayback && _currentEpisodes.isNotEmpty) {
-            _selectEpisode(_activeEpisode ?? 1);
-          }
         },
         onRefreshEpisodes: () =>
             _startDefaultSourceSearch(autoPlayFirst: false),

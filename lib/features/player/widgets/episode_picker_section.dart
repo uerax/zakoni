@@ -269,14 +269,15 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
                 final isRoadActive = idx == _activeRoadIndex;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
-                  child: BouncingScaleCard(
-                    scaleDown: 0.95,
+                  // 线路切换胶囊：采用即时响应的 InkWell，消除 BouncingScaleCard 按压回弹等待锁 (~300ms)
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
                     onTap: () {
                       setState(() => _activeRoadIndex = idx);
                       widget.onRoadSelected?.call(idx);
                     },
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
+                      duration: const Duration(milliseconds: 90),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                       decoration: BoxDecoration(
                         color: isRoadActive
@@ -339,11 +340,12 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
-                  child: BouncingScaleCard(
-                    scaleDown: 0.95,
+                  // 分页胶囊：采用即时响应的 InkWell，消除 300ms 点击等待延迟
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
                     onTap: () => setState(() => _selectedRangeIndex = rIdx),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
+                      duration: const Duration(milliseconds: 90),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: isRangeActive
@@ -434,8 +436,11 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
                           slot = slots[itemIdx];
                         }
 
-                        final isCurrentRoadPlaying = widget.playingRoadIndex == null ||
-                            widget.playingRoadIndex == _activeRoadIndex;
+                        // 线路在播隔离：仅当当前查看的线路与实际在播线路一致时才标记在播态；
+                        // 多线路存在时若未指定 playingRoadIndex 绝不盲目全线路高亮
+                        final isCurrentRoadPlaying = widget.playingRoadIndex != null
+                            ? widget.playingRoadIndex == _activeRoadIndex
+                            : (widget.roads.length <= 1);
                         final isPlaying = isCurrentRoadPlaying &&
                             (slot != null
                                 ? (slot.canonicalEp == widget.currentEpisode)

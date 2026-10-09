@@ -134,6 +134,22 @@ void main() {
       // 检查当前界面中的第 1 话不是在播高亮
       final ep1Text = tester.widget<Text>(find.text('第 1 话'));
       expect(ep1Text.style?.color, isNot(equals(Colors.white)));
+
+      // 切换查看线路 3
+      await tester.tap(find.text('线路 3'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // 验证切换到线路 3 后，第 1 集同样绝不显示在播
+      final ep1TextRoad3 = tester.widget<Text>(find.text('第 1 话'));
+      expect(ep1TextRoad3.style?.color, isNot(equals(Colors.white)));
+
+      // 切回线路 1，第 1 话恢复正在播放高亮态
+      await tester.tap(find.text('线路 1'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      final ep1TextRoad1 = tester.widget<Text>(find.text('第 1 话'));
+      expect(ep1TextRoad1.style?.color, equals(Colors.white));
     });
 
     testWidgets('6. 视频源列表顶部不再渲染冗余的「当前视频源」大卡片', (tester) async {
@@ -159,6 +175,46 @@ void main() {
       // 验证不再有旧版「当前正在生效」或「当前视频源：」大卡片
       expect(find.textContaining('当前视频源：'), findsNothing);
       expect(find.textContaining('当前生效'), findsNothing);
+    });
+
+    testWidgets('7. 点击线路 2 仅切换查看视图，绝不自动调用切集起播', (tester) async {
+      int selectedEpisodeCallCount = 0;
+      int selectedRoad = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                return EpisodePickerSection(
+                  episodeCount: 12,
+                  currentEpisode: 1,
+                  roads: const ['线路 1', '线路 2', '线路 3'],
+                  activeRoadIndex: selectedRoad,
+                  playingRoadIndex: 0,
+                  onRoadSelected: (idx) {
+                    setState(() => selectedRoad = idx);
+                  },
+                  onSelectEpisode: (_) {
+                    selectedEpisodeCallCount++;
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // 点击切换到线路 2
+      await tester.tap(find.text('线路 2'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // 验证仅线路视图切换为线路 2，绝未触发切集播放
+      expect(selectedRoad, equals(1));
+      expect(selectedEpisodeCallCount, equals(0));
     });
   });
 }
