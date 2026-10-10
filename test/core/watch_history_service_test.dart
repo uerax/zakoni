@@ -47,32 +47,17 @@ void main() {
       expect(parsed.duration, equals(1440.0));
     });
 
-    test('getHistory returns 3 mock seeds with video sources on empty cache', () async {
+    test('getHistory returns empty list on empty cache without injecting mock seeds', () async {
       final history = await WatchHistoryService.instance.getHistory();
 
-      expect(history.length, equals(3));
-      expect(history[0].title, equals('葬送的芙莉莲'));
-      expect(history[0].pluginName, equals('cycani'));
-      expect(history[0].episode, equals(14));
-
-      expect(history[1].title, equals('迷宫饭'));
-      expect(history[1].pluginName, equals('anime1'));
-      expect(history[1].episode, equals(8));
-
-      expect(history[2].title, equals('间谍过家家 第二季'));
-      expect(history[2].pluginName, equals('omofun'));
-      expect(history[2].episode, equals(4));
-
-      // 验证已持久化落盘
+      expect(history, isEmpty);
+      // 验证未持久化任何种子假数据
       final persistedJson = AppPreferences.getWatchHistoryJson();
-      expect(persistedJson, isNotNull);
-      expect(persistedJson, contains('cycani'));
-      expect(persistedJson, contains('anime1'));
-      expect(persistedJson, contains('omofun'));
+      expect(persistedJson, isNull);
     });
 
     test('recordProgress accurately preserves different episodes and dedupes same episode, latestByAnime aggregates correctly', () async {
-      await WatchHistoryService.instance.getHistory(); // 初始化 3 条种子 (芙莉莲 ep14, 迷宫饭 ep8, 间谍过家家 ep4)
+      await WatchHistoryService.instance.saveHistory(WatchHistoryService.initialMockSeeds); // 显式置入 3 条测试数据 (芙莉莲 ep14, 迷宫饭 ep8, 间谍过家家 ep4)
 
       var notified = false;
       void listener() {
@@ -189,6 +174,7 @@ void main() {
     });
 
     test('remove and clear methods work as expected and notify listeners', () async {
+      await WatchHistoryService.instance.saveHistory(WatchHistoryService.initialMockSeeds);
       final history = await WatchHistoryService.instance.getHistory();
       expect(history.length, equals(3));
 
@@ -207,6 +193,10 @@ void main() {
       expect(AppPreferences.getWatchHistoryJson(), isNull);
       expect(WatchHistoryService.instance.items, isEmpty);
       expect(clearNotified, isTrue);
+
+      // 验证清空后再次 forceReload，依然保持为空列表，不会复活种子数据
+      final reloadHistory = await WatchHistoryService.instance.getHistory(forceReload: true);
+      expect(reloadHistory, isEmpty);
     });
   });
 }

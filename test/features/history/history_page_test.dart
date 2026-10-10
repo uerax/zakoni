@@ -16,7 +16,23 @@ void main() {
   });
 
   group('HistoryPage widget tests', () {
+    testWidgets('Empty history initially renders empty state directly without seeding mock data', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: HistoryPage(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('暂无播放历史'), findsOneWidget);
+      expect(find.text('快去挑选喜欢的动画开始追番吧'), findsOneWidget);
+      expect(find.byIcon(Icons.history_toggle_off_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.delete_sweep_rounded), findsNothing);
+    });
+
     testWidgets('Renders stats bar, time groups, and history cards with video sources', (tester) async {
+      await WatchHistoryService.instance.saveHistory(WatchHistoryService.initialMockSeeds);
+
       await tester.pumpWidget(
         const MaterialApp(
           home: HistoryPage(),
@@ -49,6 +65,8 @@ void main() {
     });
 
     testWidgets('Supports clearing all records through dialog', (tester) async {
+      await WatchHistoryService.instance.saveHistory(WatchHistoryService.initialMockSeeds);
+
       await tester.pumpWidget(
         const MaterialApp(
           home: HistoryPage(),
@@ -80,7 +98,8 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final history = await WatchHistoryService.instance.getHistory();
+      await WatchHistoryService.instance.saveHistory(WatchHistoryService.initialMockSeeds);
+      final history = WatchHistoryService.instance.items;
       expect(history.length, equals(3));
       final itemB = history[1]; // B: 迷宫饭
 

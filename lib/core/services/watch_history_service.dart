@@ -8,7 +8,7 @@ import 'app_preferences.dart';
 /// 2. 独立于网络请求：本地播放历史与慢速网络 API 完全解耦，首页与历史页通过 ListenableBuilder 毫秒级动态同步；
 /// 3. 分层聚合架构：底层精确记录到分集（同番同集去重，多集共存），保证各集断点续播不丢失；同时提供 latestByAnime 聚合属性供首页使用，杜绝首页刷屏；
 /// 4. 容量与持久化管理：上限 200 条，落盘持久化至 AppPreferences；
-/// 5. 冷启动种子数据：在本地无历史时自动注入 3 条具备真实视频源与 Bangumi 封面的测试数据。
+/// 5. 本地无历史记录时保持空列表，不注入任何测试假数据。
 class WatchHistoryService extends ChangeNotifier {
   static final WatchHistoryService instance = WatchHistoryService._();
   WatchHistoryService._();
@@ -33,7 +33,8 @@ class WatchHistoryService extends ChangeNotifier {
     return result;
   }
 
-  /// 预置的 3 部真实测试数据（包含视频源、线路与时长进度）
+  /// 预置的 3 部测试数据（供单元测试场景按需引用）
+  @visibleForTesting
   static List<WatchHistoryItem> get initialMockSeeds {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
@@ -87,7 +88,7 @@ class WatchHistoryService extends ChangeNotifier {
     ];
   }
 
-  /// 获取播放历史列表（首次调用自动加载持久化缓存，为空时自动注入种子数据）
+  /// 获取播放历史列表（首次调用自动加载持久化缓存，为空时初始化为空列表）
   Future<List<WatchHistoryItem>> getHistory({bool forceReload = false}) async {
     if (_isInitialized && !forceReload) {
       return _items;
@@ -112,11 +113,9 @@ class WatchHistoryService extends ChangeNotifier {
       } catch (_) {}
     }
 
-    // 本地缓存为空时，注入种子数据并异步落盘
-    final seeds = initialMockSeeds;
-    _items = List.of(seeds);
+    // 本地缓存为空时，保持为空列表（不注入种子假数据）
+    _items = [];
     _isInitialized = true;
-    await _persist();
     notifyListeners();
     return _items;
   }

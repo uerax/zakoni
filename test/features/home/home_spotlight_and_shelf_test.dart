@@ -298,7 +298,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
 
-      await WatchHistoryService.instance.getHistory();
+      await WatchHistoryService.instance.saveHistory(WatchHistoryService.initialMockSeeds);
 
       final dio = Dio();
       dio.httpClientAdapter = _MockPlacementClientAdapter();
@@ -317,7 +317,7 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
 
-      await WatchHistoryService.instance.getHistory();
+      await WatchHistoryService.instance.saveHistory(WatchHistoryService.initialMockSeeds);
 
       final dio = Dio();
       dio.httpClientAdapter = _MockPlacementClientAdapter();
