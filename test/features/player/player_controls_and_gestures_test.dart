@@ -78,6 +78,10 @@ void main() {
       // 验证选集按钮存在
       expect(find.text('选集'), findsOneWidget);
 
+      // 设置音量为 1.0 以验证满音量面板与图标状态
+      await controller.setVolume(1.0);
+      await tester.pumpAndSettle();
+
       // 验证音量调节面板展开与无多余小喇叭
       expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
       await tester.tap(find.byIcon(Icons.volume_up_rounded));

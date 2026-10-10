@@ -16,7 +16,8 @@ import 'package:zakoway/features/player/danmaku/view/danmaku_text_layout.dart';
 const double _kTrackSpacing = 1.16;
 const double _kTopDurationMs = 5000.0;
 const double _kBottomDurationMs = 5000.0;
-const double _kScrollBaseDurationMs = 8500.0;
+/// 移动端窄屏滚动弹幕基准穿越耗时 (7.5s)
+const double _kScrollBaseDurationMs = 7500.0;
 const double _kSeekThresholdMs = 1200.0;
 
 /// 小漂移纠偏的时间常数 (ms)：采样噪声被平滑掉，不再在单帧内跳变
@@ -81,14 +82,14 @@ class _DanmakuViewState extends State<DanmakuView>
   bool get _isTablet => !_isDesktop && _deviceShortestSide >= 600.0;
 
   /// 特殊处理说明：
-  /// 平台与设备型态敏感的滚动弹幕基准穿越耗时 (毫秒)
-  /// - Windows / Desktop (桌面端): 11.0s (11000ms)，严格对齐 animaku BILI_SCROLL_BASE_DURATION 与 B 站桌面播放器物理穿越标定；
-  ///   大屏显示器 (1080p~4K) 下 8.5s 会导致像素速度飙升至 250px/s 引起严重眩晕，11.0s 让文字在人眼适读舒适区平稳滑行；
-  /// - Tablet (平板端): 10.5s (10500ms)，适配 10~13 英寸大屏视距与分辨率，防止弹幕过快滑过；
-  /// - Mobile Phone (手机端): 保持原生的 8.5s (8500ms)，维持小屏紧凑轻快的视感。
+  /// 视口形态敏感的滚动弹幕基准穿越耗时 (毫秒)
+  /// 严格依照当前播放器渲染视口物理宽度自适应，杜绝按操作系统 Platform.isWindows 一刀切判断：
+  /// - 宽屏 / 桌面全屏 (viewWidth >= 840): 11.0s (11000ms)，严格对齐桌面大屏适读舒适区，防眩晕；
+  /// - 中等平板视口 (600 <= viewWidth < 840): 约 8.08s (8077ms，原 10.5s 提速 30%：10500 / 1.3 ≈ 8077)；
+  /// - 移动端窄屏视口 (viewWidth < 600): 7.5s (7500ms)，保持小屏适读与紧凑轻快的平衡。
   double get _scrollBaseDurationMs {
-    if (_isDesktop) return 11000.0;
-    if (_isTablet) return 10500.0;
+    if (_viewWidth >= 840.0) return 11000.0;
+    if (_viewWidth >= 600.0) return 8077.0;
     return _kScrollBaseDurationMs;
   }
 

@@ -23,7 +23,7 @@ void main() {
       expect(core.loading, isTrue);
       expect(core.buffering, isFalse);
       expect(core.playbackRate, equals(1.0));
-      expect(core.volume, equals(1.0));
+      expect(core.volume, equals(0.5));
       expect(core.muted, isFalse);
 
       expect(timeline.position, equals(Duration.zero));
@@ -54,11 +54,11 @@ void main() {
 
     test('音量调整与静音切换测试', () async {
       expect(controller.core.value.muted, isFalse);
-      expect(controller.core.value.volume, equals(1.0));
-
-      // 设置音量为 50%
-      await controller.setVolume(0.5);
       expect(controller.core.value.volume, equals(0.5));
+
+      // 设置音量为 80%
+      await controller.setVolume(0.8);
+      expect(controller.core.value.volume, equals(0.8));
       expect(controller.core.value.muted, isFalse);
 
       // 切换静音
@@ -66,10 +66,10 @@ void main() {
       expect(controller.core.value.muted, isTrue);
       expect(controller.core.value.volume, equals(0.0));
 
-      // 取消静音，恢复之前的 50% 音量
+      // 取消静音，恢复之前的 80% 音量
       await controller.toggleMute();
       expect(controller.core.value.muted, isFalse);
-      expect(controller.core.value.volume, equals(0.5));
+      expect(controller.core.value.volume, equals(0.8));
     });
 
     test('Seek 操作主动清除偶发错误状态', () async {

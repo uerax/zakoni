@@ -17,6 +17,7 @@ void main() {
 
     setUp(() {
       SharedPreferences.setMockInitialValues({});
+      PlayerPreferencesService.instance.resetForTest();
       danmakuController = DanmakuController();
       controller = ZakowayPlaybackController();
     });

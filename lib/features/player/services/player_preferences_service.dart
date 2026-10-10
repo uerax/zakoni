@@ -39,7 +39,7 @@ class PlayerPreferencesService extends ChangeNotifier {
   static const String _kControlBarScaleKey = 'zakoway_player_control_bar_scale';
 
   double _playbackRate = 1.0;
-  double _volume = 1.0;
+  double _volume = 0.5;
   DanmakuSettings _danmakuSettings = const DanmakuSettings();
   bool _autoPlayNext = true;
   PlayerControlBarScale _controlBarScale = PlayerControlBarScale.auto;
@@ -57,7 +57,7 @@ class PlayerPreferencesService extends ChangeNotifier {
     try {
       final sp = await SharedPreferences.getInstance();
       _playbackRate = sp.getDouble(_kPlaybackRateKey) ?? 1.0;
-      _volume = sp.getDouble(_kVolumeKey) ?? 1.0;
+      _volume = sp.getDouble(_kVolumeKey) ?? 0.5;
       _autoPlayNext = sp.getBool(_kAutoPlayNextKey) ?? true;
       final scaleRaw = sp.getString(_kControlBarScaleKey);
       _controlBarScale = PlayerControlBarScale.fromString(scaleRaw);
@@ -127,5 +127,16 @@ class PlayerPreferencesService extends ChangeNotifier {
       final jsonStr = jsonEncode(settings.toJson());
       await sp.setString(_kDanmakuSettingsKey, jsonStr);
     } catch (_) {}
+  }
+
+  /// 重置状态（用于测试隔离）
+  @visibleForTesting
+  void resetForTest() {
+    _playbackRate = 1.0;
+    _volume = 0.5;
+    _danmakuSettings = const DanmakuSettings();
+    _autoPlayNext = true;
+    _controlBarScale = PlayerControlBarScale.auto;
+    _initialized = false;
   }
 }

@@ -116,12 +116,12 @@ void main() {
   });
 
   group('PlayerPreferencesService 播放倍速与音量持久化测试', () {
-    test('默认倍速为 1.0，音量为 1.0', () async {
+    test('默认倍速为 1.0，音量为 0.5', () async {
       final prefs = PlayerPreferencesService.instance;
       await prefs.initialize();
 
       expect(prefs.playbackRate, equals(1.0));
-      expect(prefs.volume, equals(1.0));
+      expect(prefs.volume, equals(0.5));
     });
 
     test('保存倍速与音量后持久化存储并可恢复', () async {

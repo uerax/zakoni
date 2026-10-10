@@ -25,7 +25,7 @@ class PlaybackCoreState {
     this.completed = false,
     this.firstFrameRendered = false,
     this.playbackRate = 1.0,
-    this.volume = 1.0,
+    this.volume = 0.5,
     this.muted = false,
     this.videoFit = BoxFit.contain,
     this.superResolution = SuperResolutionMode.off,

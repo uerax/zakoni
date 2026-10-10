@@ -216,6 +216,42 @@ void main() {
       expect(selectedRoad, equals(1));
       expect(selectedEpisodeCallCount, equals(0));
     });
+
+    testWidgets('8. 移动端选集分页单页容量为 28，整除 4 列网格且支持即时 0ms 切页', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EpisodePickerSection(
+              episodeCount: 60,
+              currentEpisode: 1,
+              onSelectEpisode: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 验证生成 1-28, 29-56, 57-60 区间胶囊
+      expect(find.text('1-28'), findsOneWidget);
+      expect(find.text('29-56'), findsOneWidget);
+      expect(find.text('57-60'), findsOneWidget);
+      expect(find.text('第 1 话'), findsOneWidget);
+      expect(find.text('第 28 话'), findsOneWidget);
+      expect(find.text('第 29 话'), findsNothing);
+
+      // 点击切换至第二区间「29-56」
+      await tester.tap(find.text('29-56'));
+      await tester.pump(); // 0ms 即时渲染生效，无动画延迟
+
+      expect(find.text('第 29 话'), findsOneWidget);
+      expect(find.text('第 56 话'), findsOneWidget);
+      expect(find.text('第 1 话'), findsNothing);
+    });
   });
 }
 

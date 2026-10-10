@@ -118,9 +118,7 @@ class ZakowayPlaybackController {
     if (savedRate != 1.0) {
       await player.setRate(savedRate);
     }
-    if (savedVolume != 1.0) {
-      await player.setVolume(savedVolume * 100.0);
-    }
+    await player.setVolume(savedVolume * 100.0);
   }
 
   /// 配置底层 mpv 属性（变速变调不变音、协议层断流自动重连、确保网络流快速定位、自适应分级缓冲）

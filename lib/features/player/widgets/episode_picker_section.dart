@@ -78,6 +78,7 @@ class EpisodePickerSection extends StatefulWidget {
     this.onRoadSelected,
     this.episodeTitles,
     this.watchedEpisodes = const {},
+    this.rangeSize,
   });
 
   final int episodeCount;
@@ -92,6 +93,8 @@ class EpisodePickerSection extends StatefulWidget {
   final ValueChanged<int>? onRoadSelected;
   final List<String>? episodeTitles;
   final Set<int> watchedEpisodes;
+  /// 自定义单页集数区间容量（若未指定，移动端默认 28，桌面端默认 50）
+  final int? rangeSize;
 
   @override
   State<EpisodePickerSection> createState() => _EpisodePickerSectionState();
@@ -102,7 +105,15 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
   int _activeRoadIndex = 0;
   int _selectedRangeIndex = 0;
 
-  static const int _rangeSize = 50;
+  /// 特殊处理说明：
+  /// 分页区间步长依照当前视口宽度动态自适应（严格对齐 Material 3 规范与 AppBreakpoints）：
+  /// - 移动端 / 紧凑单栏 (< 600dp): 28（4 列 x 7 行完美整除，规避 50 ÷ 4 = 12 行余 2 的末排残缺问题）；
+  /// - 宽屏 / 桌面全屏 (>= 600dp): 保持 50。
+  int get _rangeSize {
+    if (widget.rangeSize != null) return widget.rangeSize!;
+    final width = MediaQuery.maybeSizeOf(context)?.width ?? 400.0;
+    return width < 600.0 ? 28 : 50;
+  }
 
   @override
   void initState() {
@@ -117,10 +128,11 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
       _activeRoadIndex = widget.activeRoadIndex;
     }
     // 当外部选中新集数时，自动对齐到对应区间分页
+    final currentRangeSize = _rangeSize;
     if (widget.currentEpisode != null &&
         widget.currentEpisode != oldWidget.currentEpisode &&
-        widget.episodeCount > 40) {
-      final targetRange = (widget.currentEpisode! - 1) ~/ _rangeSize;
+        widget.episodeCount > currentRangeSize) {
+      final targetRange = (widget.currentEpisode! - 1) ~/ currentRangeSize;
       if (targetRange != _selectedRangeIndex) {
         setState(() => _selectedRangeIndex = targetRange);
       }
@@ -145,15 +157,23 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
     final slots = widget.slots;
     final hasSlots = slots != null && slots.isNotEmpty;
     final total = hasSlots ? slots.length : widget.episodeCount;
-    final isMultiRange = total > 40;
-    final numRanges = isMultiRange ? (total / _rangeSize).ceil() : 1;
+    final rangeSize = _rangeSize;
+    final isMultiRange = total > rangeSize;
+    final numRanges = isMultiRange ? (total / rangeSize).ceil() : 1;
+
+    if (_selectedRangeIndex >= numRanges) {
+      _selectedRangeIndex = numRanges > 0 ? numRanges - 1 : 0;
+    }
+    if (_selectedRangeIndex < 0) {
+      _selectedRangeIndex = 0;
+    }
 
     // 计算当前区间中的集数
-    final startEp = isMultiRange ? (_selectedRangeIndex * _rangeSize + 1) : 1;
+    final startEp = isMultiRange ? (_selectedRangeIndex * rangeSize + 1) : 1;
     final endEp = isMultiRange
-        ? ((_selectedRangeIndex + 1) * _rangeSize > total
+        ? ((_selectedRangeIndex + 1) * rangeSize > total
             ? total
-            : (_selectedRangeIndex + 1) * _rangeSize)
+            : (_selectedRangeIndex + 1) * rangeSize)
         : total;
 
     // 生成当前区间集数列表（考虑正倒序）
@@ -322,17 +342,17 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
             ),
           ),
 
-        // 3. 长番剧区间分页胶囊 (1-50, 51-100...)
+        // 3. 长番剧区间分页胶囊 (移动端 1-28, 29-56...; 桌面端 1-50, 51-100...)
         if (isMultiRange && numRanges > 1)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
             child: Row(
               children: List.generate(numRanges, (rIdx) {
-                final rStart = rIdx * _rangeSize + 1;
-                final rEnd = (rIdx + 1) * _rangeSize > total
+                final rStart = rIdx * rangeSize + 1;
+                final rEnd = (rIdx + 1) * rangeSize > total
                     ? total
-                    : (rIdx + 1) * _rangeSize;
+                    : (rIdx + 1) * rangeSize;
                 final isRangeActive = rIdx == _selectedRangeIndex;
                 final containsPlaying = widget.currentEpisode != null &&
                     widget.currentEpisode! >= rStart &&
@@ -340,12 +360,11 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
-                  // 分页胶囊：采用即时响应的 InkWell，消除 300ms 点击等待延迟
+                  // 分页胶囊：采用即时响应的 InkWell 与纯 Container，消除历史遗留动画延迟，实现 0ms 即时切页
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () => setState(() => _selectedRangeIndex = rIdx),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 90),
+                    child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: isRangeActive
@@ -459,8 +478,7 @@ class _EpisodePickerSectionState extends State<EpisodePickerSection> {
                               widget.onSelectEpisode(ep);
                             }
                           },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
+                          child: Container(
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: isPlaying
