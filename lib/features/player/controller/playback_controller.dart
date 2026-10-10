@@ -7,7 +7,6 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:zakoni/core/services/network_connectivity_service.dart';
 import 'package:zakoni/features/player/controller/playback_state.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
 import 'package:zakoni/features/player/services/player_preferences_service.dart';
 
 const String _kDefaultUserAgent =
@@ -27,14 +26,9 @@ const int _kMobileMaxBytes = 16 * 1024 * 1024; // 16MB
 const int _kMobileMaxBackBytes = 4 * 1024 * 1024; // 4MB
 
 /// zakoni 视频播放引擎控制器
-/// 封装 media_kit (libmpv) 底层驱动，支持 250ms 节流解耦、倍速变调修正、切片断流自动重试与弹幕联动
+/// 封装 media_kit (libmpv) 底层驱动，支持 250ms 节流解耦、倍速变调修正与切片断流自动重试
 class ZakoniPlaybackController {
-  ZakoniPlaybackController({
-    this.danmakuController,
-  });
-
-  /// 关联的弹幕控制器
-  final DanmakuController? danmakuController;
+  ZakoniPlaybackController();
 
   /// 低频宏观控制状态
   final ValueNotifier<PlaybackCoreState> core =
@@ -123,7 +117,6 @@ class ZakoniPlaybackController {
 
     if (savedRate != 1.0) {
       await player.setRate(savedRate);
-      danmakuController?.setPlaybackRate(savedRate);
     }
     if (savedVolume != 1.0) {
       await player.setVolume(savedVolume * 100.0);
@@ -261,10 +254,8 @@ class ZakoniPlaybackController {
 
     _currentUri = uri;
     _pendingStart = start ?? Duration.zero;
-
-    // 切集或加载媒体时，立即暂停冻结弹幕并预置时间轴
-    danmakuController?.pause();
-    danmakuController?.syncTime(_pendingStart);
+    _lastPosition = _pendingStart;
+    _lastPositionAt = _positionClock.elapsed;
 
     // 特殊处理说明：
     // 切集或初次打开媒体流时，必须将 firstFrameRendered 立即置为 false 并保持 loading=true。
@@ -305,6 +296,7 @@ class ZakoniPlaybackController {
 
   /// 播放 / 暂停切换
   Future<void> togglePlay() async {
+    if (_disposed) return;
     final player = _player;
     if (player == null) {
       core.value = core.value.copyWith(playing: !core.value.playing);
@@ -318,29 +310,28 @@ class ZakoniPlaybackController {
   }
 
   Future<void> play() async {
+    if (_disposed) return;
     final player = _player;
     if (player == null) {
       core.value = core.value.copyWith(playing: true);
-      _syncDanmakuState();
       return;
     }
     await player.play();
-    _syncDanmakuState();
   }
 
   Future<void> pause() async {
+    if (_disposed) return;
     final player = _player;
     if (player == null) {
       core.value = core.value.copyWith(playing: false);
-      _syncDanmakuState();
       return;
     }
     await player.pause();
-    _syncDanmakuState();
   }
 
   /// 跳转至指定播放进度
   Future<void> seek(Duration target) async {
+    if (_disposed) return;
     final dur = timeline.value.duration;
     var targetPosition = target < Duration.zero ? Duration.zero : target;
 
@@ -353,6 +344,9 @@ class ZakoniPlaybackController {
         targetPosition = Duration.zero;
       }
     }
+
+    _lastPosition = targetPosition;
+    _lastPositionAt = _positionClock.elapsed;
 
     timeline.value = timeline.value.copyWith(
       position: targetPosition,
@@ -374,7 +368,6 @@ class ZakoniPlaybackController {
       // 外层反复 pause/play 会破坏底层解复用线程与解码器缓冲区的状态机同步，诱发 Packet corrupt。
       await player.seek(targetPosition);
     }
-    danmakuController?.syncTime(targetPosition);
   }
 
   /// 进度条拖拽中实时更新预览位置（手指不松开不调用底层的 seek）
@@ -399,13 +392,13 @@ class ZakoniPlaybackController {
 
   /// 设置播放倍速
   Future<void> setPlaybackRate(double rate) async {
+    if (_disposed) return;
     final clampedRate = math.max(0.25, math.min(3.0, rate));
     core.value = core.value.copyWith(playbackRate: clampedRate);
     final player = _player;
     if (player != null) {
       await player.setRate(clampedRate);
     }
-    danmakuController?.setPlaybackRate(clampedRate);
     PlayerPreferencesService.instance.savePlaybackRate(clampedRate).ignore();
   }
 
@@ -474,49 +467,33 @@ class ZakoniPlaybackController {
     }
   }
 
-  /// 弹幕时钟与运行状态同步门禁：
-  /// 只有当视频【真正播放中】且【首帧已渲染出画】且【不在缓冲转圈中】且【不在加载中】且【未播放结束】时才允许弹幕滑行；
-  /// 其余任何状态（如加载中、卡顿缓冲中、暂停中、切集中、播放结束）一律将弹幕严格冻结暂停。
-  void _syncDanmakuState() {
-    final shouldRun = core.value.playing &&
-        core.value.firstFrameRendered &&
-        !core.value.loading &&
-        !core.value.buffering &&
-        !core.value.completed;
-
-    if (shouldRun) {
-      danmakuController?.resume();
-    } else {
-      danmakuController?.pause();
-    }
-  }
-
   // ==========================
   // 底层事件流响应与 250ms 节流
   // ==========================
 
   void _onPlayingChanged(bool isPlaying) {
+    if (_disposed) return;
     if (core.value.playing != isPlaying) {
       core.value = core.value.copyWith(
         playing: isPlaying,
         clearError: isPlaying,
       );
       _checkFirstFrameRendered();
-      _syncDanmakuState();
     }
   }
 
   void _onBufferingChanged(bool isBuffering) {
+    if (_disposed) return;
     if (core.value.buffering != isBuffering) {
       core.value = core.value.copyWith(buffering: isBuffering);
       if (!isBuffering) {
         _checkFirstFrameRendered();
       }
-      _syncDanmakuState();
     }
   }
 
   void _onCompletedChanged(bool isCompleted) {
+    if (_disposed) return;
     if (isCompleted) {
       // 特殊处理说明：
       // 当底层网络断流或解码瞬态异常抛出 EOF code: 4 (ERROR) 时，
@@ -536,18 +513,18 @@ class ZakoniPlaybackController {
 
     if (core.value.completed != isCompleted) {
       core.value = core.value.copyWith(completed: isCompleted);
-      _syncDanmakuState();
     }
   }
 
   void _onRateChanged(double rate) {
+    if (_disposed) return;
     if (core.value.playbackRate != rate) {
       core.value = core.value.copyWith(playbackRate: rate);
     }
   }
 
   void _onErrorChanged(String error) {
-    if (error.isEmpty) return;
+    if (_disposed || error.isEmpty) return;
 
     // 过滤底层网络断开/Seek重连/EOF良性日志 (如 FFmpeg AVERROR_EOF = -541478725 / 0xdfb9b0bb)
     final lower = error.toLowerCase();
@@ -567,6 +544,7 @@ class ZakoniPlaybackController {
   }
 
   void _onPositionChanged(Duration pos) {
+    if (_disposed) return;
     // 门禁：规避起播瞬间 mpv 抛出的 0 秒事件覆盖真实断点进度
     if (_pendingStart > Duration.zero) {
       if (pos + const Duration(seconds: 1) < _pendingStart) {
@@ -587,6 +565,7 @@ class ZakoniPlaybackController {
   }
 
   void _onDurationChanged(Duration dur) {
+    if (_disposed) return;
     _lastDuration = dur;
     _checkFirstFrameRendered();
     _scheduleTimelineEmit();
@@ -598,6 +577,7 @@ class ZakoniPlaybackController {
   /// 若等待 position 前进大于 0 秒会白白多出 500~1000ms 的无谓黑屏等待。
   /// 只要新流时长元数据就绪且缓冲完成（!buffering）或已处于播放中，立即判定首帧就绪，0 延迟解除黑屏。
   void _checkFirstFrameRendered() {
+    if (_disposed) return;
     if (!core.value.firstFrameRendered) {
       final hasDur = _lastDuration > Duration.zero;
       final isPlaying = core.value.playing;
@@ -607,14 +587,12 @@ class ZakoniPlaybackController {
           firstFrameRendered: true,
           loading: false,
         );
-        // 首帧真正解码出画瞬间：将弹幕时钟强制精准对齐当前视频帧进度，杜绝偷跑时差
-        danmakuController?.syncTime(_lastPosition);
-        _syncDanmakuState();
       }
     }
   }
 
   void _onBufferChanged(Duration buf) {
+    if (_disposed) return;
     _lastBuffer = buf;
     _scheduleTimelineEmit();
   }
@@ -622,9 +600,10 @@ class ZakoniPlaybackController {
   /// 把最近一次位置采样按到达时刻外推到当前时刻，供弹幕时钟对时使用。
   /// 采样本身是旧值（事件延迟 + 250ms 节流定时器），直接拿来对时会给弹幕时钟注入噪声。
   /// 暂停 / 缓冲中不外推；外推量设上限，防止事件长时间缺失时越推越偏。
-  Duration get _extrapolatedPosition {
+  Duration get extrapolatedPosition {
+    if (_disposed) return Duration.zero;
     final state = core.value;
-    if (!state.playing || state.buffering) return _lastPosition;
+    if (!state.playing || state.buffering) return timeline.value.position;
     final ageUs = (_positionClock.elapsed - _lastPositionAt).inMicroseconds;
     if (ageUs <= 0) return _lastPosition;
     final cappedUs = math.min(ageUs, 250000);
@@ -645,8 +624,6 @@ class ZakoniPlaybackController {
         duration: _lastDuration,
         buffer: _lastBuffer,
       );
-      // 联动同步弹幕时间（使用外推后的位置，而不是过时的原始采样）
-      danmakuController?.syncTime(_extrapolatedPosition);
     });
   }
 

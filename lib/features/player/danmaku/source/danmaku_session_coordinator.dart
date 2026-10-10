@@ -79,7 +79,9 @@ class DanmakuSessionCoordinator extends ChangeNotifier {
   int? _selectedEpisodeId;
 
   int _autoMatchGen = 0;
+  bool _disposed = false;
 
+  bool get isDisposed => _disposed;
   String get status => _status.isNotEmpty ? _status : _buildPoolsStatusLine();
   bool get searchBusy => _searchBusy;
   bool get bilibiliBusy => _bilibiliBusy;
@@ -90,11 +92,13 @@ class DanmakuSessionCoordinator extends ChangeNotifier {
   int? get selectedEpisodeId => _selectedEpisodeId;
 
   void _onPoolsChanged() {
+    if (_disposed) return;
     _refreshController();
     notifyListeners();
   }
 
   void _refreshController() {
+    if (_disposed) return;
     final flattened = poolsManager.flattenEnabledPools();
     danmakuController.loadItems(flattened);
   }
@@ -500,6 +504,7 @@ class DanmakuSessionCoordinator extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     poolsManager.removeListener(_onPoolsChanged);
     poolsManager.dispose();
     super.dispose();

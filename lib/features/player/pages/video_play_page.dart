@@ -79,6 +79,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     with SingleTickerProviderStateMixin {
   late final ZakoniPlaybackController _playbackController;
   late final DanmakuController _danmakuController;
+  late final DanmakuPlaybackBridge _danmakuBridge;
   late final DanmakuSessionCoordinator _danmakuCoordinator;
   late final TabController _tabController;
   late final SourceAggregator _aggregator;
@@ -191,7 +192,9 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     _danmakuCoordinator = DanmakuSessionCoordinator(
       danmakuController: _danmakuController,
     );
-    _playbackController = ZakoniPlaybackController(
+    _playbackController = ZakoniPlaybackController();
+    _danmakuBridge = DanmakuPlaybackBridge(
+      playbackController: _playbackController,
       danmakuController: _danmakuController,
     );
     _playbackController.core.addListener(_onPlaybackCoreStateChanged);
@@ -1027,6 +1030,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
 
   @override
   void dispose() {
+    _danmakuBridge.dispose();
     _saveProgressOnExit();
     if (_isFullscreen) {
       _exitFullscreen();

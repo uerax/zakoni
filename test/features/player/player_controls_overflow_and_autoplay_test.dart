@@ -18,9 +18,7 @@ void main() {
     setUp(() {
       SharedPreferences.setMockInitialValues({});
       danmakuController = DanmakuController();
-      controller = ZakoniPlaybackController(
-        danmakuController: danmakuController,
-      );
+      controller = ZakoniPlaybackController();
     });
 
     tearDown(() async {
@@ -97,7 +95,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // 打开播放设置
-      await tester.tap(find.byIcon(Icons.settings_outlined));
+      await tester.tap(find.byIcon(Icons.settings_rounded));
       await tester.pumpAndSettle();
 
       // 验证「自动播放下一集」开关存在且初始为 true
@@ -176,7 +174,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // 打开播放设置
-      await tester.tap(find.byIcon(Icons.settings_outlined));
+      await tester.tap(find.byIcon(Icons.settings_rounded));
       await tester.pumpAndSettle();
 
       expect(find.text('控制栏图标大小'), findsOneWidget);

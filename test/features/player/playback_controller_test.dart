@@ -1,24 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ZakoniPlaybackController 状态与控制测试', () {
     late ZakoniPlaybackController controller;
-    late DanmakuController danmakuController;
 
     setUp(() {
-      danmakuController = DanmakuController();
-      controller = ZakoniPlaybackController(
-        danmakuController: danmakuController,
-      );
+      controller = ZakoniPlaybackController();
     });
 
     tearDown(() async {
       await controller.dispose();
-      danmakuController.dispose();
     });
 
     test('初始状态值校验', () {

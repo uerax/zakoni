@@ -17,5 +17,6 @@ export 'source/local_xml_parser.dart';
 export 'source/danmaku_session_coordinator.dart';
 export 'view/danmaku_text_layout.dart';
 export 'view/danmaku_view.dart';
+export 'danmaku_playback_bridge.dart';
 export 'widgets/danmaku_offset_stepper.dart';
 export 'widgets/danmaku_source_chips.dart';

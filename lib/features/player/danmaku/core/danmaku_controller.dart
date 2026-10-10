@@ -49,6 +49,10 @@ class DanmakuController extends ChangeNotifier {
   bool _playing = false;
   double _playbackRate = 1.0;
   List<DanmakuCompiledRule> _compiledFilters = const [];
+  bool _disposed = false;
+
+  /// 控制器是否已销毁
+  bool get isDisposed => _disposed;
 
   /// 当前所有已就绪并排序的弹幕列表
   List<DanmakuItem> get items => List.unmodifiable(_items);
@@ -64,6 +68,7 @@ class DanmakuController extends ChangeNotifier {
 
   /// 挂载视图监听器
   void attach(DanmakuListener listener) {
+    if (_disposed) return;
     _listener = listener;
   }
 
@@ -76,6 +81,7 @@ class DanmakuController extends ChangeNotifier {
 
   /// 批量载入全集弹幕数据（内部自动按时间轴毫秒排序）
   void loadItems(List<DanmakuItem> newItems) {
+    if (_disposed) return;
     _items.clear();
     _items.addAll(newItems);
     _items.sort((a, b) => a.timeMs.compareTo(b.timeMs));
@@ -85,11 +91,13 @@ class DanmakuController extends ChangeNotifier {
 
   /// 动态发射/注入单条弹幕
   void inject(DanmakuItem item) {
+    if (_disposed) return;
     _listener?.onDanmakuInject(item);
   }
 
   /// 更新弹幕配置项
   void updateSettings(DanmakuSettings newSettings) {
+    if (_disposed) return;
     final previous = _settings;
     if (previous == newSettings) return;
     _settings = newSettings;
@@ -101,12 +109,13 @@ class DanmakuController extends ChangeNotifier {
 
   /// 同步视频时间轴
   void syncTime(Duration position) {
+    if (_disposed) return;
     _listener?.onDanmakuTimeSync(position);
   }
 
   /// 播放倍速联动
   void setPlaybackRate(double rate) {
-    if (_playbackRate == rate) return;
+    if (_disposed || _playbackRate == rate) return;
     _playbackRate = math.max(0.1, rate);
     _listener?.onDanmakuPlaybackRateChanged(_playbackRate);
     notifyListeners();
@@ -114,6 +123,7 @@ class DanmakuController extends ChangeNotifier {
 
   /// 播放状态控制：播放
   void resume() {
+    if (_disposed) return;
     _playing = true;
     _listener?.onDanmakuResume();
     notifyListeners();
@@ -121,6 +131,7 @@ class DanmakuController extends ChangeNotifier {
 
   /// 播放状态控制：暂停
   void pause() {
+    if (_disposed) return;
     _playing = false;
     _listener?.onDanmakuPause();
     notifyListeners();
@@ -128,11 +139,13 @@ class DanmakuController extends ChangeNotifier {
 
   /// 清空当前屏幕与状态
   void reset() {
+    if (_disposed) return;
     _listener?.onDanmakuReset();
   }
 
   /// 清空所有数据
   void clearAll() {
+    if (_disposed) return;
     _items.clear();
     reset();
     notifyListeners();
@@ -148,5 +161,13 @@ class DanmakuController extends ChangeNotifier {
 
   void _recompileFilters() {
     _compiledFilters = DanmakuFilterEngine.compileRules(_settings.filters);
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _listener = null;
+    super.dispose();
   }
 }

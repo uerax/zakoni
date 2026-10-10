@@ -17,9 +17,7 @@ void main() {
 
     setUp(() {
       danmakuController = DanmakuController();
-      controller = ZakoniPlaybackController(
-        danmakuController: danmakuController,
-      );
+      controller = ZakoniPlaybackController();
     });
 
     tearDown(() async {
@@ -55,7 +53,7 @@ void main() {
       expect(find.text('测试动画第01话'), findsOneWidget);
 
       // 验证设置按钮与自绘弹幕面板设置图标 (DanmakuSettingsIcon)
-      expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.settings_rounded), findsOneWidget);
       expect(find.byType(DanmakuSettingsIcon), findsOneWidget);
 
       // 验证控制栏上一集与下一集按钮已移除
@@ -278,9 +276,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // 点击控制栏设置图标 (Icons.settings_outlined)
-      expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.settings_outlined));
+      // 点击控制栏设置图标 (Icons.settings_rounded)
+      expect(find.byIcon(Icons.settings_rounded), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.settings_rounded));
       await tester.pumpAndSettle();
 
       // 验证设置面板展示

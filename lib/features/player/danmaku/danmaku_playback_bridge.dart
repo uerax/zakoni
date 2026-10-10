@@ -1,0 +1,64 @@
+import 'package:zakoni/features/player/controller/playback_controller.dart';
+import 'package:zakoni/features/player/danmaku/core/danmaku_controller.dart';
+
+/// 播放器内核与弹幕状态机的单向响应式解耦同步桥接器
+///
+/// 架构设计说明：
+/// 1. 彻底解耦 ZakoniPlaybackController 与 DanmakuController，播放控制器不再直接持有弹幕实例；
+/// 2. 单向监听 ZakoniPlaybackController 的 core 与 timeline 状态流，按需驱动弹幕时钟与启停；
+/// 3. 随宿主生命周期销毁（优先于 Controller 销毁）：在 dispose() 中立即解除所有监听，
+///    从根本上阻断任何后台异步 IPC / 微任务对已销毁弹幕控制器的非法反冲调用。
+class DanmakuPlaybackBridge {
+  DanmakuPlaybackBridge({
+    required this.playbackController,
+    required this.danmakuController,
+  }) {
+    playbackController.core.addListener(_onCoreChanged);
+    playbackController.timeline.addListener(_onTimelineChanged);
+
+    // 初始状态同步
+    danmakuController.setPlaybackRate(playbackController.core.value.playbackRate);
+    _syncDanmakuRunningState();
+  }
+
+  final ZakoniPlaybackController playbackController;
+  final DanmakuController danmakuController;
+  bool _disposed = false;
+
+  bool get isDisposed => _disposed;
+
+  void _onCoreChanged() {
+    if (_disposed) return;
+    danmakuController.setPlaybackRate(playbackController.core.value.playbackRate);
+    _syncDanmakuRunningState();
+  }
+
+  void _onTimelineChanged() {
+    if (_disposed) return;
+    danmakuController.syncTime(playbackController.extrapolatedPosition);
+  }
+
+  void _syncDanmakuRunningState() {
+    if (_disposed) return;
+    final core = playbackController.core.value;
+    final shouldRun = core.playing &&
+        core.firstFrameRendered &&
+        !core.loading &&
+        !core.buffering &&
+        !core.completed;
+
+    if (shouldRun) {
+      danmakuController.resume();
+    } else {
+      danmakuController.pause();
+    }
+  }
+
+  /// 立即注销监听器并切断同步通道
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    playbackController.core.removeListener(_onCoreChanged);
+    playbackController.timeline.removeListener(_onTimelineChanged);
+  }
+}
