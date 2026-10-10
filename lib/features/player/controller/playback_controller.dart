@@ -54,6 +54,10 @@ class ZakoniPlaybackController {
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   Timer? _timelineThrottleTimer;
   Duration _lastPosition = Duration.zero;
+
+  /// 位置采样到达时刻（单调时钟），用于把旧采样外推到“此刻”
+  final Stopwatch _positionClock = Stopwatch()..start();
+  Duration _lastPositionAt = Duration.zero;
   Duration _lastDuration = Duration.zero;
   Duration _lastBuffer = Duration.zero;
 
@@ -568,6 +572,7 @@ class ZakoniPlaybackController {
     }
 
     _lastPosition = pos;
+    _lastPositionAt = _positionClock.elapsed;
     _checkFirstFrameRendered();
     _scheduleTimelineEmit();
   }
@@ -605,6 +610,19 @@ class ZakoniPlaybackController {
     _scheduleTimelineEmit();
   }
 
+  /// 把最近一次位置采样按到达时刻外推到当前时刻，供弹幕时钟对时使用。
+  /// 采样本身是旧值（事件延迟 + 250ms 节流定时器），直接拿来对时会给弹幕时钟注入噪声。
+  /// 暂停 / 缓冲中不外推；外推量设上限，防止事件长时间缺失时越推越偏。
+  Duration get _extrapolatedPosition {
+    final state = core.value;
+    if (!state.playing || state.buffering) return _lastPosition;
+    final ageUs = (_positionClock.elapsed - _lastPositionAt).inMicroseconds;
+    if (ageUs <= 0) return _lastPosition;
+    final cappedUs = math.min(ageUs, 250000);
+    return _lastPosition +
+        Duration(microseconds: (cappedUs * state.playbackRate).round());
+  }
+
   /// 250ms 节流触发时间线更新，杜绝高频重绘
   void _scheduleTimelineEmit() {
     if (_timelineThrottleTimer != null && _timelineThrottleTimer!.isActive) {
@@ -618,8 +636,8 @@ class ZakoniPlaybackController {
         duration: _lastDuration,
         buffer: _lastBuffer,
       );
-      // 联动同步弹幕时间
-      danmakuController?.syncTime(_lastPosition);
+      // 联动同步弹幕时间（使用外推后的位置，而不是过时的原始采样）
+      danmakuController?.syncTime(_extrapolatedPosition);
     });
   }
 

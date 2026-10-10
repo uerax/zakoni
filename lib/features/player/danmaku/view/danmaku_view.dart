@@ -19,6 +19,12 @@ const double _kBottomDurationMs = 5000.0;
 const double _kScrollBaseDurationMs = 8500.0;
 const double _kSeekThresholdMs = 1200.0;
 
+/// 小漂移纠偏的时间常数 (ms)：采样噪声被平滑掉，不再在单帧内跳变
+const double _kCorrectionTauMs = 300.0;
+
+/// 纠偏对时钟速度的最大扰动比例（25%），避免大漂移时弹幕明显加速 / 倒退
+const double _kMaxCorrectionRate = 0.25;
+
 /// 高性能纯 Flutter Canvas 弹幕渲染组件
 /// 支持飞行中动态吸收合流 (xN)、微秒级时钟插值、防追尾轨道算法与智能休眠节电
 class DanmakuView extends StatefulWidget {
@@ -50,6 +56,7 @@ class _DanmakuViewState extends State<DanmakuView>
   Timer? _wakeTimer;
   int _cursor = 0;
   double _clockMs = 0.0;
+  double _pendingCorrectionMs = 0.0;
   Duration _lastElapsed = Duration.zero;
 
   double _viewWidth = 0.0;
@@ -138,7 +145,18 @@ class _DanmakuViewState extends State<DanmakuView>
     if (delta <= Duration.zero) return;
 
     // 1. 微秒级连续平滑时间插值推进
-    _clockMs += (delta.inMicroseconds / 1000.0) * _controller.playbackRate;
+    final dtMs = delta.inMicroseconds / 1000.0;
+    _clockMs += dtMs * _controller.playbackRate;
+
+    // 1.5 将待纠偏量在后续若干帧内平滑消化（指数趋近 + 速率上限），消除周期性跳格
+    if (_pendingCorrectionMs != 0.0) {
+      final maxStep = dtMs * _kMaxCorrectionRate;
+      final step = (_pendingCorrectionMs * (1.0 - math.exp(-dtMs / _kCorrectionTauMs)))
+          .clamp(-maxStep, maxStep);
+      _clockMs += step;
+      _pendingCorrectionMs -= step;
+      if (_pendingCorrectionMs.abs() < 0.05) _pendingCorrectionMs = 0.0;
+    }
 
     // 2. 发射到期弹幕（带动态合流与入场调度）
     _emitDue();
@@ -169,6 +187,7 @@ class _DanmakuViewState extends State<DanmakuView>
       _wakeTimer = null;
       if (!_ticker.isActive) {
         _lastElapsed = Duration.zero;
+        _pendingCorrectionMs = 0.0;
         _ticker.start();
       }
       return;
@@ -208,6 +227,7 @@ class _DanmakuViewState extends State<DanmakuView>
   }
 
   void _stopWork() {
+    _pendingCorrectionMs = 0.0;
     _wakeTimer?.cancel();
     _wakeTimer = null;
     if (_ticker.isActive) {
@@ -549,16 +569,19 @@ class _DanmakuViewState extends State<DanmakuView>
     // Seek 阈值超过 1.2 秒：认定为用户拖动进度条，执行重置与二分查找重定位
     if (drift.abs() > _kSeekThresholdMs) {
       _clockMs = positionMs;
+      _pendingCorrectionMs = 0.0;
       _clearActive();
       _cursor = _lowerBound(_controller.items, positionMs);
       _repaintNotifier.value++;
       _emitDue();
       _scheduleWork(forceWake: true);
     } else if (_ticker.isActive) {
-      // 微小漂移在每一帧中温和纠偏
-      _clockMs += drift.clamp(-16.0, 16.0);
+      // 微小漂移不直接改写时钟，而是记录为待纠偏量，由 _onTick 逐帧平滑消化。
+      // 新采样直接覆盖旧值：drift 是相对当前（已含部分纠偏的）时钟计算的。
+      _pendingCorrectionMs = drift;
     } else {
       _clockMs = positionMs;
+      _pendingCorrectionMs = 0.0;
     }
   }
 

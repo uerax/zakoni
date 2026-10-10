@@ -228,5 +228,71 @@ void main() {
       expect(find.byType(DanmakuView), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('小漂移平滑衰减纠偏，单帧无突跳瞬移', (tester) async {
+      final controller = DanmakuController();
+      controller.loadItems([
+        DanmakuItem(text: '平滑测试弹幕', timeMs: 0),
+      ]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 600,
+              child: DanmakuView(controller: controller),
+            ),
+          ),
+        ),
+      );
+
+      controller.resume();
+      // 先运行 100ms
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // 模拟 250ms 定时器传入一个 +30ms 的微小漂移
+      controller.syncTime(const Duration(milliseconds: 130));
+
+      // 下一帧（约 8.3ms 或 16.7ms）走一帧
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.takeException(), isNull);
+
+      // 连续推进若干帧，验证平滑收敛无异常
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(find.byType(DanmakuView), findsOneWidget);
+    });
+
+    testWidgets('超过 1200ms 的 Seek 大漂移走硬重定位并清空待纠偏量', (tester) async {
+      final controller = DanmakuController();
+      controller.loadItems([
+        DanmakuItem(text: 'Seek测试弹幕1', timeMs: 100),
+        DanmakuItem(text: 'Seek测试弹幕2', timeMs: 5000),
+      ]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 600,
+              child: DanmakuView(controller: controller),
+            ),
+          ),
+        ),
+      );
+
+      controller.resume();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // 触发超过 1.2s 的大 Seek（直接跳到 5 秒）
+      controller.syncTime(const Duration(milliseconds: 5000));
+      await tester.pump(const Duration(milliseconds: 16));
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(DanmakuView), findsOneWidget);
+    });
   });
 }
