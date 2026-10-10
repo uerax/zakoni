@@ -7,6 +7,7 @@ export 'core/danmaku_controller.dart';
 export 'core/danmaku_pools_manager.dart';
 export 'core/danmaku_scroll_track.dart';
 export 'core/danmaku_entry.dart';
+export 'core/danmaku_perf_stats.dart';
 export 'source/dandan_client.dart';
 export 'source/bilibili_input_parser.dart';
 export 'source/bilibili_xml_parser.dart';

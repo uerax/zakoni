@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:zakoni/features/player/danmaku/core/danmaku_controller.dart';
 import 'package:zakoni/features/player/danmaku/core/danmaku_entry.dart';
+import 'package:zakoni/features/player/danmaku/core/danmaku_perf_stats.dart';
 import 'package:zakoni/features/player/danmaku/core/danmaku_scroll_track.dart';
 import 'package:zakoni/features/player/danmaku/models/danmaku_item.dart';
 import 'package:zakoni/features/player/danmaku/utils/danmaku_text_normalizer.dart';
@@ -38,6 +40,7 @@ class _DanmakuViewState extends State<DanmakuView>
     implements DanmakuListener {
   late final Ticker _ticker;
   final ValueNotifier<int> _repaintNotifier = ValueNotifier<int>(0);
+  final DanmakuPerfStats _perfStats = DanmakuPerfStats();
 
   final List<DanmakuEntry> _activeEntries = <DanmakuEntry>[];
   List<DanmakuScrollTrack> _scrollTracks = const [];
@@ -94,6 +97,7 @@ class _DanmakuViewState extends State<DanmakuView>
   @override
   void initState() {
     super.initState();
+    _perfStats.start();
     _ticker = createTicker(_onTick);
     _controller.attach(this);
     if (_controller.playing) {
@@ -120,6 +124,7 @@ class _DanmakuViewState extends State<DanmakuView>
     _clearActive();
     _ticker.dispose();
     _repaintNotifier.dispose();
+    _perfStats.stop();
     super.dispose();
   }
 
@@ -140,6 +145,8 @@ class _DanmakuViewState extends State<DanmakuView>
 
     // 3. 淘汰出界弹幕
     _expire();
+
+    _perfStats.updateActiveCount(_activeEntries.length);
 
     // 4. 重绘通知
     if (_scrollingCount > 0) {
@@ -214,16 +221,21 @@ class _DanmakuViewState extends State<DanmakuView>
 
   void _emitDue() {
     if (!_hasViewport || !_controller.settings.enabled) return;
-    final items = _controller.items;
-    final initialCount = _activeEntries.length;
+    developer.Timeline.startSync('Danmaku._emitDue');
+    try {
+      final items = _controller.items;
+      final initialCount = _activeEntries.length;
 
-    while (_cursor < items.length && items[_cursor].timeMs <= _clockMs) {
-      _tryEmit(items[_cursor]);
-      _cursor++;
-    }
+      while (_cursor < items.length && items[_cursor].timeMs <= _clockMs) {
+        _tryEmit(items[_cursor]);
+        _cursor++;
+      }
 
-    if (_activeEntries.length != initialCount) {
-      _repaintNotifier.value++;
+      if (_activeEntries.length != initialCount) {
+        _repaintNotifier.value++;
+      }
+    } finally {
+      developer.Timeline.finishSync();
     }
   }
 
@@ -276,6 +288,7 @@ class _DanmakuViewState extends State<DanmakuView>
       }
 
       // === 原地吸收 ===
+      _perfStats.recordMerge();
       active.count++;
       final oldWidth = active.layout.size.width;
       active.layout.updateText('${active.baseText} ×${active.count}');
@@ -302,6 +315,7 @@ class _DanmakuViewState extends State<DanmakuView>
     final durationMs = math.max(1000.0, _scrollBaseDurationMs / settings.speed);
     final fontPx = _calculateCalculatedFontSize();
 
+    _perfStats.recordLayoutCreated();
     final layout = DanmakuTextLayout(
       text: item.text,
       color: settings.hideColor ? Colors.white : item.color,
@@ -386,6 +400,7 @@ class _DanmakuViewState extends State<DanmakuView>
     final durationMs = isTop ? _kTopDurationMs : _kBottomDurationMs;
     final fontPx = _calculateCalculatedFontSize();
 
+    _perfStats.recordLayoutCreated();
     final layout = DanmakuTextLayout(
       text: item.text,
       color: settings.hideColor ? Colors.white : item.color,
@@ -655,36 +670,41 @@ class _DanmakuPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (!state._controller.settings.enabled) return;
 
-    final now = state._clockMs;
-    final opacity = state._controller.settings.opacity;
+    developer.Timeline.startSync('Danmaku.paint');
+    try {
+      final now = state._clockMs;
+      final opacity = state._controller.settings.opacity;
 
-    // 当不透明度为 1 时无需 saveLayer，提升绘制效率
-    final needsOpacityLayer = opacity < 0.99;
-    if (needsOpacityLayer) {
-      canvas.saveLayer(
-        Offset.zero & size,
-        Paint()..color = Color.fromRGBO(0, 0, 0, opacity.clamp(0.0, 1.0)),
-      );
-    }
-
-    for (final entry in state._activeEntries) {
-      final double x;
-      if (entry.mode == DanmakuMode.scroll) {
-        x = size.width - (now - entry.startMs) * entry.speed;
-      } else {
-        x = entry.x;
+      // 当不透明度为 1 时无需 saveLayer，提升绘制效率
+      final needsOpacityLayer = opacity < 0.99;
+      if (needsOpacityLayer) {
+        canvas.saveLayer(
+          Offset.zero & size,
+          Paint()..color = Color.fromRGBO(0, 0, 0, opacity.clamp(0.0, 1.0)),
+        );
       }
 
-      final textSize = entry.layout.size;
-      // 视口外剔除，节省 GPU 负担
-      if (x >= size.width || x + textSize.width <= 0) continue;
-      if (entry.y >= size.height || entry.y + textSize.height <= 0) continue;
+      for (final entry in state._activeEntries) {
+        final double x;
+        if (entry.mode == DanmakuMode.scroll) {
+          x = size.width - (now - entry.startMs) * entry.speed;
+        } else {
+          x = entry.x;
+        }
 
-      entry.layout.paint(canvas, Offset(x, entry.y));
-    }
+        final textSize = entry.layout.size;
+        // 视口外剔除，节省 GPU 负担
+        if (x >= size.width || x + textSize.width <= 0) continue;
+        if (entry.y >= size.height || entry.y + textSize.height <= 0) continue;
 
-    if (needsOpacityLayer) {
-      canvas.restore();
+        entry.layout.paint(canvas, Offset(x, entry.y));
+      }
+
+      if (needsOpacityLayer) {
+        canvas.restore();
+      }
+    } finally {
+      developer.Timeline.finishSync();
     }
   }
 
