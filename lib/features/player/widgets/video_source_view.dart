@@ -820,14 +820,18 @@ class _VideoSourceViewState extends State<VideoSourceView> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          kw,
-                          style: TextStyle(
-                            fontFamily: theme.textTheme.bodySmall?.fontFamily,
-                            fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
-                            fontSize: 11,
-                            color: isCurrentKw ? primaryColor : theme.colorScheme.onSurface,
-                            fontWeight: isCurrentKw ? FontWeight.w600 : FontWeight.normal,
+                        Flexible(
+                          child: Text(
+                            kw,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: theme.textTheme.bodySmall?.fontFamily,
+                              fontFamilyFallback: theme.textTheme.bodySmall?.fontFamilyFallback,
+                              fontSize: 11,
+                              color: isCurrentKw ? primaryColor : theme.colorScheme.onSurface,
+                              fontWeight: isCurrentKw ? FontWeight.w600 : FontWeight.normal,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 4),
