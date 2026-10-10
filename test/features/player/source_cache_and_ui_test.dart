@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
-import 'package:zakoni/features/player/source/source_aggregator.dart';
-import 'package:zakoni/features/player/source/source_keyword_matcher.dart';
-import 'package:zakoni/features/player/widgets/video_source_view.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_item.dart';
+import 'package:zakoway/features/player/source/source_aggregator.dart';
+import 'package:zakoway/features/player/source/source_keyword_matcher.dart';
+import 'package:zakoway/features/player/widgets/video_source_view.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

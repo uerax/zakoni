@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/widgets/video_player_layouts.dart';
+import 'package:zakoway/features/player/widgets/video_player_layouts.dart';
 
 void main() {
   group('VideoPlayerDesktopLayout 桌面端黄金比例布局测试', () {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/utils/responsive.dart';
+import 'package:zakoway/core/utils/responsive.dart';
 
 void main() {
   group('AppBreakpoints tests', () {

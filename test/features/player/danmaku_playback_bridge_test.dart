@@ -1,17 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('DanmakuPlaybackBridge 解耦响应式同步测试', () {
-    late ZakoniPlaybackController playback;
+    late ZakowayPlaybackController playback;
     late DanmakuController danmaku;
     late DanmakuPlaybackBridge bridge;
 
     setUp(() {
-      playback = ZakoniPlaybackController();
+      playback = ZakowayPlaybackController();
       danmaku = DanmakuController();
       bridge = DanmakuPlaybackBridge(
         playbackController: playback,

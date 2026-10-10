@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/controller/playback_state.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
-import 'package:zakoni/features/player/widgets/controls/danmaku_settings_icon.dart';
-import 'package:zakoni/features/player/widgets/player_controls.dart';
-import 'package:zakoni/features/player/widgets/player_indicators.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/controller/playback_state.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/widgets/controls/danmaku_settings_icon.dart';
+import 'package:zakoway/features/player/widgets/player_controls.dart';
+import 'package:zakoway/features/player/widgets/player_indicators.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('PlayerControls 现代交互与控制增强测试', () {
-    late ZakoniPlaybackController controller;
+    late ZakowayPlaybackController controller;
     late DanmakuController danmakuController;
 
     setUp(() {
       danmakuController = DanmakuController();
-      controller = ZakoniPlaybackController();
+      controller = ZakowayPlaybackController();
     });
 
     tearDown(() async {

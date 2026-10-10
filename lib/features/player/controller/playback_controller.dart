@@ -5,9 +5,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:zakoni/core/services/network_connectivity_service.dart';
-import 'package:zakoni/features/player/controller/playback_state.dart';
-import 'package:zakoni/features/player/services/player_preferences_service.dart';
+import 'package:zakoway/core/services/network_connectivity_service.dart';
+import 'package:zakoway/features/player/controller/playback_state.dart';
+import 'package:zakoway/features/player/services/player_preferences_service.dart';
 
 const String _kDefaultUserAgent =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
@@ -25,10 +25,10 @@ const int _kMobileBufferSize = 16 * 1024 * 1024; // 16MB
 const int _kMobileMaxBytes = 16 * 1024 * 1024; // 16MB
 const int _kMobileMaxBackBytes = 4 * 1024 * 1024; // 4MB
 
-/// zakoni 视频播放引擎控制器
+/// zakoway 视频播放引擎控制器
 /// 封装 media_kit (libmpv) 底层驱动，支持 250ms 节流解耦、倍速变调修正与切片断流自动重试
-class ZakoniPlaybackController {
-  ZakoniPlaybackController();
+class ZakowayPlaybackController {
+  ZakowayPlaybackController();
 
   /// 低频宏观控制状态
   final ValueNotifier<PlaybackCoreState> core =
@@ -75,7 +75,7 @@ class ZakoniPlaybackController {
     final player = Player(
       configuration: PlayerConfiguration(
         bufferSize: initialBufferSize,
-        title: 'zakoni Player',
+        title: 'zakoway Player',
       ),
     );
     _player = player;
@@ -208,7 +208,7 @@ class ZakoniPlaybackController {
         }
       }
     } catch (e) {
-      debugPrint('[ZakoniPlayback] 配置 mpv 属性失败: $e');
+      debugPrint('[ZakowayPlayback] 配置 mpv 属性失败: $e');
     }
   }
 
@@ -228,12 +228,12 @@ class ZakoniPlaybackController {
         await platform.setProperty('demuxer-max-bytes', maxBytes.toString());
         await platform.setProperty('demuxer-max-back-bytes', maxBackBytes.toString());
         debugPrint(
-          '[ZakoniPlayback] 网络类型动态变更，已热更新解复用缓冲: '
+          '[ZakowayPlayback] 网络类型动态变更，已热更新解复用缓冲: '
           '${isMetered ? "移动蜂窝数据模式(16MB)" : "高速Wi-Fi/有线模式(150MB)"}',
         );
       }
     } catch (e) {
-      debugPrint('[ZakoniPlayback] 动态热更新解复用缓冲失败: $e');
+      debugPrint('[ZakowayPlayback] 动态热更新解复用缓冲失败: $e');
     }
   }
 
@@ -505,7 +505,7 @@ class ZakoniPlaybackController {
       if (totalDur > const Duration(seconds: 5) &&
           currentPos < totalDur - const Duration(seconds: 2)) {
         debugPrint(
-          '[ZakoniPlayback] 忽略中途非正常 EOF 信号 (当前: ${currentPos.inSeconds}s, 总长: ${totalDur.inSeconds}s)',
+          '[ZakowayPlayback] 忽略中途非正常 EOF 信号 (当前: ${currentPos.inSeconds}s, 总长: ${totalDur.inSeconds}s)',
         );
         return;
       }
@@ -532,7 +532,7 @@ class ZakoniPlaybackController {
         lower.contains('ffurl_read returned') ||
         lower.contains('end of file') ||
         lower.contains('connection reset by peer')) {
-      debugPrint('[ZakoniPlayback] 忽略底层网络断流/Seek良性重连日志: $error');
+      debugPrint('[ZakowayPlayback] 忽略底层网络断流/Seek良性重连日志: $error');
       return;
     }
 

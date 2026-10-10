@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zakoni/core/services/app_preferences.dart';
-import 'package:zakoni/core/utils/appearance_manager.dart';
-import 'package:zakoni/features/settings/widgets/wallpaper_settings_tile.dart';
+import 'package:zakoway/core/services/app_preferences.dart';
+import 'package:zakoway/core/utils/appearance_manager.dart';
+import 'package:zakoway/features/settings/widgets/wallpaper_settings_tile.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

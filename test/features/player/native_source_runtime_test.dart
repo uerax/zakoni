@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/source/native_source_runtime.dart';
+import 'package:zakoway/features/player/source/native_source_runtime.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

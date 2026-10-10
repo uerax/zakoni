@@ -3,16 +3,16 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_calendar.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
-import 'package:zakoni/core/models/home/recommend_item.dart';
-import 'package:zakoni/core/network/bangumi_client.dart';
-import 'package:zakoni/core/services/watch_history_service.dart';
-import 'package:zakoni/features/home/pages/home_page.dart';
-import 'package:zakoni/features/home/widgets/continue_watching_shelf.dart';
-import 'package:zakoni/features/home/widgets/daily_spotlight_card.dart';
-import 'package:zakoni/features/home/widgets/home_desktop_hero.dart';
-import 'package:zakoni/features/home/widgets/today_anime_shelf.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_calendar.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_item.dart';
+import 'package:zakoway/core/models/home/recommend_item.dart';
+import 'package:zakoway/core/network/bangumi_client.dart';
+import 'package:zakoway/core/services/watch_history_service.dart';
+import 'package:zakoway/features/home/pages/home_page.dart';
+import 'package:zakoway/features/home/widgets/continue_watching_shelf.dart';
+import 'package:zakoway/features/home/widgets/daily_spotlight_card.dart';
+import 'package:zakoway/features/home/widgets/home_desktop_hero.dart';
+import 'package:zakoway/features/home/widgets/today_anime_shelf.dart';
 
 BangumiItem _createMockItem(int id, String name, double score) {
   return BangumiItem(

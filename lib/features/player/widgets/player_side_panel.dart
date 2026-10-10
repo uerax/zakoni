@@ -2,14 +2,14 @@ import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/controller/playback_state.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
-import 'package:zakoni/features/player/source/source_aggregator.dart';
-import 'package:zakoni/features/player/source/utils/playable_slot_engine.dart';
-import 'package:zakoni/core/services/watched_episodes_service.dart';
-import 'package:zakoni/features/player/widgets/episode_picker_section.dart';
-import 'package:zakoni/features/player/widgets/video_source_view.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/controller/playback_state.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/source/source_aggregator.dart';
+import 'package:zakoway/features/player/source/utils/playable_slot_engine.dart';
+import 'package:zakoway/core/services/watched_episodes_service.dart';
+import 'package:zakoway/features/player/widgets/episode_picker_section.dart';
+import 'package:zakoway/features/player/widgets/video_source_view.dart';
 
 /// 全屏侧边抽屉 Tab 枚举
 enum PlayerSidePanelTab {
@@ -78,7 +78,7 @@ class PlayerSidePanel extends StatefulWidget {
 
   // 弹幕与播放控制
   final DanmakuController? danmakuController;
-  final ZakoniPlaybackController? controller;
+  final ZakowayPlaybackController? controller;
 
   @override
   State<PlayerSidePanel> createState() => _PlayerSidePanelState();

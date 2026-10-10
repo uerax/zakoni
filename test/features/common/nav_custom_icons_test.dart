@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/common/widgets/app_floating_bottom_bar.dart';
-import 'package:zakoni/features/common/widgets/nav_custom_icons.dart';
+import 'package:zakoway/features/common/widgets/app_floating_bottom_bar.dart';
+import 'package:zakoway/features/common/widgets/nav_custom_icons.dart';
 
 void main() {
   group('NavCustomIcons', () {

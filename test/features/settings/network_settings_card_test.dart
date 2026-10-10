@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zakoni/core/constants/app_constants.dart';
-import 'package:zakoni/core/network/bangumi_client.dart';
-import 'package:zakoni/core/services/app_preferences.dart';
-import 'package:zakoni/features/common/widgets/ios_swipe_action_tile.dart';
-import 'package:zakoni/features/settings/widgets/network_settings_card.dart';
+import 'package:zakoway/core/constants/app_constants.dart';
+import 'package:zakoway/core/network/bangumi_client.dart';
+import 'package:zakoway/core/services/app_preferences.dart';
+import 'package:zakoway/features/common/widgets/ios_swipe_action_tile.dart';
+import 'package:zakoway/features/settings/widgets/network_settings_card.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

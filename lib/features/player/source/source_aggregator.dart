@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_item.dart';
 import 'models/source_models.dart';
 import 'services/plugin_circuit_breaker.dart';
 import 'services/source_binding_service.dart';

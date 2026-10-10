@@ -1,11 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
-import 'package:zakoni/core/services/watched_episodes_service.dart';
-import 'package:zakoni/features/common/widgets/bouncing_scale_card.dart';
-import 'package:zakoni/features/player/source/models/source_models.dart';
-import 'package:zakoni/features/player/source/source_aggregator.dart';
-import 'package:zakoni/features/player/source/utils/playable_slot_engine.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_item.dart';
+import 'package:zakoway/core/services/watched_episodes_service.dart';
+import 'package:zakoway/features/common/widgets/bouncing_scale_card.dart';
+import 'package:zakoway/features/player/source/models/source_models.dart';
+import 'package:zakoway/features/player/source/source_aggregator.dart';
+import 'package:zakoway/features/player/source/utils/playable_slot_engine.dart';
 import 'episode_picker_section.dart';
 import 'video_source_view.dart';
 import 'watch_meta_view.dart';

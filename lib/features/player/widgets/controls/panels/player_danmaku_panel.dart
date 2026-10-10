@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
 import 'player_panel_widgets.dart';
 
 enum _DanmakuTab { search, settings, import }

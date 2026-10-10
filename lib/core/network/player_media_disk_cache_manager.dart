@@ -9,7 +9,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 /// 3. 支持 App 重启后从硬盘 0ms 秒级恢复；
 /// 4. 支持 LRU 自动淘汰、磁盘容量统计与一键清空。
 class PlayerMediaDiskCacheManager extends CacheManager {
-  static const key = 'zakoni_player_media_disk_cache';
+  static const key = 'zakoway_player_media_disk_cache';
 
   static PlayerMediaDiskCacheManager? _instance;
 

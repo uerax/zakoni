@@ -1,11 +1,11 @@
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/danmaku/core/danmaku_controller.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/danmaku/core/danmaku_controller.dart';
 
 /// 播放器内核与弹幕状态机的单向响应式解耦同步桥接器
 ///
 /// 架构设计说明：
-/// 1. 彻底解耦 ZakoniPlaybackController 与 DanmakuController，播放控制器不再直接持有弹幕实例；
-/// 2. 单向监听 ZakoniPlaybackController 的 core 与 timeline 状态流，按需驱动弹幕时钟与启停；
+/// 1. 彻底解耦 ZakowayPlaybackController 与 DanmakuController，播放控制器不再直接持有弹幕实例；
+/// 2. 单向监听 ZakowayPlaybackController 的 core 与 timeline 状态流，按需驱动弹幕时钟与启停；
 /// 3. 随宿主生命周期销毁（优先于 Controller 销毁）：在 dispose() 中立即解除所有监听，
 ///    从根本上阻断任何后台异步 IPC / 微任务对已销毁弹幕控制器的非法反冲调用。
 class DanmakuPlaybackBridge {
@@ -21,7 +21,7 @@ class DanmakuPlaybackBridge {
     _syncDanmakuRunningState();
   }
 
-  final ZakoniPlaybackController playbackController;
+  final ZakowayPlaybackController playbackController;
   final DanmakuController danmakuController;
   bool _disposed = false;
 

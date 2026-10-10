@@ -1,11 +1,11 @@
-# zakoni 视频播放系统架构与设计选型规范
-> 本文档基于对 **animaku (Web)**、**Kazumi (Flutter)**、**AniBaka (Flutter)** 三大项目的源码深度调研，为 **zakoni (Flutter)** 制定工业级、跨平台的动漫播放系统落地规范与技术路线图。
+# zakoway 视频播放系统架构与设计选型规范
+> 本文档基于对 **animaku (Web)**、**Kazumi (Flutter)**、**AniBaka (Flutter)** 三大项目的源码深度调研，为 **zakoway (Flutter)** 制定工业级、跨平台的动漫播放系统落地规范与技术路线图。
 
 ---
 
 ## 1. 架构目标与设计哲学
 
-zakoni 作为 animaku 的移动与多端增强版本，播放模块需同时满足：
+zakoway 作为 animaku 的移动与多端增强版本，播放模块需同时满足：
 1. **极致播放性能与跨平台稳定性**：适配 Android、iOS、Windows、macOS、Linux，支持硬解与自适应渲染。
 2. **继承 animaku 最强业务大脑**：直接移植经过实战验证的**多源并发探测、智能仲裁、自动故障转移算法**。
 3. **吸收 Kazumi 的多端工程化体验**：全屏/宽屏下的**悬浮侧边抽屉（SidePanel）**，选集与换源无需打断播放。
@@ -171,7 +171,7 @@ zakoni 作为 animaku 的移动与多端增强版本，播放模块需同时满�
 - [ ] 引入 `media_kit`、`media_kit_video` 相关依赖，配置各平台原生构建参数；
 - [ ] 封装 `PlaybackController`，实现基础的播放、暂停、Seek、音量、倍速控制；
 - [ ] 构建双层状态系统：将高频时间线 `TimelineState` 与 UI 控制 `CoreState` 彻底物理隔离；
-- [ ] 完成基础播放器组件 `ZakoniPlayer` 及其移动端竖屏与桌面端窗口的基础呈现。
+- [ ] 完成基础播放器组件 `ZakowayPlayer` 及其移动端竖屏与桌面端窗口的基础呈现。
 
 ### 阶段二：源调度系统与数据联动 (Source & Business Integration)
 - [ ] 将 animaku 的 `use-auto-source-pick`（优先级排序、0ms秒提、1200ms宽限期、自动 Fallback）移植为 Dart 单测可验证的领域逻辑；

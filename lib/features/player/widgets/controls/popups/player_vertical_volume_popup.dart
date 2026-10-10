@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/controller/playback_state.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/controller/playback_state.dart';
 
 /// 专用原生垂直音量滑槽组件：
 /// 纯手势驱动（无需 RotatedBox），基于局部 Y 轴高度精准响应点击与上下拖动，
@@ -102,7 +102,7 @@ class PlayerVerticalVolumePopup extends StatelessWidget {
     required this.onVolumeChanged,
   });
 
-  final ZakoniPlaybackController controller;
+  final ZakowayPlaybackController controller;
   final Color primaryColor;
   final ValueChanged<double> onVolumeChanged;
 

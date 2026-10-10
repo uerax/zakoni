@@ -1,13 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_search_result.dart';
-import 'package:zakoni/core/network/bangumi_search_query_builder.dart';
-import 'package:zakoni/core/services/app_preferences.dart';
-import 'package:zakoni/features/search/controllers/search_history_notifier.dart';
-import 'package:zakoni/features/search/controllers/search_state.dart';
-import 'package:zakoni/features/search/models/search_types.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_item.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_search_result.dart';
+import 'package:zakoway/core/network/bangumi_search_query_builder.dart';
+import 'package:zakoway/core/services/app_preferences.dart';
+import 'package:zakoway/features/search/controllers/search_history_notifier.dart';
+import 'package:zakoway/features/search/controllers/search_state.dart';
+import 'package:zakoway/features/search/models/search_types.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

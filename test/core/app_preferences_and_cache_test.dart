@@ -1,12 +1,12 @@
 import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zakoni/core/network/bangumi_client.dart';
-import 'package:zakoni/core/services/app_preferences.dart';
-import 'package:zakoni/core/theme/app_theme_color.dart';
-import 'package:zakoni/core/utils/appearance_manager.dart';
-import 'package:zakoni/core/utils/font_manager.dart';
-import 'package:zakoni/core/utils/image_utils.dart';
+import 'package:zakoway/core/network/bangumi_client.dart';
+import 'package:zakoway/core/services/app_preferences.dart';
+import 'package:zakoway/core/theme/app_theme_color.dart';
+import 'package:zakoway/core/utils/appearance_manager.dart';
+import 'package:zakoway/core/utils/font_manager.dart';
+import 'package:zakoway/core/utils/image_utils.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

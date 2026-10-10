@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_calendar.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_collection.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_episode.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
-import 'package:zakoni/core/utils/html_utils.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_calendar.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_collection.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_episode.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_item.dart';
+import 'package:zakoway/core/utils/html_utils.dart';
 
 void main() {
   group('decodeHtmlEntities', () {

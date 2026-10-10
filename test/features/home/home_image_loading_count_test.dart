@@ -3,10 +3,10 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/network/bangumi_client.dart';
-import 'package:zakoni/features/common/widgets/cached_anime_image.dart';
-import 'package:zakoni/features/home/pages/home_page.dart';
-import 'package:zakoni/features/home/widgets/rank_horizontal_section.dart';
+import 'package:zakoway/core/network/bangumi_client.dart';
+import 'package:zakoway/features/common/widgets/cached_anime_image.dart';
+import 'package:zakoway/features/home/pages/home_page.dart';
+import 'package:zakoway/features/home/widgets/rank_horizontal_section.dart';
 
 Map<String, dynamic> _generateMockJson(String prefix, int index) {
   return {

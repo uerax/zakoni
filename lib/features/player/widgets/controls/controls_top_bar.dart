@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
-import 'package:zakoni/features/player/widgets/player_side_panel.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/widgets/player_side_panel.dart';
 
 /// 顶部药丸微光按钮
 class PlayerPillButton extends StatelessWidget {

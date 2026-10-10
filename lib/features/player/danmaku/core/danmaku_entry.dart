@@ -1,5 +1,5 @@
-import 'package:zakoni/features/player/danmaku/models/danmaku_item.dart';
-import 'package:zakoni/features/player/danmaku/view/danmaku_text_layout.dart';
+import 'package:zakoway/features/player/danmaku/models/danmaku_item.dart';
+import 'package:zakoway/features/player/danmaku/view/danmaku_text_layout.dart';
 
 /// 屏幕上正在活动的弹幕运行时实体
 class DanmakuEntry {

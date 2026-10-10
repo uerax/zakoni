@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
-import 'package:zakoni/core/network/bangumi_client.dart';
-import 'package:zakoni/core/services/daily_recommend_service.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_item.dart';
+import 'package:zakoway/core/network/bangumi_client.dart';
+import 'package:zakoway/core/services/daily_recommend_service.dart';
 
 class MockDailyClientAdapter implements HttpClientAdapter {
   final List<Map<String, dynamic>> recordedPayloads = [];

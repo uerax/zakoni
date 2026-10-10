@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:zakoni/features/player/danmaku/models/danmaku_item.dart';
-import 'package:zakoni/features/player/danmaku/utils/danmaku_filter_engine.dart';
-import 'package:zakoni/features/player/services/player_preferences_service.dart';
+import 'package:zakoway/features/player/danmaku/models/danmaku_item.dart';
+import 'package:zakoway/features/player/danmaku/utils/danmaku_filter_engine.dart';
+import 'package:zakoway/features/player/services/player_preferences_service.dart';
 
 /// 弹幕事件监听接口，由视图层 DanmakuView 实现并绑定
 abstract interface class DanmakuListener {

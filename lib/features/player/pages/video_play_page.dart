@@ -25,7 +25,7 @@ import '../widgets/video_player_surface_with_controls.dart';
 import '../widgets/video_play_tabs.dart';
 import '../widgets/video_source_view.dart';
 
-/// zakoni 统一多端视频播放页面 (1:1 严格对齐 animaku 完整视频源生命周期与架构规范)
+/// zakoway 统一多端视频播放页面 (1:1 严格对齐 animaku 完整视频源生命周期与架构规范)
 ///
 /// 核心流程与规范：
 /// 1. 初始 0ms 直开: 检查 SourceBindingService，若命中该番剧在该源的历史绑定，直接取 sourceUrl 提取分集，跳过搜索；
@@ -77,7 +77,7 @@ class VideoPlayPage extends StatefulWidget {
 
 class _VideoPlayPageState extends State<VideoPlayPage>
     with SingleTickerProviderStateMixin {
-  late final ZakoniPlaybackController _playbackController;
+  late final ZakowayPlaybackController _playbackController;
   late final DanmakuController _danmakuController;
   late final DanmakuPlaybackBridge _danmakuBridge;
   late final DanmakuSessionCoordinator _danmakuCoordinator;
@@ -192,7 +192,7 @@ class _VideoPlayPageState extends State<VideoPlayPage>
     _danmakuCoordinator = DanmakuSessionCoordinator(
       danmakuController: _danmakuController,
     );
-    _playbackController = ZakoniPlaybackController();
+    _playbackController = ZakowayPlaybackController();
     _danmakuBridge = DanmakuPlaybackBridge(
       playbackController: _playbackController,
       danmakuController: _danmakuController,

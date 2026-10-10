@@ -3,10 +3,10 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/network/bangumi_client.dart';
-import 'package:zakoni/features/category/pages/category_page.dart';
-import 'package:zakoni/features/common/widgets/nav_custom_icons.dart';
-import 'package:zakoni/main.dart';
+import 'package:zakoway/core/network/bangumi_client.dart';
+import 'package:zakoway/features/category/pages/category_page.dart';
+import 'package:zakoway/features/common/widgets/nav_custom_icons.dart';
+import 'package:zakoway/main.dart';
 
 class ImmediateMockAdapter implements HttpClientAdapter {
   @override
@@ -31,12 +31,12 @@ class ImmediateMockAdapter implements HttpClientAdapter {
 }
 
 void main() {
-  testWidgets('ZakoniApp smoke test with navigation and settings', (WidgetTester tester) async {
+  testWidgets('ZakowayApp smoke test with navigation and settings', (WidgetTester tester) async {
     final dio = Dio();
     dio.httpClientAdapter = ImmediateMockAdapter();
     final client = BangumiClient(dio: dio);
 
-    await tester.pumpWidget(ZakoniApp(client: client));
+    await tester.pumpWidget(ZakowayApp(client: client));
     await tester.pumpAndSettle();
 
     // 检查顶部全宽沉浸式栏：搜索栏占位文字
@@ -75,7 +75,7 @@ void main() {
     dio.httpClientAdapter = ImmediateMockAdapter();
     final client = BangumiClient(dio: dio);
 
-    await tester.pumpWidget(ZakoniApp(client: client));
+    await tester.pumpWidget(ZakowayApp(client: client));
     await tester.pump();
 
     // 刚打开应用时（仅激活 Tab 0 首页）：分类页与设置页未挂载，杜绝后台偷跑网络
@@ -110,7 +110,7 @@ void main() {
       tester.view.resetDevicePixelRatio();
     });
 
-    await tester.pumpWidget(ZakoniApp(client: client));
+    await tester.pumpWidget(ZakowayApp(client: client));
     await tester.pumpAndSettle();
 
     expect(find.text('搜索番剧、剧场版、特别篇...'), findsOneWidget);

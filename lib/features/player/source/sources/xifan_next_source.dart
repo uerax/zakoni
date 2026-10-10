@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:zakoni/core/network/bangumi_data_disk_cache_manager.dart';
+import 'package:zakoway/core/network/bangumi_data_disk_cache_manager.dart';
 import '../models/source_models.dart';
 import 'video_source.dart';
 

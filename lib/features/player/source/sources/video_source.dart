@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:zakoni/features/player/source/models/source_models.dart';
+import 'package:zakoway/features/player/source/models/source_models.dart';
 
 /// 安全解析任意 Dio 响应（无论服务器以 text/html、text/plain 或 application/json 返回）
 Map<String, dynamic>? parseJsonMap(dynamic data) {

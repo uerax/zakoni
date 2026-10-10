@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
 
 void main() {
   group('DanmakuTextNormalizer 文本归一化测试', () {

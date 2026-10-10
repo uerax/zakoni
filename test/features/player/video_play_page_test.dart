@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/pages/video_play_page.dart';
-import 'package:zakoni/features/player/widgets/episode_picker_section.dart';
-import 'package:zakoni/features/player/widgets/video_source_view.dart';
+import 'package:zakoway/features/player/pages/video_play_page.dart';
+import 'package:zakoway/features/player/widgets/episode_picker_section.dart';
+import 'package:zakoway/features/player/widgets/video_source_view.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:zakoni/core/utils/font_manager.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/controller/playback_state.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/core/utils/font_manager.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/controller/playback_state.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
 
 /// 纯视频画面与弹幕复合渲染表面
 /// 严格使用 RepaintBoundary 对视频画面和弹幕图层进行独立光栅化隔离
@@ -15,7 +15,7 @@ class VideoSurface extends StatelessWidget {
     this.overlay,
   });
 
-  final ZakoniPlaybackController controller;
+  final ZakowayPlaybackController controller;
   final DanmakuController? danmakuController;
   final Widget? overlay;
 

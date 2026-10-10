@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zakoni/features/player/danmaku/models/danmaku_item.dart';
-import 'package:zakoni/features/player/danmaku/source/dandan_config_manager.dart';
-import 'package:zakoni/features/player/services/player_preferences_service.dart';
-import 'package:zakoni/features/player/source/models/source_models.dart';
-import 'package:zakoni/features/player/source/native_source_runtime.dart';
-import 'package:zakoni/features/player/source/sources/video_source.dart';
+import 'package:zakoway/features/player/danmaku/models/danmaku_item.dart';
+import 'package:zakoway/features/player/danmaku/source/dandan_config_manager.dart';
+import 'package:zakoway/features/player/services/player_preferences_service.dart';
+import 'package:zakoway/features/player/source/models/source_models.dart';
+import 'package:zakoway/features/player/source/native_source_runtime.dart';
+import 'package:zakoway/features/player/source/sources/video_source.dart';
 
 class _FakeVideoSource extends VideoSource {
   int searchCount = 0;

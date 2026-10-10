@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
 
 void main() {
   group('DanmakuEpisodeMatcher 智能集数匹配测试', () {

@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/constants/app_constants.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_collection.dart';
-import 'package:zakoni/core/network/bangumi_client.dart';
+import 'package:zakoway/core/constants/app_constants.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_collection.dart';
+import 'package:zakoway/core/network/bangumi_client.dart';
 
 class MockAdapter implements HttpClientAdapter {
   final Map<String, dynamic> Function(RequestOptions options) handler;
@@ -41,11 +41,11 @@ void main() {
     late BangumiClient client;
 
     test('defaultUserAgent matches Bangumi API developer guidelines', () {
-      expect(BangumiClient.defaultUserAgent, contains('uerax/zakoni/${AppConstants.appVersion}'));
-      expect(BangumiClient.defaultUserAgent, contains('https://github.com/uerax/zakoni'));
+      expect(BangumiClient.defaultUserAgent, contains('uerax/zakoway/${AppConstants.appVersion}'));
+      expect(BangumiClient.defaultUserAgent, contains('https://github.com/uerax/zakoway'));
       expect(
         BangumiClient.buildUserAgent(version: '2.0.0', platform: 'Android'),
-        'uerax/zakoni/2.0.0 (Android) (https://github.com/uerax/zakoni)',
+        'uerax/zakoway/2.0.0 (Android) (https://github.com/uerax/zakoway)',
       );
     });
 

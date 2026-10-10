@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:zakoni/features/player/danmaku/source/dandan_config_manager.dart';
+import 'package:zakoway/features/player/danmaku/source/dandan_config_manager.dart';
 import 'm3_settings_card.dart';
 import 'tg_action_sheet.dart';
 import 'tg_form_sheet.dart';

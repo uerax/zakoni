@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/widgets/controls/danmaku_settings_icon.dart';
+import 'package:zakoway/features/player/widgets/controls/danmaku_settings_icon.dart';
 
 void main() {
   testWidgets('DanmakuSettingsIcon renders and paints without errors', (tester) async {

@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/controller/playback_state.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/controller/playback_state.dart';
 
 /// 垂直倍速选择气泡浮层（带毛玻璃背景、降序排布与选中勾选指示）
 class PlayerSpeedPopup extends StatelessWidget {
@@ -13,7 +13,7 @@ class PlayerSpeedPopup extends StatelessWidget {
     this.compact = false,
   });
 
-  final ZakoniPlaybackController controller;
+  final ZakowayPlaybackController controller;
   final Color primaryColor;
   final ValueChanged<double> onSelectSpeed;
   final bool compact;

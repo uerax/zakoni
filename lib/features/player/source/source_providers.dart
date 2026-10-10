@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:zakoni/features/player/source/models/source_models.dart';
-import 'package:zakoni/features/player/source/source_bundle_manager.dart';
+import 'package:zakoway/features/player/source/models/source_models.dart';
+import 'package:zakoway/features/player/source/source_bundle_manager.dart';
 
 /// 适配器 Bundle 管理器 Provider
 final sourceBundleManagerProvider = Provider<SourceBundleManager>((ref) {

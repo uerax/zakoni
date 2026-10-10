@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zakoni/core/services/app_preferences.dart';
-import 'package:zakoni/core/services/watch_history_service.dart';
-import 'package:zakoni/features/history/pages/history_page.dart';
-import 'package:zakoni/features/home/widgets/continue_watching_shelf.dart';
+import 'package:zakoway/core/services/app_preferences.dart';
+import 'package:zakoway/core/services/watch_history_service.dart';
+import 'package:zakoway/features/history/pages/history_page.dart';
+import 'package:zakoway/features/home/widgets/continue_watching_shelf.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

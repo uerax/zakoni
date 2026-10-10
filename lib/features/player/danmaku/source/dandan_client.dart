@@ -1,8 +1,8 @@
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:zakoni/core/network/player_media_disk_cache_manager.dart';
-import 'package:zakoni/core/utils/timed_cache.dart';
+import 'package:zakoway/core/network/player_media_disk_cache_manager.dart';
+import 'package:zakoway/core/utils/timed_cache.dart';
 import '../models/danmaku_item.dart';
 import '../utils/danmaku_episode_matcher.dart';
 import 'dandan_config_manager.dart';
@@ -146,7 +146,7 @@ class DandanClient {
 
   Map<String, String> _buildHeaders(String path) {
     final headers = <String, String>{
-      'User-Agent': 'Zakoni/1.0.0 (Anime Client)',
+      'User-Agent': 'Zakoway/1.0.0 (Anime Client)',
       'Accept': 'application/json',
     };
 

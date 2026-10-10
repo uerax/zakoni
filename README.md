@@ -1,4 +1,4 @@
-# zakoni
+# zakoway
 
 A new Flutter project.
 

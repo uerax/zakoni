@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/utils/anime_tag_filter.dart';
+import 'package:zakoway/core/utils/anime_tag_filter.dart';
 
 void main() {
   group('AnimeTagFilter tests', () {

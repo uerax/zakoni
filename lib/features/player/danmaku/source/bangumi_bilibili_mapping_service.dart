@@ -11,8 +11,8 @@ class BangumiBilibiliMappingService {
   BangumiBilibiliMappingService._();
   static final BangumiBilibiliMappingService instance = BangumiBilibiliMappingService._();
 
-  static const String _kStorageKey = 'zakoni_bgm_bili_mapping_v1';
-  static const String _kLastSyncKey = 'zakoni_bgm_bili_last_sync_v1';
+  static const String _kStorageKey = 'zakoway_bgm_bili_mapping_v1';
+  static const String _kLastSyncKey = 'zakoway_bgm_bili_last_sync_v1';
   static const int _kSyncIntervalMs = 7 * 24 * 60 * 60 * 1000; // 7 天周期
 
   static const List<String> _kCdnUrls = [

@@ -1,14 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('ZakoniPlaybackController 状态与控制测试', () {
-    late ZakoniPlaybackController controller;
+  group('ZakowayPlaybackController 状态与控制测试', () {
+    late ZakowayPlaybackController controller;
 
     setUp(() {
-      controller = ZakoniPlaybackController();
+      controller = ZakowayPlaybackController();
     });
 
     tearDown(() async {

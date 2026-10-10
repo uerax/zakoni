@@ -1,8 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:zakoni/features/common/widgets/bouncing_scale_card.dart';
-import 'package:zakoni/features/common/widgets/cached_anime_image.dart';
+import 'package:zakoway/features/common/widgets/bouncing_scale_card.dart';
+import 'package:zakoway/features/common/widgets/cached_anime_image.dart';
 
 /// 播放器未起播海报占位组件 (iOS Ambient Placeholder)
 class VideoPlayerInitialPlaceholder extends StatelessWidget {

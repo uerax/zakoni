@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
 
 enum _ActiveVerticalGesture {
   none,
@@ -31,7 +31,7 @@ class PlayerGestureLayer extends StatefulWidget {
     required this.onSpeedIndicatorUpdate,
   });
 
-  final ZakoniPlaybackController controller;
+  final ZakowayPlaybackController controller;
   final bool isLocked;
   final ValueNotifier<double> brightnessNotifier;
   final VoidCallback onToggleControls;

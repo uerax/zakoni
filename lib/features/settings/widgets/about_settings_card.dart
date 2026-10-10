@@ -15,7 +15,7 @@ class AboutSettingsCard extends StatelessWidget {
       children: [
         const M3SettingsSectionHeader(title: '关于应用'),
         M3SettingsCard(
-          footerText: 'Zakoni - 跨平台动漫流媒体播放与番剧追踪客户端',
+          footerText: 'Zakoway - 跨平台动漫流媒体播放与番剧追踪客户端',
           children: [
             M3SettingsTile(
               leading: const M3SettingsIconBox(

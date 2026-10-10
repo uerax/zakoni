@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
-import 'package:zakoni/features/player/services/player_preferences_service.dart';
-import 'package:zakoni/features/player/widgets/controls/danmaku_settings_icon.dart';
-import 'package:zakoni/features/player/widgets/controls/popups/player_speed_popup.dart';
-import 'package:zakoni/features/player/widgets/player_controls.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/services/player_preferences_service.dart';
+import 'package:zakoway/features/player/widgets/controls/danmaku_settings_icon.dart';
+import 'package:zakoway/features/player/widgets/controls/popups/player_speed_popup.dart';
+import 'package:zakoway/features/player/widgets/player_controls.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('PlayerControls 底栏紧凑防溢出与自动连播测试', () {
-    late ZakoniPlaybackController controller;
+    late ZakowayPlaybackController controller;
     late DanmakuController danmakuController;
 
     setUp(() {
       SharedPreferences.setMockInitialValues({});
       danmakuController = DanmakuController();
-      controller = ZakoniPlaybackController();
+      controller = ZakowayPlaybackController();
     });
 
     tearDown(() async {

@@ -1,8 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:zakoni/features/player/source/models/source_models.dart';
-import 'package:zakoni/features/player/source/source_aggregator.dart';
-import 'package:zakoni/features/player/source/source_bundle_manager.dart';
+import 'package:zakoway/features/player/source/models/source_models.dart';
+import 'package:zakoway/features/player/source/source_aggregator.dart';
+import 'package:zakoway/features/player/source/source_bundle_manager.dart';
 import '../../common/widgets/bouncing_scale_card.dart';
 
 /// 视频源实体项

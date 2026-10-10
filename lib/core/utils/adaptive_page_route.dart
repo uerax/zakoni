@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:zakoni/core/utils/instant_page_route.dart';
-import 'package:zakoni/core/utils/responsive.dart';
+import 'package:zakoway/core/utils/instant_page_route.dart';
+import 'package:zakoway/core/utils/responsive.dart';
 
 /// 按平台与窗口宽度选择页面转场（用于带视频画面的全屏页，如播放页）。
 ///

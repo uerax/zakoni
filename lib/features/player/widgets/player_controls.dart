@@ -3,16 +3,16 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:zakoni/core/services/bangumi_oped_service.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/controller/playback_state.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
-import 'package:zakoni/features/player/widgets/player_gesture_layer.dart';
-import 'package:zakoni/features/player/widgets/player_indicators.dart';
-import 'package:zakoni/features/player/widgets/player_side_panel.dart';
-import 'package:zakoni/features/player/widgets/player_skip_toast.dart';
+import 'package:zakoway/core/services/bangumi_oped_service.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/controller/playback_state.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/widgets/player_gesture_layer.dart';
+import 'package:zakoway/features/player/widgets/player_indicators.dart';
+import 'package:zakoway/features/player/widgets/player_side_panel.dart';
+import 'package:zakoway/features/player/widgets/player_skip_toast.dart';
 
-import 'package:zakoni/features/player/services/player_preferences_service.dart';
+import 'package:zakoway/features/player/services/player_preferences_service.dart';
 
 import 'controls/controls_bottom_bar.dart';
 import 'controls/controls_top_bar.dart';
@@ -44,7 +44,7 @@ class PlayerControls extends StatefulWidget {
     this.autoPlayNextNotifier,
   });
 
-  final ZakoniPlaybackController controller;
+  final ZakowayPlaybackController controller;
   final String title;
   final DanmakuController? danmakuController;
   final DanmakuSessionCoordinator? danmakuCoordinator;

@@ -32,11 +32,11 @@ class PlayerPreferencesService extends ChangeNotifier {
   PlayerPreferencesService._();
   static final PlayerPreferencesService instance = PlayerPreferencesService._();
 
-  static const String _kPlaybackRateKey = 'zakoni_player_playback_rate';
-  static const String _kVolumeKey = 'zakoni_player_volume';
-  static const String _kDanmakuSettingsKey = 'zakoni_player_danmaku_settings';
-  static const String _kAutoPlayNextKey = 'zakoni_player_auto_play_next';
-  static const String _kControlBarScaleKey = 'zakoni_player_control_bar_scale';
+  static const String _kPlaybackRateKey = 'zakoway_player_playback_rate';
+  static const String _kVolumeKey = 'zakoway_player_volume';
+  static const String _kDanmakuSettingsKey = 'zakoway_player_danmaku_settings';
+  static const String _kAutoPlayNextKey = 'zakoway_player_auto_play_next';
+  static const String _kControlBarScaleKey = 'zakoway_player_control_bar_scale';
 
   double _playbackRate = 1.0;
   double _volume = 1.0;

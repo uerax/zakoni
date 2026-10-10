@@ -1,23 +1,23 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
-import 'package:zakoni/core/network/player_media_disk_cache_manager.dart';
-import 'package:zakoni/core/utils/timed_cache.dart';
-import 'package:zakoni/features/player/source/models/source_models.dart';
-import 'package:zakoni/features/player/source/sources/anime1_source.dart';
-import 'package:zakoni/features/player/source/sources/animoe_source.dart';
-import 'package:zakoni/features/player/source/sources/cycani_source.dart';
-import 'package:zakoni/features/player/source/sources/girigiri_source.dart';
-import 'package:zakoni/features/player/source/sources/libvio_source.dart';
-import 'package:zakoni/features/player/source/sources/lzizy_source.dart';
-import 'package:zakoni/features/player/source/sources/mifun_source.dart';
-import 'package:zakoni/features/player/source/sources/moonci_source.dart';
-import 'package:zakoni/features/player/source/sources/mxdm_source.dart';
-import 'package:zakoni/features/player/source/sources/omofun_source.dart';
-import 'package:zakoni/features/player/source/sources/sorani_source.dart';
-import 'package:zakoni/features/player/source/sources/tvtfun_source.dart';
-import 'package:zakoni/features/player/source/sources/video_source.dart';
-import 'package:zakoni/features/player/source/sources/xifan_next_source.dart';
+import 'package:zakoway/core/network/player_media_disk_cache_manager.dart';
+import 'package:zakoway/core/utils/timed_cache.dart';
+import 'package:zakoway/features/player/source/models/source_models.dart';
+import 'package:zakoway/features/player/source/sources/anime1_source.dart';
+import 'package:zakoway/features/player/source/sources/animoe_source.dart';
+import 'package:zakoway/features/player/source/sources/cycani_source.dart';
+import 'package:zakoway/features/player/source/sources/girigiri_source.dart';
+import 'package:zakoway/features/player/source/sources/libvio_source.dart';
+import 'package:zakoway/features/player/source/sources/lzizy_source.dart';
+import 'package:zakoway/features/player/source/sources/mifun_source.dart';
+import 'package:zakoway/features/player/source/sources/moonci_source.dart';
+import 'package:zakoway/features/player/source/sources/mxdm_source.dart';
+import 'package:zakoway/features/player/source/sources/omofun_source.dart';
+import 'package:zakoway/features/player/source/sources/sorani_source.dart';
+import 'package:zakoway/features/player/source/sources/tvtfun_source.dart';
+import 'package:zakoway/features/player/source/sources/video_source.dart';
+import 'package:zakoway/features/player/source/sources/xifan_next_source.dart';
 
 /// 100% 纯原生 Dart 视频源运行时与统一缓存调度中心
 /// 涵盖 animaku 全部 12 个核心视频源，配备 L1 内存 + L2 硬盘持久化双层缓存体系

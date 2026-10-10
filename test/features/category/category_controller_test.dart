@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/network/bangumi_client.dart';
-import 'package:zakoni/core/providers/bangumi_providers.dart';
-import 'package:zakoni/features/category/controllers/category_controller.dart';
-import 'package:zakoni/features/category/controllers/category_state.dart';
+import 'package:zakoway/core/network/bangumi_client.dart';
+import 'package:zakoway/core/providers/bangumi_providers.dart';
+import 'package:zakoway/features/category/controllers/category_controller.dart';
+import 'package:zakoway/features/category/controllers/category_state.dart';
 
 void main() {
   group('CategoryFilter & State tests', () {

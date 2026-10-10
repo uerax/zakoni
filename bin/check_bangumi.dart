@@ -1,6 +1,6 @@
 // ignore_for_file: avoid_print
 
-import 'package:zakoni/core/network/bangumi_client.dart';
+import 'package:zakoway/core/network/bangumi_client.dart';
 
 void main() async {
   print('🚀 正在请求 Bangumi 官方 API (https://api.bgm.tv/calendar) ...\n');

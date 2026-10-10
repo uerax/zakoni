@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/widgets/watch_meta_view.dart';
+import 'package:zakoway/features/player/widgets/watch_meta_view.dart';
 
 void main() {
   testWidgets('WatchMetaView 默认无选中追番状态，且支持选中与反选', (tester) async {

@@ -42,13 +42,13 @@ void main() async {
       ? 200 * 1024 * 1024
       : 100 * 1024 * 1024;
 
-  runApp(const ZakoniApp());
+  runApp(const ZakowayApp());
 }
 
-class ZakoniApp extends StatelessWidget {
+class ZakowayApp extends StatelessWidget {
   final BangumiClient? client;
 
-  const ZakoniApp({super.key, this.client});
+  const ZakowayApp({super.key, this.client});
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +68,7 @@ class ZakoniApp extends StatelessWidget {
         final primaryColor = AppearanceManager.instance.primaryColor;
 
         return MaterialApp(
-          title: 'Zakoni 动漫',
+          title: 'Zakoway 动漫',
           debugShowCheckedModeBanner: false,
           scrollBehavior: const AppScrollBehavior(),
           theme: M3ExpressiveTheme.build(

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:zakoni/core/services/bangumi_oped_service.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/controller/playback_state.dart';
-import 'package:zakoni/features/player/services/player_preferences_service.dart';
+import 'package:zakoway/core/services/bangumi_oped_service.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/controller/playback_state.dart';
+import 'package:zakoway/features/player/services/player_preferences_service.dart';
 import 'player_panel_widgets.dart';
 
 /// 播放器设置面板主体（连播与跳过、播放速度、超分辨率 Anime4K、画幅比例、屏幕亮度）
@@ -22,7 +22,7 @@ class PlayerSettingsPanelBody extends StatelessWidget {
     this.onTriggerSkipToast,
   });
 
-  final ZakoniPlaybackController controller;
+  final ZakowayPlaybackController controller;
   final Color primaryColor;
   final ValueNotifier<bool> autoSkipOpedNotifier;
   final ValueNotifier<bool>? autoPlayNextNotifier;

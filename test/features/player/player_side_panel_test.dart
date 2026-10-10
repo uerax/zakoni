@@ -1,9 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
-import 'package:zakoni/features/player/widgets/player_side_panel.dart';
-import 'package:zakoni/features/player/widgets/video_source_view.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/widgets/player_side_panel.dart';
+import 'package:zakoway/features/player/widgets/video_source_view.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

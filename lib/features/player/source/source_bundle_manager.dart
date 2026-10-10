@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:zakoni/features/player/source/models/source_models.dart';
-import 'package:zakoni/features/player/source/native_source_runtime.dart';
+import 'package:zakoway/features/player/source/models/source_models.dart';
+import 'package:zakoway/features/player/source/native_source_runtime.dart';
 
 /// 视频源全局生命周期与调度中心
 /// 运行于高性能 100% 纯原生 Dart 视频源内核

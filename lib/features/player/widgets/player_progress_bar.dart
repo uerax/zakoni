@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:zakoni/core/services/bangumi_oped_service.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/core/services/bangumi_oped_service.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
 
 /// 复合型多功能流体播放进度条
 /// 整合了：

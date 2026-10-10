@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_item.dart';
 import 'models/source_models.dart';
 import 'utils/chinese_s2t_converter.dart';
 

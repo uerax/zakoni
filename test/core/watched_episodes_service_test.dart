@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zakoni/core/models/history/watch_history_item.dart';
-import 'package:zakoni/core/services/app_preferences.dart';
-import 'package:zakoni/core/services/watched_episodes_service.dart';
+import 'package:zakoway/core/models/history/watch_history_item.dart';
+import 'package:zakoway/core/services/app_preferences.dart';
+import 'package:zakoway/core/services/watched_episodes_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

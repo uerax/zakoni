@@ -1,18 +1,18 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_episode.dart';
-import 'package:zakoni/core/models/bangumi/bangumi_item.dart';
-import 'package:zakoni/features/player/source/auto_source_pick_coordinator.dart';
-import 'package:zakoni/features/player/source/models/source_models.dart';
-import 'package:zakoni/features/player/source/services/plugin_circuit_breaker.dart';
-import 'package:zakoni/features/player/source/services/source_binding_service.dart';
-import 'package:zakoni/features/player/source/source_aggregator.dart';
-import 'package:zakoni/features/player/source/source_bundle_manager.dart';
-import 'package:zakoni/features/player/source/source_keyword_matcher.dart';
-import 'package:zakoni/features/player/source/sources/video_source.dart';
-import 'package:zakoni/features/player/source/utils/chinese_s2t_converter.dart';
-import 'package:zakoni/features/player/source/utils/playable_slot_engine.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_episode.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_item.dart';
+import 'package:zakoway/features/player/source/auto_source_pick_coordinator.dart';
+import 'package:zakoway/features/player/source/models/source_models.dart';
+import 'package:zakoway/features/player/source/services/plugin_circuit_breaker.dart';
+import 'package:zakoway/features/player/source/services/source_binding_service.dart';
+import 'package:zakoway/features/player/source/source_aggregator.dart';
+import 'package:zakoway/features/player/source/source_bundle_manager.dart';
+import 'package:zakoway/features/player/source/source_keyword_matcher.dart';
+import 'package:zakoway/features/player/source/sources/video_source.dart';
+import 'package:zakoway/features/player/source/utils/chinese_s2t_converter.dart';
+import 'package:zakoway/features/player/source/utils/playable_slot_engine.dart';
 
 BangumiItem _createItem({
   required int id,

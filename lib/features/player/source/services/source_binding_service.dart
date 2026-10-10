@@ -55,7 +55,7 @@ class SourceBindingService {
   SourceBindingService._();
   static final SourceBindingService instance = SourceBindingService._();
 
-  static const String _storageKey = 'zakoni_source_bindings_v1';
+  static const String _storageKey = 'zakoway_source_bindings_v1';
   static const int _maxBindings = 1000;
 
   final Map<String, SourceBindingEntry> _bindings = {};

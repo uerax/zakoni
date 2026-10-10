@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/services/bangumi_oped_service.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
-import 'package:zakoni/features/player/widgets/player_controls.dart';
-import 'package:zakoni/features/player/widgets/player_progress_bar.dart';
-import 'package:zakoni/features/player/widgets/player_skip_toast.dart';
+import 'package:zakoway/core/services/bangumi_oped_service.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/widgets/player_controls.dart';
+import 'package:zakoway/features/player/widgets/player_progress_bar.dart';
+import 'package:zakoway/features/player/widgets/player_skip_toast.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -120,10 +120,10 @@ malformed line
   });
 
   group('PlayerControls 自动跳过片头与撤销联动测试', () {
-    late ZakoniPlaybackController controller;
+    late ZakowayPlaybackController controller;
 
     setUp(() {
-      controller = ZakoniPlaybackController();
+      controller = ZakowayPlaybackController();
     });
 
     tearDown(() async {

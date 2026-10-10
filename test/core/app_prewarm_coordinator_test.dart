@@ -1,9 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zakoni/core/network/bangumi_client.dart';
-import 'package:zakoni/core/services/app_preferences.dart';
-import 'package:zakoni/core/services/app_prewarm_coordinator.dart';
+import 'package:zakoway/core/network/bangumi_client.dart';
+import 'package:zakoway/core/services/app_preferences.dart';
+import 'package:zakoway/core/services/app_prewarm_coordinator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

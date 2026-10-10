@@ -19,9 +19,9 @@ class DandanConfigManager extends ChangeNotifier {
   DandanConfigManager._();
   static final DandanConfigManager instance = DandanConfigManager._();
 
-  static const String _kAppIdKey = 'zakoni_dandan_app_id';
-  static const String _kAppSecretKey = 'zakoni_dandan_app_secret';
-  static const String _kApiEndpointKey = 'zakoni_dandan_api_endpoint';
+  static const String _kAppIdKey = 'zakoway_dandan_app_id';
+  static const String _kAppSecretKey = 'zakoway_dandan_app_secret';
+  static const String _kApiEndpointKey = 'zakoway_dandan_api_endpoint';
 
   /// 默认通用公开客户端凭证 (保证开箱即用，1:1 对齐 animaku dandan.ts)
   static const String fallbackAppId = 'hvf6pzvxcm';
@@ -147,7 +147,7 @@ class DandanConfigManager extends ChangeNotifier {
     final url = '$targetEp$path';
 
     final headers = <String, String>{
-      'User-Agent': 'Zakoni/1.0.0 (Anime Client)',
+      'User-Agent': 'Zakoway/1.0.0 (Anime Client)',
       'Accept': 'application/json',
     };
 

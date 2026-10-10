@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/features/player/danmaku/core/danmaku_perf_stats.dart';
+import 'package:zakoway/features/player/danmaku/core/danmaku_perf_stats.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

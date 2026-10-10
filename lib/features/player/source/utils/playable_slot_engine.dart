@@ -1,4 +1,4 @@
-import 'package:zakoni/core/models/bangumi/bangumi_episode.dart';
+import 'package:zakoway/core/models/bangumi/bangumi_episode.dart';
 import '../models/source_models.dart';
 import '../source_keyword_matcher.dart';
 

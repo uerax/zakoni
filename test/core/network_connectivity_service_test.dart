@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zakoni/core/services/network_connectivity_service.dart';
+import 'package:zakoway/core/services/network_connectivity_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

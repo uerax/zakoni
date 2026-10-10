@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:zakoni/core/services/bangumi_oped_service.dart';
-import 'package:zakoni/core/utils/font_manager.dart';
-import 'package:zakoni/features/player/controller/playback_controller.dart';
-import 'package:zakoni/features/player/controller/playback_state.dart';
-import 'package:zakoni/features/player/danmaku/danmaku.dart';
-import 'package:zakoni/features/player/services/player_preferences_service.dart';
-import 'package:zakoni/features/player/widgets/player_progress_bar.dart';
+import 'package:zakoway/core/services/bangumi_oped_service.dart';
+import 'package:zakoway/core/utils/font_manager.dart';
+import 'package:zakoway/features/player/controller/playback_controller.dart';
+import 'package:zakoway/features/player/controller/playback_state.dart';
+import 'package:zakoway/features/player/danmaku/danmaku.dart';
+import 'package:zakoway/features/player/services/player_preferences_service.dart';
+import 'package:zakoway/features/player/widgets/player_progress_bar.dart';
 import 'danmaku_settings_icon.dart';
 
 /// 底部控制栏响应式尺寸度量规范
@@ -135,7 +135,7 @@ class PlayerControlsBottomBar extends StatelessWidget {
     this.volumeButtonKey,
   });
 
-  final ZakoniPlaybackController controller;
+  final ZakowayPlaybackController controller;
   final Color primaryColor;
   final DanmakuController? danmakuController;
   final EpisodeOpedSegment? opedSegment;

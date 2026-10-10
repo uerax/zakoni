@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.zakoni" "\0"
-            VALUE "FileDescription", "zakoni" "\0"
+            VALUE "CompanyName", "com.zakoway" "\0"
+            VALUE "FileDescription", "zakoway" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "zakoni" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.zakoni. All rights reserved." "\0"
-            VALUE "OriginalFilename", "zakoni.exe" "\0"
-            VALUE "ProductName", "zakoni" "\0"
+            VALUE "InternalName", "zakoway" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.zakoway. All rights reserved." "\0"
+            VALUE "OriginalFilename", "zakoway.exe" "\0"
+            VALUE "ProductName", "zakoway" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
