@@ -8,7 +8,7 @@ void main() {
   group('DanmakuPerfStats 性能埋点统计测试', () {
     test('单秒指标累加与日志格式化输出', () {
       final logs = <String>[];
-      final stats = DanmakuPerfStats(onLog: logs.add);
+      final stats = DanmakuPerfStats(onLog: logs.add, enabled: true);
 
       stats.recordLayoutCreated(3);
       stats.recordMerge(2);
@@ -52,7 +52,7 @@ void main() {
 
     test('60Hz 帧间隔识别与计算', () {
       final logs = <String>[];
-      final stats = DanmakuPerfStats(onLog: logs.add);
+      final stats = DanmakuPerfStats(onLog: logs.add, enabled: true);
 
       // 构造模拟 60Hz (~16.7ms) FrameTiming 数据
       final timings = [
@@ -91,11 +91,37 @@ void main() {
 
     test('统计重置与零状态格式', () {
       final logs = <String>[];
-      final stats = DanmakuPerfStats(onLog: logs.add);
+      final stats = DanmakuPerfStats(onLog: logs.add, enabled: true);
 
       // 没有帧时不输出日志
       stats.flush();
       expect(logs.isEmpty, isTrue);
+    });
+
+    test('默认关闭状态下彻底静默不输出日志且不监听', () {
+      final logs = <String>[];
+      final stats = DanmakuPerfStats(onLog: logs.add, enabled: false);
+
+      expect(stats.isEnabled, isFalse);
+      stats.recordLayoutCreated(10);
+      stats.recordMerge(5);
+      stats.recordDropped(2);
+      stats.updateActiveCount(50);
+      stats.start();
+
+      stats.handleTimings([
+        FrameTiming(
+          vsyncStart: 1000000,
+          buildStart: 1001000,
+          buildFinish: 1002000,
+          rasterStart: 1002500,
+          rasterFinish: 1004500,
+          rasterFinishWallTime: 1004500,
+        ),
+      ]);
+      stats.flush();
+      expect(logs.isEmpty, isTrue);
+      stats.stop();
     });
   });
 }

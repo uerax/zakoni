@@ -3,16 +3,22 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 
 /// 弹幕运行时性能诊断与统计追踪器
-/// 仅在非 Release 构建或开启 DANMAKU_PERF 编译常量时激活
+/// 仅在通过编译常量 DANMAKU_PERF=true 显式开启时激活展示，日常默认静默
 class DanmakuPerfStats {
-  DanmakuPerfStats({this.onLog});
+  DanmakuPerfStats({this.onLog, bool? enabled})
+      : _enabled = enabled ?? defaultEnabled;
 
   /// 自定义日志回调（用于测试捕获或外部重定向），默认使用 debugPrint
   final void Function(String line)? onLog;
 
-  /// 全局性能埋点开关
-  static const bool enabled =
-      !kReleaseMode || bool.fromEnvironment('DANMAKU_PERF', defaultValue: false);
+  /// 全局性能埋点默认开关（默认关闭；仅在编译宏指定 --dart-define=DANMAKU_PERF=true 时激活）
+  static const bool defaultEnabled =
+      bool.fromEnvironment('DANMAKU_PERF', defaultValue: false);
+
+  final bool _enabled;
+
+  /// 当前实例是否处于启用状态
+  bool get isEnabled => _enabled;
 
   bool _isListening = false;
   TimingsCallback? _timingsCallback;
@@ -36,7 +42,7 @@ class DanmakuPerfStats {
 
   /// 启动帧性能采集
   void start() {
-    if (!enabled || _isListening) return;
+    if (!_enabled || _isListening) return;
     _isListening = true;
     _lastFlushTimeMs = DateTime.now().millisecondsSinceEpoch;
     _timingsCallback = _onTimings;
@@ -55,25 +61,25 @@ class DanmakuPerfStats {
 
   /// 记录新建 layout 次数
   void recordLayoutCreated([int count = 1]) {
-    if (!enabled) return;
+    if (!_enabled) return;
     _layoutCount += count;
   }
 
   /// 记录合流吸收次数
   void recordMerge([int count = 1]) {
-    if (!enabled) return;
+    if (!_enabled) return;
     _mergeCount += count;
   }
 
   /// 记录弹幕被丢弃次数
   void recordDropped([int count = 1]) {
-    if (!enabled) return;
+    if (!_enabled) return;
     _droppedCount += count;
   }
 
   /// 更新当前在场活动弹幕数
   void updateActiveCount(int count) {
-    if (!enabled) return;
+    if (!_enabled) return;
     _activeCount = count;
   }
 
@@ -86,6 +92,7 @@ class DanmakuPerfStats {
   /// 处理帧耗时数据（暴露供测试调用）
   @visibleForTesting
   void handleTimings(List<FrameTiming> timings) {
+    if (!_enabled) return;
     for (final timing in timings) {
       _frameCount++;
       final buildUs = timing.buildDuration.inMicroseconds;
@@ -115,7 +122,7 @@ class DanmakuPerfStats {
 
   /// 手动刷新当前统计窗口并输出日志（公开方法方便测试触发）
   void flush([int? nowMs]) {
-    if (_frameCount == 0) return;
+    if (!_enabled || _frameCount == 0) return;
 
     final avgIntervalMs = _intervalCount > 0
         ? (_totalIntervalUs / _intervalCount) / 1000.0
