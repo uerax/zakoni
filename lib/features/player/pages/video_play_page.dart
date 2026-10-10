@@ -1076,9 +1076,12 @@ class _VideoPlayPageState extends State<VideoPlayPage>
       _exitFullscreen();
       return;
     }
-    _saveProgressOnExit();
+    // 进度统一由 dispose 落盘（系统返回键 / 手势返回也走这条路径），这里不再重复写入：
+    // 否则点击返回的瞬间会多触发一次历史落盘 + 全局 notifyListeners，让首页在退场动画期间重建。
     _playbackController.pause();
-    _playbackController.setVolume(0.0);
+    // 仅静音底层播放器，避免退场动画期间还有声音。
+    // 不能用 setVolume(0.0)：它会把 0 写进用户音量偏好，导致下次起播被静音。
+    _playbackController.muteForExit();
     Navigator.of(context).maybePop();
   }
 

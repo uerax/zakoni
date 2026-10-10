@@ -424,6 +424,15 @@ class ZakoniPlaybackController {
     PlayerPreferencesService.instance.saveVolume(clamped).ignore();
   }
 
+  /// 退出页面前静音底层播放器：不改写 UI 音量状态，也不落盘用户音量偏好
+  Future<void> muteForExit() async {
+    final player = _player;
+    if (player == null) return;
+    try {
+      await player.setVolume(0.0);
+    } catch (_) {}
+  }
+
   /// 切换静音
   Future<void> toggleMute() async {
     if (core.value.muted) {
